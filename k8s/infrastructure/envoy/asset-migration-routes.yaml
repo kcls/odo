@@ -1,0 +1,81 @@
+---
+# odo-asset: backwards-compat retrieval for the pre-`current/` directory
+# layout. Files uploaded under the old paths are physically rooted under the
+# old directories, but the UI now requests them (and odo-asset's directory
+# permissions are keyed) under `current/...`. These rules rewrite the legacy
+# path prefixes to the new ones so existing <img src> / download links keep
+# resolving without a data migration:
+#
+#   incident-tracker/photos    -> current/photos
+#   incident-tracker/videos    -> current/videos
+#   incident-tracker/documents -> current/documents
+#   patrons/photos             -> current/patron/photos
+#
+# These must precede the catch-all `odo-asset-file-retrieval` route below;
+# Gateway API matches more-specific PathPrefix values first, but keeping them
+# ordered makes the intent explicit. Same no-JWT-at-envoy rationale applies
+# (see the retrieval route comment): odo-asset self-validates the token.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: odo-asset-legacy-paths
+spec:
+  parentRefs:
+    - name: envoy
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api/v1/odo/asset/files/incident-tracker/photos
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /api/v1/odo/asset/files/current/photos
+      backendRefs:
+        - name: odo-asset
+          namespace: odo-pub
+          port: 8080
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api/v1/odo/asset/files/incident-tracker/videos
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /api/v1/odo/asset/files/current/videos
+      backendRefs:
+        - name: odo-asset
+          namespace: odo-pub
+          port: 8080
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api/v1/odo/asset/files/incident-tracker/documents
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /api/v1/odo/asset/files/current/documents
+      backendRefs:
+        - name: odo-asset
+          namespace: odo-pub
+          port: 8080
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api/v1/odo/asset/files/patrons/photos
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /api/v1/odo/asset/files/current/patron/photos
+      backendRefs:
+        - name: odo-asset
+          namespace: odo-pub
+          port: 8080

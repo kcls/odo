@@ -1,0 +1,59 @@
+<div class="odo-paginator">
+  <label class="odo-paginator-size">
+    <span i18n="Paginator: rows-per-page label">Rows per page:</span>
+    <select (change)="onSizeChange($any($event.target).value)">
+      @for (option of pageSizeOptions(); track option) {
+        <option [value]="option" [selected]="option === pageSize()">
+          {{ option }}
+        </option>
+      }
+    </select>
+  </label>
+
+  <span class="odo-paginator-range" i18n="Paginator: range of rows shown, e.g. 1–25 of 200">
+    {{ rangeStart() }}–{{ rangeEnd() }} of {{ length() }}
+  </span>
+
+  <div class="odo-paginator-nav">
+    <button
+      type="button"
+      class="odo-paginator-btn"
+      [disabled]="!canPrev()"
+      (click)="first()"
+      i18n-aria-label="Paginator: go to first page"
+      aria-label="First page"
+    >
+      <mat-icon>first_page</mat-icon>
+    </button>
+    <button
+      type="button"
+      class="odo-paginator-btn"
+      [disabled]="!canPrev()"
+      (click)="prev()"
+      i18n-aria-label="Paginator: go to previous page"
+      aria-label="Previous page"
+    >
+      <mat-icon>chevron_left</mat-icon>
+    </button>
+    <button
+      type="button"
+      class="odo-paginator-btn"
+      [disabled]="!canNext()"
+      (click)="next()"
+      i18n-aria-label="Paginator: go to next page"
+      aria-label="Next page"
+    >
+      <mat-icon>chevron_right</mat-icon>
+    </button>
+    <button
+      type="button"
+      class="odo-paginator-btn"
+      [disabled]="!canNext()"
+      (click)="last()"
+      i18n-aria-label="Paginator: go to last page"
+      aria-label="Last page"
+    >
+      <mat-icon>last_page</mat-icon>
+    </button>
+  </div>
+</div>

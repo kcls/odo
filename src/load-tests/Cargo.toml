@@ -1,0 +1,19 @@
+[package]
+name = "load-tests"
+version = "0.1.0"
+edition = "2024"
+description = "Load / soak test harness for the odo-* HTTP APIs"
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive", "env"] }
+hdrhistogram = "7"
+humantime = "2"
+rand = "0.9"
+reqwest = { version = "0.12", features = ["json", "multipart"], default-features = false }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.35", features = ["rt-multi-thread", "macros", "time", "sync", "signal"] }
+
+[profile.release]
+debug = false

@@ -1,0 +1,7 @@
+%syntax-version=1.0.0
+%project=odo
+%uri=https://github.com/kcls/odo
+
+001_odo_baseline 2026-08-18T00:00:00Z Bill Erickson <bserickson@kcls.org> # Baseline: complete odo platform schema (squashed at the repo split)
+002_odo_seed [001_odo_baseline] 2026-08-18T00:05:00Z Bill Erickson <bserickson@kcls.org> # Platform seed: odo.* permissions, platform roles, machine accounts, demo org tree
+003_directory_upload_mapping [001_odo_baseline] 2026-08-19T00:00:00Z Bill Erickson <bserickson@kcls.org> # Upload routing (entity_type/category -> path) moves into the directory registry

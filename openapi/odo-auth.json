@@ -1,0 +1,4091 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "odo-auth",
+    "description": "Authentication and authorization service",
+    "license": {
+      "name": ""
+    },
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/v1/odo/auth/authz/permission/create": {
+      "post": {
+        "tags": [
+          "authz-admin"
+        ],
+        "operationId": "create_permission",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePermissionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Newly-created permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PermissionRow"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/auth/authz/permission/delete": {
+      "post": {
+        "tags": [
+          "authz-admin"
+        ],
+        "operationId": "delete_permission",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PermissionCodeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Permission deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthzAdminSuccessResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/auth/authz/permission/list": {
+      "post": {
+        "tags": [
+          "authz-admin"
+        ],
+        "operationId": "list_permissions",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ListPermissionsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Permissions with grant counts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PermissionPage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/auth/authz/permission/update": {
+      "post": {
+        "tags": [
+          "authz-admin"
+        ],
+        "operationId": "update_permission",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePermissionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Updated permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PermissionRow"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/auth/authz/role-permission/create": {
+      "post": {
+        "tags": [
+          "authz-admin"
+        ],
+        "operationId": "create_role_permission",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRolePermissionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Newly-created permission grant",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RolePermissionRow"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/auth/authz/role-permission/delete": {
+      "post": {
+        "tags": [
+          "authz-admin"
+        ],
+        "operationId": "delete_role_permission",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RolePermissionIdRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Permission grant revoked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthzAdminSuccessResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/auth/authz/role-permission/update": {
+      "post": {
+        "tags": [
+          "authz-admin"
+        ],
+        "operationId": "update_role_permission",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRolePermissionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Updated permission grant",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RolePermissionRow"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/auth/authz/role/create": {
+      "post": {
+        "tags": [
+          "authz-admin"
+        ],
+        "operationId": "create_role",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRoleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Newly-created role",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleRow"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/auth/authz/role/delete": {
+      "post": {
+        "tags": [
+          "authz-admin"
+        ],
+        "operationId": "delete_role",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleCodeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Role deleted along with its permission grants",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthzAdminSuccessResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/auth/authz/role/get": {
+      "post": {
+        "tags": [
+          "authz-admin"
+        ],
+        "operationId": "get_role",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleCodeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Role with its permission grants",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleDetailResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/auth/authz/role/list": {
+      "post": {
+        "tags": [
+          "authz-admin"
+        ],
+        "operationId": "list_roles",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ListRolesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Roles with grant and user counts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RolePage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/auth/authz/role/update": {
+      "post": {
+        "tags": [
+          "authz-admin"
+        ],
+        "operationId": "update_role",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRoleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Updated role",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleRow"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/auth/authz/user-has-perm": {
+      "post": {
+        "tags": [
+          "authz"
+        ],
+        "operationId": "user_has_perm",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserHasPermRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Permission check result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthzPermResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/auth/authz/user-has-role": {
+      "post": {
+        "tags": [
+          "authz"
+        ],
+        "operationId": "user_has_role",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserHasRoleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Role check result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthzRoleResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/auth/authz/user-perm-scopes": {
+      "post": {
+        "tags": [
+          "authz-admin"
+        ],
+        "operationId": "user_perm_scopes",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ListAssignmentsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "A user's effective permissions and where each applies",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserPermScopesResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/auth/authz/user-role/create": {
+      "post": {
+        "tags": [
+          "authz-admin"
+        ],
+        "operationId": "create_assignment",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAssignmentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Newly-created role assignment",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentRow"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/auth/authz/user-role/delete": {
+      "post": {
+        "tags": [
+          "authz-admin"
+        ],
+        "operationId": "delete_assignment",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignmentIdRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Role assignment removed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentSuccessResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/auth/authz/user-role/list": {
+      "post": {
+        "tags": [
+          "authz-admin"
+        ],
+        "operationId": "list_assignments",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ListAssignmentsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "A user's role assignments",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListAssignmentsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/auth/authz/user-roles": {
+      "post": {
+        "tags": [
+          "authz"
+        ],
+        "operationId": "user_roles",
+        "responses": {
+          "200": {
+            "description": "User's role assignments",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserRolesResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/auth/authz/users-with-role": {
+      "post": {
+        "tags": [
+          "authz"
+        ],
+        "operationId": "users_with_role",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UsersWithRoleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Subset of user_ids that hold the role",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsersWithRoleResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/auth/login": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "login",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Login successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credentials"
+          }
+        }
+      }
+    },
+    "/api/v1/odo/auth/logout": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "logout",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LogoutRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Logout processed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogoutResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/odo/auth/saml/admin/attr-role-map/create": {
+      "post": {
+        "tags": [
+          "saml-admin"
+        ],
+        "operationId": "create_attr_role_map",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAttrRoleMapRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Newly-created attribute role mapping",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttrRoleMapRow"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/auth/saml/admin/attr-role-map/delete": {
+      "post": {
+        "tags": [
+          "saml-admin"
+        ],
+        "operationId": "delete_attr_role_map",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttrRoleMapIdRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Attribute role mapping deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SamlAttrSuccessResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/auth/saml/admin/attr-role-map/list": {
+      "post": {
+        "tags": [
+          "saml-admin"
+        ],
+        "operationId": "list_attr_role_maps",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ListAttrRoleMapsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Filtered SAML attribute-to-role mappings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttrRoleMapPage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/auth/saml/admin/attr-role-map/update": {
+      "post": {
+        "tags": [
+          "saml-admin"
+        ],
+        "operationId": "update_attr_role_map",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAttrRoleMapRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Updated attribute role mapping",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttrRoleMapRow"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/auth/saml/admin/attribute/create": {
+      "post": {
+        "tags": [
+          "saml-admin"
+        ],
+        "operationId": "create_attribute",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAttributeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Newly-created SAML attribute",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttributeRow"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/auth/saml/admin/attribute/delete": {
+      "post": {
+        "tags": [
+          "saml-admin"
+        ],
+        "operationId": "delete_attribute",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttributeIdRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "SAML attribute deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SamlAttrSuccessResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/auth/saml/admin/attribute/list": {
+      "post": {
+        "tags": [
+          "saml-admin"
+        ],
+        "operationId": "list_attributes",
+        "responses": {
+          "200": {
+            "description": "All tracked SAML attributes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListAttributesResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/auth/saml/admin/attribute/update": {
+      "post": {
+        "tags": [
+          "saml-admin"
+        ],
+        "operationId": "update_attribute",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAttributeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Updated SAML attribute",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttributeRow"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/auth/saml/admin/idp/create": {
+      "post": {
+        "tags": [
+          "saml-admin"
+        ],
+        "operationId": "create_idp",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateIdpRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Newly-created IdP config",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdpRow"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/auth/saml/admin/idp/delete": {
+      "post": {
+        "tags": [
+          "saml-admin"
+        ],
+        "operationId": "delete_idp",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IdpIdRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "IdP config deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SamlAdminSuccessResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/auth/saml/admin/idp/list": {
+      "post": {
+        "tags": [
+          "saml-admin"
+        ],
+        "operationId": "list_idps",
+        "responses": {
+          "200": {
+            "description": "All SAML identity provider configs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListIdpsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/auth/saml/admin/idp/update": {
+      "post": {
+        "tags": [
+          "saml-admin"
+        ],
+        "operationId": "update_idp",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateIdpRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Updated IdP config",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdpRow"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/auth/saml/admin/sp/create": {
+      "post": {
+        "tags": [
+          "saml-admin"
+        ],
+        "operationId": "create_sp",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSpRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Newly-created SP config",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpRow"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/auth/saml/admin/sp/delete": {
+      "post": {
+        "tags": [
+          "saml-admin"
+        ],
+        "operationId": "delete_sp",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpIdRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "SP config deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SamlAdminSuccessResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/auth/saml/admin/sp/list": {
+      "post": {
+        "tags": [
+          "saml-admin"
+        ],
+        "operationId": "list_sps",
+        "responses": {
+          "200": {
+            "description": "All SAML service provider configs (private keys omitted)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListSpsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/auth/saml/admin/sp/update": {
+      "post": {
+        "tags": [
+          "saml-admin"
+        ],
+        "operationId": "update_sp",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSpRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Updated SP config",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpRow"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/auth/token/refresh": {
+      "post": {
+        "tags": [
+          "token"
+        ],
+        "operationId": "refresh_token",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Token refreshed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefreshResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or expired refresh token"
+          }
+        }
+      }
+    },
+    "/api/v1/odo/auth/token/revoke": {
+      "post": {
+        "tags": [
+          "token"
+        ],
+        "operationId": "revoke_token",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevokeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Revocation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevokeResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/odo/auth/token/validate": {
+      "post": {
+        "tags": [
+          "token"
+        ],
+        "operationId": "validate_token",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ValidateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Validation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidateTokenResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/odo/auth/user/create": {
+      "post": {
+        "tags": [
+          "user_admin"
+        ],
+        "summary": "Create a user account (and optionally its local-account password).",
+        "description": "This is the API face of what create-local-account.sh used to do with\ndirect SQL: app registration and test fixtures provision their users\nhere, then assign roles via authz/user-role/create.",
+        "operationId": "create_user",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserAccountRow"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/auth/user/detail": {
+      "post": {
+        "tags": [
+          "user"
+        ],
+        "operationId": "user_detail",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserDetailRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Detailed account view for one user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDetailResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/auth/user/get": {
+      "post": {
+        "tags": [
+          "user"
+        ],
+        "operationId": "get_user",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GetUserRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "User profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/auth/user/search": {
+      "post": {
+        "tags": [
+          "user"
+        ],
+        "operationId": "user_search",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserSearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Search results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/auth/user/update": {
+      "post": {
+        "tags": [
+          "user"
+        ],
+        "operationId": "update_user",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Updated user account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserAccountRow"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AssignmentIdRequest": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "AssignmentRow": {
+        "type": "object",
+        "required": [
+          "id",
+          "usr",
+          "role",
+          "role_label",
+          "org_unit",
+          "org_unit_label",
+          "is_managed_by_saml",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "is_managed_by_saml": {
+            "type": "boolean"
+          },
+          "org_unit": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "org_unit_label": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "role_label": {
+            "type": "string"
+          },
+          "usr": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "AssignmentSuccessResponse": {
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AttrRoleMapIdRequest": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "AttrRoleMapPage": {
+        "type": "object",
+        "description": "One page of SAML attribute-to-role mappings.",
+        "required": [
+          "rows",
+          "total"
+        ],
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AttrRoleMapRow"
+            },
+            "description": "The rows on this page."
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Total rows matching the filter, ignoring limit/offset."
+          }
+        }
+      },
+      "AttrRoleMapRow": {
+        "type": "object",
+        "required": [
+          "id",
+          "attr",
+          "attr_key",
+          "idp_name",
+          "attr_value",
+          "role",
+          "role_label",
+          "is_active"
+        ],
+        "properties": {
+          "attr": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "attr_key": {
+            "type": "string"
+          },
+          "attr_value": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "idp_name": {
+            "type": "string"
+          },
+          "is_active": {
+            "type": "boolean"
+          },
+          "role": {
+            "type": "string"
+          },
+          "role_label": {
+            "type": "string"
+          }
+        }
+      },
+      "AttributeIdRequest": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "AttributeRow": {
+        "type": "object",
+        "required": [
+          "id",
+          "idp",
+          "idp_name",
+          "key",
+          "label",
+          "is_location",
+          "mapping_count"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "idp": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "idp_name": {
+            "type": "string"
+          },
+          "is_location": {
+            "type": "boolean"
+          },
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "mapping_count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Role mappings referencing this attribute."
+          },
+          "normalizer": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "AuthzAdminSuccessResponse": {
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AuthzPermResponse": {
+        "type": "object",
+        "required": [
+          "has_perm",
+          "user_id",
+          "perm"
+        ],
+        "properties": {
+          "has_perm": {
+            "type": "boolean"
+          },
+          "org_unit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "perm": {
+            "type": "string"
+          },
+          "user_id": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "AuthzRoleResponse": {
+        "type": "object",
+        "required": [
+          "has_role",
+          "user_id",
+          "role"
+        ],
+        "properties": {
+          "has_role": {
+            "type": "boolean"
+          },
+          "org_unit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "role": {
+            "type": "string"
+          },
+          "user_id": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "CreateAssignmentRequest": {
+        "type": "object",
+        "required": [
+          "role"
+        ],
+        "properties": {
+          "org_unit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "org_unit_uuid": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Org unit by stable uuid (accepted alongside `org_unit`; id wins)."
+          },
+          "role": {
+            "type": "string"
+          },
+          "usr": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "usr_uuid": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "User by stable uuid (accepted alongside `usr`; id wins)."
+          }
+        }
+      },
+      "CreateAttrRoleMapRequest": {
+        "type": "object",
+        "required": [
+          "attr",
+          "role",
+          "attr_value"
+        ],
+        "properties": {
+          "attr": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "attr_value": {
+            "type": "string"
+          },
+          "is_active": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "role": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateAttributeRequest": {
+        "type": "object",
+        "required": [
+          "idp",
+          "key",
+          "label"
+        ],
+        "properties": {
+          "idp": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "is_location": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "normalizer": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "CreateIdpRequest": {
+        "type": "object",
+        "required": [
+          "name",
+          "entity_id"
+        ],
+        "properties": {
+          "allow_idp_initiated": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "attribute_mapping": {},
+          "entity_id": {
+            "type": "string"
+          },
+          "is_active": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "metadata_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "session_lifetime_hours": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "slo_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sso_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "CreatePermissionRequest": {
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "CreateRolePermissionRequest": {
+        "type": "object",
+        "required": [
+          "role",
+          "perm"
+        ],
+        "properties": {
+          "min_depth": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "perm": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateRoleRequest": {
+        "type": "object",
+        "required": [
+          "code",
+          "label"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "label": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateSpRequest": {
+        "type": "object",
+        "required": [
+          "entity_id",
+          "acs_url",
+          "x509_cert",
+          "private_key"
+        ],
+        "properties": {
+          "acs_url": {
+            "type": "string"
+          },
+          "callback_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "entity_id": {
+            "type": "string"
+          },
+          "idp": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "idp_x509_cert": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "is_active": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "metadata_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "private_key": {
+            "type": "string"
+          },
+          "slo_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "x509_cert": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateUserRequest": {
+        "type": "object",
+        "required": [
+          "username",
+          "email"
+        ],
+        "properties": {
+          "auth_method": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "\"local\" (default) or \"saml\". SAML accounts are normally created at\nfirst SSO login; creating one here pre-provisions it."
+          },
+          "email": {
+            "type": "string"
+          },
+          "family_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "first_given_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "password": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Sets the local-account password. Local accounts without a password\ncannot log in until one is set. Rejected for SAML accounts."
+          },
+          "second_given_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "username": {
+            "type": "string"
+          },
+          "uuid": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Pin the stable uuid (durable references; fixtures and app\nregistration pin well-known uuids). Random when omitted."
+          }
+        }
+      },
+      "GetUserOptions": {
+        "type": "object",
+        "properties": {
+          "with_deleted": {
+            "type": "boolean",
+            "description": "Opt in to resolve a soft-deleted user (flagged with deleted_at) instead\nof 404. Default false keeps get_user active-only."
+          },
+          "with_working_locations": {
+            "type": "boolean"
+          }
+        }
+      },
+      "GetUserRequest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "options": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/GetUserOptions"
+              }
+            ]
+          },
+          "uuid": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Resolve by stable uuid instead of database id (durable references)."
+          }
+        }
+      },
+      "GrantRow": {
+        "type": "object",
+        "required": [
+          "id",
+          "perm",
+          "min_depth"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "min_depth": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "perm": {
+            "type": "string"
+          },
+          "perm_description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "IdpIdRequest": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "IdpRow": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "entity_id",
+          "is_active",
+          "allow_idp_initiated",
+          "sp_count",
+          "user_count"
+        ],
+        "properties": {
+          "allow_idp_initiated": {
+            "type": "boolean"
+          },
+          "attribute_mapping": {},
+          "created_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "entity_id": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "is_active": {
+            "type": "boolean"
+          },
+          "metadata_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "session_lifetime_hours": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "slo_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sp_count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Service providers configured against this IdP."
+          },
+          "sso_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "user_count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Users with a SAML identity from this IdP."
+          }
+        }
+      },
+      "ListAssignmentsRequest": {
+        "type": "object",
+        "properties": {
+          "usr": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "usr_uuid": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "User by stable uuid (accepted alongside `usr`; id wins)."
+          }
+        }
+      },
+      "ListAssignmentsResponse": {
+        "type": "object",
+        "required": [
+          "assignments"
+        ],
+        "properties": {
+          "assignments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssignmentRow"
+            }
+          }
+        }
+      },
+      "ListAttrRoleMapsRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Page"
+          },
+          {
+            "$ref": "#/components/schemas/Sort"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "attr": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "int32",
+                "description": "Restrict to a single attribute."
+              },
+              "idp": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "int32",
+                "description": "Restrict to mappings whose attribute belongs to this IdP."
+              },
+              "role": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Restrict to a single role code."
+              },
+              "search": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Case-insensitive substring match on the attribute value."
+              }
+            }
+          }
+        ]
+      },
+      "ListAttributesResponse": {
+        "type": "object",
+        "required": [
+          "attributes"
+        ],
+        "properties": {
+          "attributes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AttributeRow"
+            }
+          }
+        }
+      },
+      "ListIdpsResponse": {
+        "type": "object",
+        "required": [
+          "idps"
+        ],
+        "properties": {
+          "idps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IdpRow"
+            }
+          }
+        }
+      },
+      "ListPermissionsRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Page"
+          },
+          {
+            "$ref": "#/components/schemas/Sort"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "search": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "ListRolesRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Page"
+          },
+          {
+            "$ref": "#/components/schemas/Sort"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "search": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "ListSpsResponse": {
+        "type": "object",
+        "required": [
+          "sps"
+        ],
+        "properties": {
+          "sps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SpRow"
+            }
+          }
+        }
+      },
+      "LocalAccountRow": {
+        "type": "object",
+        "required": [
+          "failed_login_attempts"
+        ],
+        "properties": {
+          "created_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "failed_login_attempts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "locked_until": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "required": [
+          "username",
+          "password"
+        ],
+        "properties": {
+          "ip_address": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "org_unit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Working org unit by stable uuid (uuid migration 1d.3: the\nlogin/session surface no longer accepts integer org ids; the\n`org_unit_uuid` name is kept as an alias for older clients)."
+          },
+          "password": {
+            "type": "string"
+          },
+          "user_agent": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "username": {
+            "type": "string"
+          }
+        }
+      },
+      "LoginResponse": {
+        "type": "object",
+        "required": [
+          "access_token",
+          "token_type",
+          "expires_in",
+          "refresh_expires_at",
+          "user"
+        ],
+        "properties": {
+          "access_token": {
+            "type": "string"
+          },
+          "expires_in": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "refresh_expires_at": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "token_type": {
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserInfo"
+          }
+        }
+      },
+      "LogoutRequest": {
+        "type": "object",
+        "properties": {
+          "access_token": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "revoke_all_sessions": {
+            "type": "boolean"
+          }
+        }
+      },
+      "LogoutResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Page": {
+        "type": "object",
+        "description": "Standard pagination inputs for admin list endpoints. Flatten this into a\nper-resource request struct alongside that resource's own filter fields:\n\n```ignore\n#[derive(Deserialize, ToSchema)]\npub struct ListThingsRequest {\n    #[serde(default)]\n    search: Option<String>,\n    #[serde(flatten)]\n    page: Page,\n}\n```",
+        "properties": {
+          "limit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "minimum": 0
+          },
+          "offset": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "PermScopeRow": {
+        "type": "object",
+        "description": "A permission the user effectively holds, plus where it applies.",
+        "required": [
+          "perm",
+          "global",
+          "scope_units"
+        ],
+        "properties": {
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "global": {
+            "type": "boolean",
+            "description": "True when the permission applies at every org unit (covers the root);\n`scope_units` is then empty."
+          },
+          "perm": {
+            "type": "string"
+          },
+          "scope_units": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScopeUnit"
+            },
+            "description": "Minimal set of subtree roots the permission applies within. Empty when\n`global` is true."
+          }
+        }
+      },
+      "PermissionCodeRequest": {
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          }
+        }
+      },
+      "PermissionPage": {
+        "type": "object",
+        "description": "One page of permissions.",
+        "required": [
+          "rows",
+          "total"
+        ],
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PermissionRow"
+            },
+            "description": "The rows on this page."
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Total rows matching the filter, ignoring limit/offset."
+          }
+        }
+      },
+      "PermissionRow": {
+        "type": "object",
+        "required": [
+          "code",
+          "role_count"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "role_count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Number of roles this permission is granted to."
+          }
+        }
+      },
+      "RefreshRequest": {
+        "type": "object",
+        "properties": {
+          "org_unit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Working org unit by stable uuid (uuid migration 1d.3: the\nlogin/session surface no longer accepts integer org ids; the\n`org_unit_uuid` name is kept as an alias for older clients)."
+          },
+          "refresh_token": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "RefreshResponse": {
+        "type": "object",
+        "required": [
+          "access_token",
+          "token_type",
+          "expires_in",
+          "refresh_expires_at"
+        ],
+        "properties": {
+          "access_token": {
+            "type": "string"
+          },
+          "expires_in": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "refresh_expires_at": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "token_type": {
+            "type": "string"
+          }
+        }
+      },
+      "RevokeRequest": {
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "token_type": {
+            "type": "string"
+          }
+        }
+      },
+      "RevokeResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "RoleAssignment": {
+        "type": "object",
+        "required": [
+          "role",
+          "org_unit"
+        ],
+        "properties": {
+          "org_unit": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "role": {
+            "type": "string"
+          }
+        }
+      },
+      "RoleCodeRequest": {
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          }
+        }
+      },
+      "RoleDetailResponse": {
+        "type": "object",
+        "required": [
+          "role",
+          "grants"
+        ],
+        "properties": {
+          "grants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GrantRow"
+            }
+          },
+          "role": {
+            "$ref": "#/components/schemas/RoleRow"
+          }
+        }
+      },
+      "RolePage": {
+        "type": "object",
+        "description": "One page of roles.",
+        "required": [
+          "rows",
+          "total"
+        ],
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RoleRow"
+            },
+            "description": "The rows on this page."
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Total rows matching the filter, ignoring limit/offset."
+          }
+        }
+      },
+      "RolePermissionIdRequest": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "RolePermissionRow": {
+        "type": "object",
+        "required": [
+          "id",
+          "role",
+          "perm",
+          "min_depth"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "min_depth": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "perm": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          }
+        }
+      },
+      "RoleRow": {
+        "type": "object",
+        "required": [
+          "code",
+          "label",
+          "perm_count",
+          "user_count"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "perm_count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Number of permissions granted to this role."
+          },
+          "user_count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Number of distinct users holding this role at any org unit."
+          }
+        }
+      },
+      "SamlAdminSuccessResponse": {
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SamlAttrSuccessResponse": {
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SamlIdentityRow": {
+        "type": "object",
+        "required": [
+          "idp",
+          "idp_name",
+          "name_id"
+        ],
+        "properties": {
+          "created_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "idp": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "idp_name": {
+            "type": "string"
+          },
+          "name_id": {
+            "type": "string"
+          },
+          "name_id_format": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "SamlUserAttrRow": {
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "value"
+        ],
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          }
+        }
+      },
+      "ScopeUnit": {
+        "type": "object",
+        "description": "One org-unit subtree root where a permission applies (\"<label> and below\").",
+        "required": [
+          "id",
+          "label"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "label": {
+            "type": "string"
+          }
+        }
+      },
+      "SessionRow": {
+        "type": "object",
+        "required": [
+          "auth_method",
+          "is_active",
+          "expires_at"
+        ],
+        "properties": {
+          "auth_method": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ip_address": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "is_active": {
+            "type": "boolean"
+          },
+          "last_activity_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "org_unit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "org_unit_label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "user_agent": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "Sort": {
+        "type": "object",
+        "description": "Standard sort inputs for admin list endpoints. Flatten this into a\nper-resource request struct alongside `Page`:\n\n```ignore\n#[derive(Deserialize, ToSchema)]\npub struct ListThingsRequest {\n    #[serde(default)]\n    search: Option<String>,\n    #[serde(flatten)]\n    page: Page,\n    #[serde(flatten)]\n    sort: Sort,\n}\n```\n\n`sort_by` is a client-supplied string, so a handler must NEVER map it to a\ncolumn directly — resolve it against an explicit allow-list with\n[`Sort::resolve`], which falls back to the handler's default for any\nunknown or absent key.",
+        "properties": {
+          "sort_by": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Logical column key to sort by (must be one the handler allow-lists)."
+          },
+          "sort_dir": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SortDir",
+                "description": "Sort direction; defaults to ascending when a `sort_by` is given."
+              }
+            ]
+          }
+        }
+      },
+      "SortDir": {
+        "type": "string",
+        "description": "Sort direction for a list endpoint.",
+        "enum": [
+          "asc",
+          "desc"
+        ]
+      },
+      "SpIdRequest": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "SpRow": {
+        "type": "object",
+        "description": "SP row for API responses. Never carries the private key.",
+        "required": [
+          "id",
+          "entity_id",
+          "acs_url",
+          "is_active",
+          "x509_cert",
+          "has_private_key"
+        ],
+        "properties": {
+          "acs_url": {
+            "type": "string"
+          },
+          "callback_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "entity_id": {
+            "type": "string"
+          },
+          "has_private_key": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "idp": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "idp_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "idp_x509_cert": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "is_active": {
+            "type": "boolean"
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "metadata_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "slo_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "x509_cert": {
+            "type": "string"
+          }
+        }
+      },
+      "TokenClaims": {
+        "type": "object",
+        "required": [
+          "user_id",
+          "email",
+          "auth_method",
+          "issued_at",
+          "expires_at",
+          "session_id"
+        ],
+        "properties": {
+          "auth_method": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "email": {
+            "type": "string"
+          },
+          "expires_at": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "issued_at": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "user_id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "UpdateAttrRoleMapRequest": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "attr": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "attr_value": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "is_active": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "role": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "UpdateAttributeRequest": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "is_location": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "normalizer": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Empty string clears the normalizer."
+          }
+        }
+      },
+      "UpdateIdpRequest": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "allow_idp_initiated": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "attribute_mapping": {},
+          "entity_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "is_active": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "metadata_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "session_lifetime_hours": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "slo_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sso_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "UpdatePermissionRequest": {
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "UpdateRolePermissionRequest": {
+        "type": "object",
+        "required": [
+          "id",
+          "min_depth"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "min_depth": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "UpdateRoleRequest": {
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "UpdateSpRequest": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "acs_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "callback_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "entity_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "idp": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "idp_x509_cert": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "is_active": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "metadata_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "private_key": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Empty or absent leaves the existing key unchanged."
+          },
+          "slo_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "x509_cert": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "UpdateUserRequest": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "deleted": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Soft-delete action: `true` marks the account deleted (server stamps\ndeleted_at/deleted_by), `false` restores it. Omitted leaves it as-is."
+          },
+          "family_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "first_given_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Empty string clears the field."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "second_given_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "UserAccountRow": {
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "display_name",
+          "auth_method"
+        ],
+        "properties": {
+          "auth_method": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "deleted_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Soft-delete timestamp; null when the account is active. odo never\nhard-deletes shared rows, so a deleted account stays resolvable."
+          },
+          "deleted_by": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Id of the user who soft-deleted this account (if deleted)."
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "family_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "first_given_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "last_login_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "username": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "UserDetailRequest": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "UserDetailResponse": {
+        "type": "object",
+        "required": [
+          "user",
+          "roles",
+          "saml_identities",
+          "saml_attributes",
+          "sessions"
+        ],
+        "properties": {
+          "local_account": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/LocalAccountRow",
+                "description": "Present when the user has a local (username/password) account."
+              }
+            ]
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssignmentRow"
+            }
+          },
+          "saml_attributes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SamlUserAttrRow"
+            }
+          },
+          "saml_identities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SamlIdentityRow"
+            }
+          },
+          "sessions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SessionRow"
+            },
+            "description": "Most recent sessions, newest first."
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserAccountRow"
+          }
+        }
+      },
+      "UserHasPermRequest": {
+        "type": "object",
+        "required": [
+          "perm"
+        ],
+        "properties": {
+          "org_unit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "org_unit_uuid": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Org unit by stable uuid (accepted alongside `org_unit`; id wins)."
+          },
+          "perm": {
+            "type": "string"
+          }
+        }
+      },
+      "UserHasRoleRequest": {
+        "type": "object",
+        "required": [
+          "role"
+        ],
+        "properties": {
+          "org_unit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "org_unit_uuid": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Org unit by stable uuid (accepted alongside `org_unit`; id wins)."
+          },
+          "role": {
+            "type": "string"
+          }
+        }
+      },
+      "UserInfo": {
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "username",
+          "display_name"
+        ],
+        "properties": {
+          "display_name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "username": {
+            "type": "string"
+          }
+        }
+      },
+      "UserPermScopesResponse": {
+        "type": "object",
+        "required": [
+          "perms"
+        ],
+        "properties": {
+          "perms": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PermScopeRow"
+            }
+          }
+        }
+      },
+      "UserResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "uuid",
+          "email",
+          "display_name"
+        ],
+        "properties": {
+          "deleted_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "RFC3339 soft-delete timestamp; null for active users. get_user resolves\nby id and returns soft-deleted users flagged so historical `*_by`\nreferences still render (login/search stay active-only)."
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "family_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "first_given_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "second_given_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "username": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "uuid": {
+            "type": "string",
+            "description": "Stable, DB-independent identity (see odo-durable-references)."
+          },
+          "working_org_unit_uuids": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "description": "Stable uuids of the working org units, parallel to\n`working_org_units` (uuid migration)."
+          },
+          "working_org_units": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        }
+      },
+      "UserRolesResponse": {
+        "type": "object",
+        "required": [
+          "user_id",
+          "roles"
+        ],
+        "properties": {
+          "roles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RoleAssignment"
+            }
+          },
+          "user_id": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "UserSearchRequest": {
+        "type": "object",
+        "properties": {
+          "keywords": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "minimum": 0
+          },
+          "offset": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "minimum": 0
+          },
+          "options": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/GetUserOptions"
+              }
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "UsersWithRoleRequest": {
+        "type": "object",
+        "required": [
+          "role"
+        ],
+        "properties": {
+          "org_unit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "org_unit_uuid": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Org unit by stable uuid (accepted alongside `org_unit`; id wins)."
+          },
+          "role": {
+            "type": "string"
+          },
+          "user_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "user_uuids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Users by stable uuid (accepted alongside `user_ids`)."
+          }
+        }
+      },
+      "UsersWithRoleResponse": {
+        "type": "object",
+        "required": [
+          "role",
+          "user_ids",
+          "user_uuids"
+        ],
+        "properties": {
+          "org_unit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "role": {
+            "type": "string"
+          },
+          "user_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "description": "Subset of the requested user_ids who hold the role."
+          },
+          "user_uuids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Uuids of the holders (covers users requested by uuid too)."
+          }
+        }
+      },
+      "ValidateRequest": {
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "properties": {
+          "token": {
+            "type": "string"
+          }
+        }
+      },
+      "ValidateTokenResponse": {
+        "type": "object",
+        "required": [
+          "valid",
+          "error"
+        ],
+        "properties": {
+          "claims": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TokenClaims"
+              }
+            ]
+          },
+          "error": {
+            "type": "string"
+          },
+          "valid": {
+            "type": "boolean"
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "bearer": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "auth",
+      "description": "Login, logout, and session management"
+    },
+    {
+      "name": "token",
+      "description": "Token validation, refresh, and revocation"
+    },
+    {
+      "name": "authz",
+      "description": "Authorization checks (requires Bearer token)"
+    },
+    {
+      "name": "authz-admin",
+      "description": "Role and permission administration (requires Bearer token)"
+    },
+    {
+      "name": "saml-admin",
+      "description": "SAML IdP/SP configuration administration (requires Bearer token)"
+    },
+    {
+      "name": "user",
+      "description": "User profile and search (requires Bearer token)"
+    }
+  ]
+}

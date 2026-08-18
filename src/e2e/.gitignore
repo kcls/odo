@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Auth state (contains session tokens)
+.auth/
+
+# Test artifacts
+reports/
+test-results/
+playwright-report/
+
+# TypeScript build output
+dist/
+
+# Debug screenshots
+screenshots/

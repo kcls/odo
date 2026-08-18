@@ -1,0 +1,60 @@
+:host {
+  display: block;
+}
+
+.user-meta {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+}
+
+.assign-role {
+  width: 280px;
+}
+
+.assign-org {
+  width: 320px;
+}
+
+.role-code {
+  color: var(--mat-sys-on-surface-variant);
+  margin-left: 8px;
+}
+
+.perm-description {
+  display: block;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.85rem;
+  margin-top: 2px;
+}
+
+.scope-list {
+  margin: 0;
+  padding-left: 18px;
+
+  li {
+    margin: 2px 0;
+  }
+}
+
+// Inline text button to expand/collapse the scope list (own control, no
+// Material component internals).
+.scope-toggle {
+  margin-left: 8px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--mat-sys-primary);
+  font: inherit;
+  cursor: pointer;
+
+  &:hover {
+    text-decoration: underline;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--mat-sys-primary);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+}

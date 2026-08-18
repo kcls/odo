@@ -1,0 +1,47 @@
+[package]
+name = "odo-auth"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+default = []
+# SAML SSO support - requires xmlsec1 library and build dependencies
+# Disable for development builds: cargo build --no-default-features
+saml = ["dep:samael", "dep:openssl", "dep:flate2", "dep:urlencoding"]
+
+[dependencies]
+odo-client = { path = "../odo-client" }
+odo-service = { path = "../odo-service" }
+odo-entity = { path = "../odo-entity" }
+
+sea-orm = { version = "2.0.0-rc", features = [
+    "sqlx-postgres",
+    "runtime-tokio-rustls",
+    "macros",
+    "with-chrono",
+    "with-json",
+    "with-uuid",
+] }
+
+axum = "0.8"
+axum-extra = { version = "0.10", features = ["cookie"] }
+utoipa = { version = "5", features = ["axum_extras", "chrono"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+log = { version = "0.4", features = ["kv_serde"] }
+tokio = { version = "1.35", features = ["full"] }
+sha2 = "0.10"
+tracing = "0.1"
+time = "0.3"
+uuid = { version = "1.0", features = ["v4"] }
+base64 = "0.22"
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+samael = { version = "0.0.15", features = ["xmlsec"], optional = true }
+openssl = { version = "0.10", optional = true }
+flate2 = { version = "1.0", optional = true }
+urlencoding = { version = "2.1", optional = true }
+
+[[bin]]
+name = "odo-auth"
+path = "src/bin/odo-auth.rs"

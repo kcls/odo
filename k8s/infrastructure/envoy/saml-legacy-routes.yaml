@@ -1,0 +1,61 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: saml-legacy-routes
+spec:
+  parentRefs:
+    - name: envoy
+  # SAML migration: rewrite legacy ACS/SLO paths to the new odo-auth
+  # endpoints. SAML ACS is an IdP-initiated POST whose body must survive
+  # the hop, so we use ReplaceFullPath (internal rewrite) rather than a
+  # 30x redirect. Both legacy SPs (id=2) and new SPs (id=3) coexist in
+  # auth.saml_sp_config; this lets the legacy SP entries keep working
+  # while the codepath behind them is the new odo-auth handler.
+  #
+  # Backend goes straight to odo-auth in odo-pub (matching the routing
+  # in odo-routes.yaml for /api/v1/odo/auth/saml/*) — NOT api-gateway,
+  # which is a separate JSON-RPC service that doesn't speak this path.
+  rules:
+    - matches:
+        - path:
+            type: Exact
+            value: /http-handlers/saml/acs
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplaceFullPath
+              replaceFullPath: /api/v1/odo/auth/saml/acs
+      backendRefs:
+        - name: odo-auth
+          namespace: odo-pub
+          port: 8080
+    - matches:
+        - path:
+            type: Exact
+            value: /saml/acs
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplaceFullPath
+              replaceFullPath: /api/v1/odo/auth/saml/acs
+      backendRefs:
+        - name: odo-auth
+          namespace: odo-pub
+          port: 8080
+
+    - matches:
+        - path:
+            type: Exact
+            value: /saml/slo
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplaceFullPath
+              replaceFullPath: /api/v1/odo/auth/saml/sls
+      backendRefs:
+        - name: odo-auth
+          namespace: odo-pub
+          port: 8080

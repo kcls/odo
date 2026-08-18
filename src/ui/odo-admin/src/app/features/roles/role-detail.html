@@ -1,0 +1,175 @@
+@if (loading()) {
+  <div class="list-loading"><mat-spinner diameter="36" /></div>
+} @else if (role(); as r) {
+  <odo-detail-page
+    backLink="/roles"
+    i18n-backLabel="Back link to the role list"
+    backLabel="Roles"
+    [title]="r.label"
+  >
+    <div slot="summary">
+      <span class="cell-code">{{ r.code }}</span>
+      <span i18n="Number of users holding the role">{{ userCountLabel() }}</span>
+    </div>
+
+    @if (canWrite()) {
+      <div slot="actions">
+        <button
+          mat-stroked-button
+          class="delete-button"
+          [disabled]="r.user_count > 0"
+          (click)="deleteRole()"
+        >
+          <mat-icon>delete</mat-icon>
+          <ng-container i18n="Button that deletes the role">Delete Role</ng-container>
+        </button>
+      </div>
+    }
+
+    <section class="section">
+      <div class="section-header">
+        <h2 i18n="Section heading for role settings">Details</h2>
+      </div>
+      <div class="detail-form">
+        <mat-form-field appearance="outline">
+          <mat-label i18n="Role field label">Label</mat-label>
+          <input matInput name="label" [(ngModel)]="label" [disabled]="!canWrite()" />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="detail-flex-field">
+          <mat-label i18n="Role field label">Description</mat-label>
+          <input
+            matInput
+            name="description"
+            [(ngModel)]="description"
+            [disabled]="!canWrite()"
+          />
+        </mat-form-field>
+
+        @if (canWrite()) {
+          <button
+            mat-flat-button
+            [disabled]="saving() || !roleDirty() || !label.trim()"
+            (click)="saveRole()"
+            i18n="Button that saves role edits"
+          >
+            Save
+          </button>
+        }
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-header">
+        <div>
+          <h2 i18n="Section heading for the permission grant list">
+            Permissions ({{ grants().length }})
+          </h2>
+          <p class="page-intro" i18n="Explanation of the role permissions section">
+            Permissions this role grants, and the minimum org-tree depth each
+            grant applies at.
+          </p>
+        </div>
+      </div>
+
+      @if (canWrite()) {
+        <form class="inline-form" (ngSubmit)="addGrant()">
+          <mat-form-field appearance="outline" class="grant-add-perm" subscriptSizing="dynamic">
+            <mat-label i18n="Field label for choosing a permission to grant"
+              >Grant permission</mat-label
+            >
+            <mat-select name="newPerm" [(ngModel)]="newPerm">
+              @for (perm of availablePermissions(); track perm.code) {
+                <mat-option [value]="perm.code">{{ perm.code }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="grant-add-depth" subscriptSizing="dynamic">
+            <mat-label i18n="Field label for the grant's minimum org depth"
+              >Min depth</mat-label
+            >
+            <input
+              matInput
+              type="number"
+              name="newMinDepth"
+              min="0"
+              [(ngModel)]="newMinDepth"
+            />
+          </mat-form-field>
+
+          <button
+            mat-flat-button
+            type="submit"
+            [disabled]="addingGrant() || !newPerm"
+            i18n="Button that grants the selected permission"
+          >
+            Grant
+          </button>
+        </form>
+        @if (grantError()) {
+          <p class="form-error" role="alert">{{ grantError() }}</p>
+        }
+      }
+
+      @if (grants().length === 0) {
+        <p class="list-empty" i18n="Shown when a role has no permission grants">
+          This role has no permissions yet.
+        </p>
+      } @else {
+        <odo-table [rows]="grants()" [displayedColumns]="grantColumns">
+          <ng-container cdkColumnDef="perm">
+            <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">
+              Permission
+            </th>
+            <td cdk-cell *cdkCellDef="let grant" class="cell-code">{{ grant.perm }}</td>
+          </ng-container>
+
+          <ng-container cdkColumnDef="description">
+            <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">
+              Description
+            </th>
+            <td cdk-cell *cdkCellDef="let grant">{{ grant.perm_description }}</td>
+          </ng-container>
+
+          <ng-container cdkColumnDef="min_depth">
+            <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header: minimum org tree depth for the grant">
+              Min depth
+            </th>
+            <td cdk-cell *cdkCellDef="let grant">
+              @if (canWrite()) {
+                <input
+                  class="depth-input"
+                  type="number"
+                  min="0"
+                  [value]="grant.min_depth"
+                  (change)="updateMinDepth(grant, $any($event.target).value)"
+                  i18n-aria-label="Input for the grant's minimum org depth"
+                  aria-label="Minimum depth"
+                />
+              } @else {
+                {{ grant.min_depth }}
+              }
+            </td>
+          </ng-container>
+
+          <ng-container cdkColumnDef="actions">
+            <th cdk-header-cell *cdkHeaderCellDef></th>
+            <td cdk-cell *cdkCellDef="let grant" class="cell-actions">
+              @if (canWrite()) {
+                <button
+                  mat-icon-button
+                  (click)="revokeGrant(grant)"
+                  i18n-aria-label="Button that revokes the permission grant"
+                  aria-label="Revoke grant"
+                >
+                  <mat-icon>delete</mat-icon>
+                </button>
+              }
+            </td>
+          </ng-container>
+        </odo-table>
+      }
+    </section>
+  </odo-detail-page>
+}

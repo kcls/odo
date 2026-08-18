@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: ui-odo-admin
+    part-of: odo
+    version: v1
+  name: ui-odo-admin
+  namespace: odo-pub
+spec:
+  ports:
+    - name: http
+      port: 80
+      protocol: TCP
+      targetPort: 8080
+  selector:
+    app: ui-odo-admin
+    version: v1
+  type: ClusterIP

@@ -1,0 +1,222 @@
+@if (loading()) {
+  <div class="list-loading"><mat-spinner diameter="36" /></div>
+} @else if (unit(); as u) {
+  <odo-detail-page
+    backLink="/org-units"
+    i18n-backLabel="Back link to the org unit list"
+    backLabel="Org Units"
+    [title]="u.label"
+  >
+    <span slot="summary" class="cell-code">{{ u.code }}</span>
+    <span slot="summary">{{ typeLabel() }}</span>
+    @if (u.timezone) {
+      <span slot="summary" class="cell-code">{{ u.timezone }}</span>
+    }
+
+    @if (canWrite()) {
+      <div slot="actions">
+        <button mat-stroked-button (click)="editUnit()">
+          <mat-icon>edit</mat-icon>
+          <ng-container i18n="Button that edits the org unit">Edit</ng-container>
+        </button>
+      </div>
+    }
+
+    @if (childUnits().length > 0) {
+      <section class="section">
+        <div class="section-header">
+          <h2 i18n="Child units section heading">Child units</h2>
+        </div>
+        <odo-table
+          [rows]="childUnits()"
+          [displayedColumns]="childColumns"
+          [clickableRows]="true"
+          (rowClick)="openChild($event)"
+        >
+          <ng-container cdkColumnDef="label">
+            <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">Unit</th>
+            <td cdk-cell *cdkCellDef="let c">{{ c.label }}</td>
+          </ng-container>
+          <ng-container cdkColumnDef="code">
+            <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">Code</th>
+            <td cdk-cell *cdkCellDef="let c" class="cell-code">{{ c.code }}</td>
+          </ng-container>
+          <ng-container cdkColumnDef="type">
+            <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">Type</th>
+            <td cdk-cell *cdkCellDef="let c">{{ c.unit_type.label }}</td>
+          </ng-container>
+          <ng-container cdkColumnDef="open">
+            <th cdk-header-cell *cdkHeaderCellDef></th>
+            <td cdk-cell *cdkCellDef="let c" class="cell-actions">
+              <mat-icon>chevron_right</mat-icon>
+            </td>
+          </ng-container>
+        </odo-table>
+      </section>
+    }
+
+    <section class="section">
+      <div class="section-header">
+        <div>
+          <h2 i18n="Addresses section heading">Addresses</h2>
+          <p class="page-intro" i18n="Explanation of the addresses section">
+            Physical and mailing addresses for this org unit.
+          </p>
+        </div>
+        @if (canWrite()) {
+          <button mat-flat-button (click)="addressDialog()">
+            <mat-icon>add</mat-icon>
+            <ng-container i18n="Button that opens the create-address dialog">New Address</ng-container>
+          </button>
+        }
+      </div>
+
+      @if (addresses().length === 0) {
+        <p class="list-empty" i18n="Shown when the unit has no addresses">No addresses.</p>
+      } @else {
+        <odo-table [rows]="addresses()" [displayedColumns]="addressColumns">
+          <ng-container cdkColumnDef="label">
+            <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">Label</th>
+            <td cdk-cell *cdkCellDef="let a">{{ a.label }}</td>
+          </ng-container>
+          <ng-container cdkColumnDef="type">
+            <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">Type</th>
+            <td cdk-cell *cdkCellDef="let a">{{ a.address_type }}</td>
+          </ng-container>
+          <ng-container cdkColumnDef="lines">
+            <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">Street</th>
+            <td cdk-cell *cdkCellDef="let a">
+              {{ a.address_line1 }}{{ a.address_line2 ? ', ' + a.address_line2 : '' }}
+            </td>
+          </ng-container>
+          <ng-container cdkColumnDef="city">
+            <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">City</th>
+            <td cdk-cell *cdkCellDef="let a">
+              {{ a.city }}{{ a.state_province ? ', ' + a.state_province : '' }}
+              {{ a.postal_code }}
+            </td>
+          </ng-container>
+          <ng-container cdkColumnDef="actions">
+            <th cdk-header-cell *cdkHeaderCellDef></th>
+            <td cdk-cell *cdkCellDef="let a" class="cell-actions">
+              @if (canWrite()) {
+                <button mat-icon-button (click)="addressDialog(a)" i18n-aria-label="Edit address" aria-label="Edit address">
+                  <mat-icon>edit</mat-icon>
+                </button>
+                <button mat-icon-button (click)="deleteAddress(a)" i18n-aria-label="Delete address" aria-label="Delete address">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              }
+            </td>
+          </ng-container>
+        </odo-table>
+      }
+    </section>
+
+    <section class="section">
+      <div class="section-header">
+        <div>
+          <h2 i18n="Closures section heading">Closures</h2>
+          <p class="page-intro" i18n="Explanation of the closures section">
+            Dates this org unit is closed, including past closures.
+          </p>
+        </div>
+        @if (canWrite()) {
+          <button mat-flat-button (click)="closureDialog()">
+            <mat-icon>add</mat-icon>
+            <ng-container i18n="Button that opens the create-closure dialog">New Closure</ng-container>
+          </button>
+        }
+      </div>
+
+      @if (closures().length === 0) {
+        <p class="list-empty" i18n="Shown when the unit has no closures">No closures.</p>
+      } @else {
+        <odo-table [rows]="closures()" [displayedColumns]="closureColumns">
+          <ng-container cdkColumnDef="date">
+            <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">Date</th>
+            <td cdk-cell *cdkCellDef="let c">{{ c.closure_date | date: 'mediumDate' }}</td>
+          </ng-container>
+          <ng-container cdkColumnDef="reason">
+            <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">Reason</th>
+            <td cdk-cell *cdkCellDef="let c">{{ c.reason }}</td>
+          </ng-container>
+          <ng-container cdkColumnDef="emergency">
+            <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">Type</th>
+            <td cdk-cell *cdkCellDef="let c">
+              @if (c.is_emergency) {
+                <span class="status-badge status-warn" i18n="Badge for emergency closures">Emergency</span>
+              }
+            </td>
+          </ng-container>
+          <ng-container cdkColumnDef="actions">
+            <th cdk-header-cell *cdkHeaderCellDef></th>
+            <td cdk-cell *cdkCellDef="let c" class="cell-actions">
+              @if (canWrite()) {
+                <button mat-icon-button (click)="closureDialog(c)" i18n-aria-label="Edit closure" aria-label="Edit closure">
+                  <mat-icon>edit</mat-icon>
+                </button>
+                <button mat-icon-button (click)="deleteClosure(c)" i18n-aria-label="Delete closure" aria-label="Delete closure">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              }
+            </td>
+          </ng-container>
+        </odo-table>
+      }
+    </section>
+
+    <section class="section">
+      <div class="section-header">
+        <div>
+          <h2 i18n="Operating hours section heading">Operating hours</h2>
+          <p class="page-intro" i18n="Explanation of the operating hours section">
+            Weekly open hours for this org unit.
+          </p>
+        </div>
+        @if (canWrite()) {
+          <button mat-flat-button (click)="hoursDialog()">
+            <mat-icon>add</mat-icon>
+            <ng-container i18n="Button that opens the create-hours dialog">New Hours</ng-container>
+          </button>
+        }
+      </div>
+
+      @if (hours().length === 0) {
+        <p class="list-empty" i18n="Shown when the unit has no operating hours">
+          No operating hours.
+        </p>
+      } @else {
+        <odo-table [rows]="hours()" [displayedColumns]="hoursColumns">
+          <ng-container cdkColumnDef="day">
+            <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">Day</th>
+            <td cdk-cell *cdkCellDef="let h">{{ dayName(h.day_of_week) }}</td>
+          </ng-container>
+          <ng-container cdkColumnDef="hours">
+            <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">Hours</th>
+            <td cdk-cell *cdkCellDef="let h">
+              @if (h.is_closed) {
+                <span class="status-badge status-inactive" i18n="Shown when closed all day">Closed</span>
+              } @else {
+                {{ shortTime(h.open_time) }}–{{ shortTime(h.close_time) }}
+              }
+            </td>
+          </ng-container>
+          <ng-container cdkColumnDef="actions">
+            <th cdk-header-cell *cdkHeaderCellDef></th>
+            <td cdk-cell *cdkCellDef="let h" class="cell-actions">
+              @if (canWrite()) {
+                <button mat-icon-button (click)="hoursDialog(h)" i18n-aria-label="Edit hours" aria-label="Edit hours">
+                  <mat-icon>edit</mat-icon>
+                </button>
+                <button mat-icon-button (click)="deleteHours(h)" i18n-aria-label="Delete hours" aria-label="Delete hours">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              }
+            </td>
+          </ng-container>
+        </odo-table>
+      }
+    </section>
+  </odo-detail-page>
+}

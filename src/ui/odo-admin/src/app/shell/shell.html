@@ -1,0 +1,73 @@
+<mat-toolbar class="shell-toolbar">
+  <span class="shell-title" i18n="App title in the toolbar">ODO Admin</span>
+  <span class="shell-spacer"></span>
+
+  <button
+    mat-icon-button
+    [matMenuTriggerFor]="themeMenu"
+    i18n-aria-label="Toolbar button that opens the theme picker"
+    aria-label="Choose theme"
+  >
+    <mat-icon>{{ themeIcon() }}</mat-icon>
+  </button>
+  <mat-menu #themeMenu="matMenu">
+    <button mat-menu-item (click)="setTheme('light')">
+      <mat-icon>light_mode</mat-icon>
+      <span i18n="Theme picker option">Light</span>
+    </button>
+    <button mat-menu-item (click)="setTheme('dark')">
+      <mat-icon>dark_mode</mat-icon>
+      <span i18n="Theme picker option">Dark</span>
+    </button>
+    <button mat-menu-item (click)="setTheme('system')">
+      <mat-icon>brightness_auto</mat-icon>
+      <span i18n="Theme picker option">System</span>
+    </button>
+  </mat-menu>
+
+  <button
+    mat-icon-button
+    [matMenuTriggerFor]="userMenu"
+    i18n-aria-label="Toolbar button that opens the user menu"
+    aria-label="User menu"
+  >
+    <mat-icon>account_circle</mat-icon>
+  </button>
+  <mat-menu #userMenu="matMenu">
+    <div class="shell-user" mat-menu-item disabled>{{ displayName() }}</div>
+    <button mat-menu-item (click)="logout()">
+      <mat-icon>logout</mat-icon>
+      <span i18n="User menu action">Sign out</span>
+    </button>
+  </mat-menu>
+</mat-toolbar>
+
+<mat-sidenav-container class="shell-container">
+  <mat-sidenav mode="side" opened class="shell-nav">
+    <nav class="shell-nav-list">
+      <a
+        class="shell-nav-link"
+        routerLink="/"
+        routerLinkActive="active-link"
+        [routerLinkActiveOptions]="{ exact: true }"
+      >
+        <mat-icon>home</mat-icon>
+        <span i18n="Nav link to the landing page">Home</span>
+      </a>
+      @for (tool of tools(); track tool.path) {
+        <a
+          class="shell-nav-link"
+          [routerLink]="['/', tool.path]"
+          routerLinkActive="active-link"
+        >
+          <mat-icon>{{ tool.icon }}</mat-icon>
+          <span>{{ tool.label }}</span>
+        </a>
+      }
+    </nav>
+  </mat-sidenav>
+
+  <mat-sidenav-content class="shell-content">
+    <router-outlet />
+  </mat-sidenav-content>
+</mat-sidenav-container>

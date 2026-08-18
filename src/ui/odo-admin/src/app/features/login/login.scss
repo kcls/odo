@@ -1,0 +1,87 @@
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--mat-sys-surface-dim);
+}
+
+.login-card {
+  width: 380px;
+  padding: 8px;
+}
+
+.login-title {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+// Separate the card body (SSO button / warning / form) from the title above.
+.login-content {
+  margin-top: 16px;
+}
+
+.login-progress {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 24px 0;
+}
+
+.login-warning {
+  color: var(--mat-sys-on-surface-variant);
+  background: var(--mat-sys-surface-container);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+.login-error {
+  color: var(--mat-sys-error);
+}
+
+.sso-button {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.local-login-toggle {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  padding: 4px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font: var(--mat-sys-body-medium);
+  color: var(--mat-sys-primary);
+  text-align: center;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.login-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0;
+  color: var(--mat-sys-on-surface-variant);
+
+  &::before,
+  &::after {
+    content: '';
+    flex: 1;
+    border-top: 1px solid var(--mat-sys-outline-variant);
+  }
+}
+
+.login-field {
+  width: 100%;
+}
+
+.login-submit {
+  width: 100%;
+  margin-top: 4px;
+}

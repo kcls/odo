@@ -1,0 +1,84 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.shell-toolbar {
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+  background: var(--mat-sys-surface);
+  color: var(--mat-sys-on-surface);
+}
+
+.shell-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.shell-spacer {
+  flex: 1;
+}
+
+.shell-user {
+  font-weight: 500;
+}
+
+.shell-container {
+  flex: 1;
+  background: var(--mat-sys-surface);
+}
+
+.shell-nav {
+  width: 220px;
+  border-right: 1px solid var(--mat-sys-outline-variant);
+  background: var(--mat-sys-surface-container-low);
+}
+
+.shell-content {
+  // Generous bottom padding so trailing controls (e.g. a paginator) aren't
+  // flush against the scroll-container edge and clipped.
+  padding: 24px 24px 64px;
+  background: var(--mat-sys-surface);
+  box-sizing: border-box;
+}
+
+.shell-nav-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 8px;
+}
+
+.shell-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  color: var(--mat-sys-on-surface);
+  text-decoration: none;
+  font-size: 0.9rem;
+
+  mat-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  &:hover {
+    color: var(--mat-sys-primary);
+
+    mat-icon {
+      color: var(--mat-sys-primary);
+    }
+  }
+
+  &.active-link {
+    color: var(--mat-sys-primary);
+    font-weight: 600;
+
+    mat-icon {
+      color: var(--mat-sys-primary);
+    }
+  }
+}

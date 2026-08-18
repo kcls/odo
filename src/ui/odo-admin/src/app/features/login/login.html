@@ -1,0 +1,100 @@
+<div class="login-page">
+  <mat-card class="login-card" appearance="outlined">
+    <mat-card-header>
+      <mat-card-title>
+        <h1 class="login-title" i18n="Login page heading">ODO Admin</h1>
+      </mat-card-title>
+    </mat-card-header>
+
+    <mat-card-content class="login-content">
+      @if (processingSamlCallback()) {
+        <div class="login-progress">
+          <mat-spinner diameter="36" />
+          <p i18n="Shown while completing single sign-on">Completing sign-in…</p>
+        </div>
+      } @else {
+        @if (sessionExpired()) {
+          <p class="login-warning" i18n="Warning shown after the session times out">
+            Your session has expired. Please sign in again.
+          </p>
+        }
+        @if (error()) {
+          <p class="login-error" role="alert">{{ error() }}</p>
+        }
+
+        @if (ssoLoading()) {
+          <div class="login-progress"><mat-spinner diameter="28" /></div>
+        } @else {
+        @for (config of ssoConfigs(); track config.sp_id) {
+          <button
+            mat-flat-button
+            class="sso-button"
+            [disabled]="loading()"
+            (click)="ssoLogin(config.sp_id)"
+          >
+            <mat-icon>login</mat-icon>
+            <ng-container i18n="Single sign-on button; the label names the identity provider"
+              >Sign in with {{ config.label }}</ng-container
+            >
+          </button>
+        }
+
+        @if (ssoConfigs().length > 0 && !showLocalLogin()) {
+          <button
+            type="button"
+            class="local-login-toggle"
+            (click)="showLocalLogin.set(true)"
+            i18n="Link that reveals the local login form when SSO is available"
+          >
+            Sign in with username and password
+          </button>
+        } @else {
+        @if (ssoConfigs().length > 0) {
+          <div class="login-divider">
+            <span i18n="Separator between SSO buttons and the local login form">or</span>
+          </div>
+        }
+
+        <form (ngSubmit)="submit()">
+          <mat-form-field appearance="outline" class="login-field">
+            <mat-label i18n="Login form field label">Username</mat-label>
+            <input
+              matInput
+              name="username"
+              [(ngModel)]="username"
+              autocomplete="username"
+              required
+            />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="login-field">
+            <mat-label i18n="Login form field label">Password</mat-label>
+            <input
+              matInput
+              type="password"
+              name="password"
+              [(ngModel)]="password"
+              autocomplete="current-password"
+              required
+            />
+          </mat-form-field>
+
+          <button
+            mat-flat-button
+            type="submit"
+            class="login-submit"
+            [disabled]="!canSubmit()"
+          >
+            @if (loading()) {
+              <mat-spinner diameter="20" />
+            } @else {
+              <ng-container i18n="Login form submit button">Sign in</ng-container>
+            }
+          </button>
+        </form>
+        }
+        }
+      }
+    </mat-card-content>
+  </mat-card>
+</div>

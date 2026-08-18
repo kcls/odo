@@ -1,0 +1,102 @@
+:host {
+  display: block;
+}
+
+.user-meta {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.header-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.danger-button {
+  color: var(--mat-sys-error);
+}
+
+// Compact label/value pairs for the Account + SAML facts.
+.facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 16px;
+  margin: 0;
+  max-width: 640px;
+
+  dt {
+    color: var(--mat-sys-on-surface-variant);
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+
+  dd {
+    margin: 0;
+    word-break: break-word;
+  }
+}
+
+.summary-subhead {
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 12px 0 6px;
+
+  &:first-child {
+    margin-top: 0;
+  }
+}
+
+.summary-list {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  max-width: 640px;
+
+  li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--mat-sys-outline-variant);
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+}
+
+.summary-list-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.summary-list-title {
+  font-size: 0.9rem;
+}
+
+.summary-list-sub {
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.role-code {
+  color: var(--mat-sys-on-surface-variant);
+  margin-left: 8px;
+}
+
+.cell-agent {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.8rem;
+}

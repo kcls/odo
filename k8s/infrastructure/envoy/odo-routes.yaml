@@ -1,0 +1,168 @@
+# Public odo-auth routes — no JWT required.
+# Login, logout, token operations, and health are accessible without
+# a bearer token.  Future SSO/SAML callback paths go here too.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: odo-auth-public
+spec:
+  parentRefs:
+    - name: envoy
+  rules:
+    - matches:
+        - path:
+            type: Exact
+            value: /api/v1/odo/auth/login
+        - path:
+            type: Exact
+            value: /api/v1/odo/auth/logout
+        - path:
+            type: PathPrefix
+            value: /api/v1/odo/auth/token
+        - path:
+            type: PathPrefix
+            value: /api/v1/odo/auth/saml
+      backendRefs:
+        - name: odo-auth
+          namespace: odo-pub
+          port: 8080
+---
+# OpenAPI specs — no auth required.
+# Each service serves its own spec at /api-doc/openapi.json.
+# Routed via service-specific paths so they don't collide.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: odo-api-docs
+spec:
+  parentRefs:
+    - name: envoy
+  rules:
+    - matches:
+        - path:
+            type: Exact
+            value: /api/v1/odo/auth/api-doc/openapi.json
+      backendRefs:
+        - name: odo-auth
+          namespace: odo-pub
+          port: 8080
+    - matches:
+        - path:
+            type: Exact
+            value: /api/v1/odo/org/api-doc/openapi.json
+      backendRefs:
+        - name: odo-org
+          namespace: odo-pub
+          port: 8080
+    - matches:
+        - path:
+            type: Exact
+            value: /api/v1/odo/notify/api-doc/openapi.json
+      backendRefs:
+        - name: odo-notify
+          namespace: odo-pub
+          port: 8080
+    - matches:
+        - path:
+            type: Exact
+            value: /api/v1/odo/asset/api-doc/openapi.json
+      backendRefs:
+        - name: odo-asset
+          namespace: odo-pub
+          port: 8080
+---
+# Protected odo routes — JWT required (SecurityPolicy attached via
+# odo-security.yaml).  All paths here require a valid bearer token.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: odo-protected
+spec:
+  parentRefs:
+    - name: envoy
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api/v1/odo/auth/authz
+        - path:
+            type: PathPrefix
+            value: /api/v1/odo/auth/user
+      backendRefs:
+        - name: odo-auth
+          namespace: odo-pub
+          port: 8080
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api/v1/odo/org
+      backendRefs:
+        - name: odo-org
+          namespace: odo-pub
+          port: 8080
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api/v1/odo/notify
+      backendRefs:
+        - name: odo-notify
+          namespace: odo-pub
+          port: 8080
+    # odo-asset: upload + JSON batch ops live under odo-protected
+    # so they inherit envoy's JWT enforcement. The `/files/{*path}`
+    # GET retrieval route is *not* listed here — see
+    # `odo-asset-file-retrieval` below for why.
+    - matches:
+        - path:
+            type: Exact
+            value: /api/v1/odo/asset/upload
+        - path:
+            type: Exact
+            value: /api/v1/odo/asset/files/get
+        - path:
+            type: Exact
+            value: /api/v1/odo/asset/files/delete
+        - path:
+            type: PathPrefix
+            value: /api/v1/odo/asset/directory
+      backendRefs:
+        - name: odo-asset
+          namespace: odo-pub
+          port: 8080
+---
+# odo-asset: file retrieval. Not under odo-protected because the UI
+# uses <img src="...?token=..."> to render files, and envoy's
+# Authorization-header-only JWT check would reject that. odo-asset's
+# `retrieve` handler validates the token itself from either header or
+# `?token=` query param — defense-in-depth.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: odo-asset-file-retrieval
+spec:
+  parentRefs:
+    - name: envoy
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api/v1/odo/asset/files/
+      backendRefs:
+        - name: odo-asset
+          namespace: odo-pub
+          port: 8080
+---
+# Allow HTTPRoutes in the default namespace to services in odo-pub
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: allow-envoy-to-odo-pub
+  namespace: odo-pub
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: default
+  to:
+    - group: ""
+      kind: Service

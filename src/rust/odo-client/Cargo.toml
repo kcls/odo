@@ -1,0 +1,29 @@
+[package]
+name = "odo-client"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+chrono-tz = "0.10"
+uuid = { version = "1.0", features = ["v4", "serde"] }
+tokio = { version = "1.35", features = ["rt", "macros", "time"] }
+jsonwebtoken = "9.2"
+rsa = { version = "0.9", features = ["pem"] }
+base64 = "0.22"
+utoipa = { version = "5", features = ["axum_extras"] }
+axum = "0.8"
+tracing = "0.1"
+reqwest = { version = "0.12", features = ["json", "http2", "rustls-tls"], default-features = false }
+
+# Only for the From<sea_orm::DbErr> error conversions; brings in no
+# database driver. Enabled by the `seaorm` feature (on by default —
+# every current consumer is a SeaORM app; a pure-HTTP client can opt out
+# with default-features = false).
+sea-orm = { version = "2.0.0-rc", default-features = false, optional = true, features = ["macros"] }
+
+[features]
+default = ["seaorm"]
+seaorm = ["dep:sea-orm"]

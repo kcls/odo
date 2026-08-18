@@ -1,0 +1,63 @@
+<div class="page-header">
+  <h1 i18n="Roles page heading">Roles</h1>
+  @if (canWrite()) {
+    <button mat-flat-button (click)="createRole()">
+      <mat-icon>add</mat-icon>
+      <ng-container i18n="Button that opens the create-role dialog">New Role</ng-container>
+    </button>
+  }
+</div>
+
+<div class="list-controls">
+  <mat-form-field appearance="outline" class="list-filter" subscriptSizing="dynamic">
+    <mat-label i18n="Placeholder for the role filter input">Filter</mat-label>
+    <input matInput [ngModel]="search()" (ngModelChange)="onSearch($event)" />
+    <mat-icon matSuffix>search</mat-icon>
+  </mat-form-field>
+</div>
+
+@if (loading()) {
+  <div class="list-loading"><mat-spinner diameter="36" /></div>
+} @else if (roles().length === 0) {
+  <p class="list-empty" i18n="Shown when no roles match">No roles found.</p>
+} @else {
+  <odo-table
+    [rows]="roles()"
+    [displayedColumns]="columns"
+    [clickableRows]="true"
+    [sort]="sort()"
+    (sortChange)="onSort($event)"
+    (rowClick)="open($event)"
+  >
+    <ng-container cdkColumnDef="code">
+      <th cdk-header-cell *cdkHeaderCellDef>
+        <odo-sort-header key="code" i18n="Table column header">Code</odo-sort-header>
+      </th>
+      <td cdk-cell *cdkCellDef="let role" class="cell-code">{{ role.code }}</td>
+    </ng-container>
+
+    <ng-container cdkColumnDef="label">
+      <th cdk-header-cell *cdkHeaderCellDef>
+        <odo-sort-header key="label" i18n="Table column header">Label</odo-sort-header>
+      </th>
+      <td cdk-cell *cdkCellDef="let role">{{ role.label }}</td>
+    </ng-container>
+
+    <ng-container cdkColumnDef="permissions">
+      <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header: number of permission grants">Permissions</th>
+      <td cdk-cell *cdkCellDef="let role">{{ role.perm_count }}</td>
+    </ng-container>
+
+    <ng-container cdkColumnDef="users">
+      <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header: number of users holding the role">Users</th>
+      <td cdk-cell *cdkCellDef="let role">{{ role.user_count }}</td>
+    </ng-container>
+  </odo-table>
+
+  <odo-paginator
+    [length]="total()"
+    [pageIndex]="pageIndex()"
+    [pageSize]="pageSize()"
+    (page)="onPage($event)"
+  />
+}

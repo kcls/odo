@@ -1,0 +1,18 @@
+<div class="page-header">
+  <div class="detail-heading">
+    <a mat-button [routerLink]="backLink()">
+      <mat-icon>arrow_back</mat-icon>
+      {{ backLabel() }}
+    </a>
+    <h1>{{ title() }}</h1>
+    <div class="detail-summary">
+      <ng-content select="[slot=summary]" />
+    </div>
+  </div>
+
+  <div class="detail-actions">
+    <ng-content select="[slot=actions]" />
+  </div>
+</div>
+
+<ng-content />

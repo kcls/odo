@@ -1,0 +1,21 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: odo-core
+  labels:
+    name: odo-core
+    part-of: odo
+    environment: production
+    argocd.argoproj.io/managed-by: argocd
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: odo-pub
+  labels:
+    name: odo-pub
+    part-of: odo
+    environment: production
+    description: public-facing-services
+    argocd.argoproj.io/managed-by: argocd

@@ -1,0 +1,2058 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "odo-org",
+    "description": "Organization unit service",
+    "license": {
+      "name": ""
+    },
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/v1/odo/org/admin/address/create": {
+      "post": {
+        "tags": [
+          "org-admin"
+        ],
+        "operationId": "create_address",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAddressRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Newly-created address",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddressRow"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/org/admin/address/delete": {
+      "post": {
+        "tags": [
+          "org-admin"
+        ],
+        "operationId": "delete_address",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddressIdRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Address deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrgChildSuccessResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/org/admin/address/update": {
+      "post": {
+        "tags": [
+          "org-admin"
+        ],
+        "operationId": "update_address",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAddressRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Updated address",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddressRow"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/org/admin/closure/create": {
+      "post": {
+        "tags": [
+          "org-admin"
+        ],
+        "operationId": "create_closure",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateClosureRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Newly-created closure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClosureRow"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/org/admin/closure/delete": {
+      "post": {
+        "tags": [
+          "org-admin"
+        ],
+        "operationId": "delete_closure",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClosureIdRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Closure deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrgChildSuccessResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/org/admin/closure/update": {
+      "post": {
+        "tags": [
+          "org-admin"
+        ],
+        "operationId": "update_closure",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateClosureRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Updated closure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClosureRow"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/org/admin/operating-hours/create": {
+      "post": {
+        "tags": [
+          "org-admin"
+        ],
+        "operationId": "create_operating_hours",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOperatingHoursRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Newly-created operating hours row",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatingHoursRow"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/org/admin/operating-hours/delete": {
+      "post": {
+        "tags": [
+          "org-admin"
+        ],
+        "operationId": "delete_operating_hours",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatingHoursIdRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Operating hours row deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrgChildSuccessResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/org/admin/operating-hours/update": {
+      "post": {
+        "tags": [
+          "org-admin"
+        ],
+        "operationId": "update_operating_hours",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOperatingHoursRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Updated operating hours row",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatingHoursRow"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/org/admin/unit-children": {
+      "post": {
+        "tags": [
+          "org-admin"
+        ],
+        "operationId": "list_unit_children",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrgUnitChildrenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "All addresses, closures, and operating hours for one org unit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrgUnitChildrenResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/org/admin/unit-type/create": {
+      "post": {
+        "tags": [
+          "org-admin"
+        ],
+        "operationId": "create_unit_type",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUnitTypeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Newly-created org unit type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnitTypeRow"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/org/admin/unit-type/delete": {
+      "post": {
+        "tags": [
+          "org-admin"
+        ],
+        "operationId": "delete_unit_type",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnitTypeIdRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Org unit type deactivated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrgAdminSuccessResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/org/admin/unit-type/list": {
+      "post": {
+        "tags": [
+          "org-admin"
+        ],
+        "operationId": "list_unit_types",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ListUnitTypesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Active org unit types with usage counts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnitTypePage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/org/admin/unit-type/update": {
+      "post": {
+        "tags": [
+          "org-admin"
+        ],
+        "operationId": "update_unit_type",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUnitTypeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Updated org unit type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnitTypeRow"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/org/admin/unit/create": {
+      "post": {
+        "tags": [
+          "org-admin"
+        ],
+        "operationId": "create_unit",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUnitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Newly-created org unit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnitRow"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/org/admin/unit/delete": {
+      "post": {
+        "tags": [
+          "org-admin"
+        ],
+        "operationId": "delete_unit",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnitIdRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Org unit deactivated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrgAdminSuccessResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/org/admin/unit/update": {
+      "post": {
+        "tags": [
+          "org-admin"
+        ],
+        "operationId": "update_unit",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUnitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Updated org unit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnitRow"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/org/root": {
+      "get": {
+        "tags": [
+          "org"
+        ],
+        "operationId": "org_unit_root",
+        "responses": {
+          "200": {
+            "description": "The root org unit (flat, no children)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrgUnitResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/org/tree": {
+      "get": {
+        "tags": [
+          "org"
+        ],
+        "operationId": "org_unit_tree",
+        "responses": {
+          "200": {
+            "description": "Full org unit tree",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrgUnitResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/org/unit/label-batch": {
+      "post": {
+        "tags": [
+          "org"
+        ],
+        "summary": "Batch lookup of org-unit `(code, label)` keyed by id.",
+        "description": "Built for callers that hold a set of org_unit ids and just need\ndisplay labels — e.g. patron.search's per-page decoration. Unknown ids\nare silently dropped from the response.",
+        "operationId": "org_unit_label_batch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabelBatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Labels for the requested org-unit ids",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabelBatchResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/org/unit/uuid/{uuid}": {
+      "get": {
+        "tags": [
+          "org"
+        ],
+        "summary": "Unit detail by stable uuid (durable references): same response and\nsoft-delete semantics as the id route.",
+        "operationId": "org_unit_detail_by_uuid",
+        "parameters": [
+          {
+            "name": "uuid",
+            "in": "path",
+            "description": "Org unit uuid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrgUnitDetailResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/org/unit/uuid/{uuid}/ancestors": {
+      "get": {
+        "tags": [
+          "org"
+        ],
+        "summary": "Ancestor chain by stable uuid.",
+        "operationId": "org_unit_ancestors_by_uuid",
+        "parameters": [
+          {
+            "name": "uuid",
+            "in": "path",
+            "description": "Org unit uuid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OrgUnitResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/org/unit/uuid/{uuid}/descendants": {
+      "get": {
+        "tags": [
+          "org"
+        ],
+        "summary": "Descendant subtree by stable uuid.",
+        "operationId": "org_unit_descendants_by_uuid",
+        "parameters": [
+          {
+            "name": "uuid",
+            "in": "path",
+            "description": "Org unit uuid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OrgUnitResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/org/unit/{id}": {
+      "get": {
+        "tags": [
+          "org"
+        ],
+        "operationId": "org_unit_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Org unit ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Org unit detail with addresses, hours, and closures",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrgUnitDetailResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/org/unit/{id}/ancestors": {
+      "get": {
+        "tags": [
+          "org"
+        ],
+        "operationId": "org_unit_ancestors",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Org unit ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ancestor chain from root to target",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OrgUnitResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/org/unit/{id}/descendants": {
+      "get": {
+        "tags": [
+          "org"
+        ],
+        "operationId": "org_unit_descendants",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Org unit ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "All descendants (flat list)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OrgUnitResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AddressIdRequest": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "AddressResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "org_unit",
+          "address_type",
+          "label"
+        ],
+        "properties": {
+          "address_line1": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "address_line2": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "address_type": {
+            "type": "string"
+          },
+          "city": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "label": {
+            "type": "string"
+          },
+          "org_unit": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "postal_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "state_province": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "AddressRow": {
+        "type": "object",
+        "required": [
+          "id",
+          "org_unit",
+          "address_type",
+          "label"
+        ],
+        "properties": {
+          "address_line1": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "address_line2": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "address_type": {
+            "type": "string"
+          },
+          "city": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "label": {
+            "type": "string"
+          },
+          "org_unit": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "postal_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "state_province": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "ClosureIdRequest": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "ClosureResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "org_unit",
+          "closure_date",
+          "reason"
+        ],
+        "properties": {
+          "closure_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "is_emergency": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "org_unit": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "ClosureRow": {
+        "type": "object",
+        "required": [
+          "id",
+          "org_unit",
+          "closure_date",
+          "reason",
+          "is_emergency"
+        ],
+        "properties": {
+          "closure_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "is_emergency": {
+            "type": "boolean"
+          },
+          "org_unit": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateAddressRequest": {
+        "type": "object",
+        "required": [
+          "org_unit",
+          "address_type",
+          "label"
+        ],
+        "properties": {
+          "address_line1": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "address_line2": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "address_type": {
+            "type": "string"
+          },
+          "city": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "org_unit": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "postal_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "state_province": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "CreateClosureRequest": {
+        "type": "object",
+        "required": [
+          "org_unit",
+          "closure_date",
+          "reason"
+        ],
+        "properties": {
+          "closure_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "is_emergency": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "org_unit": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateOperatingHoursRequest": {
+        "type": "object",
+        "required": [
+          "org_unit",
+          "day_of_week",
+          "open_time",
+          "close_time"
+        ],
+        "properties": {
+          "close_time": {
+            "type": "string"
+          },
+          "day_of_week": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "is_closed": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "open_time": {
+            "type": "string"
+          },
+          "org_unit": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "CreateUnitRequest": {
+        "type": "object",
+        "required": [
+          "label",
+          "code",
+          "parent",
+          "unit_type"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "parent": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Required: new units always attach below an existing unit."
+          },
+          "timezone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "unit_type": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "CreateUnitTypeRequest": {
+        "type": "object",
+        "required": [
+          "label"
+        ],
+        "properties": {
+          "can_have_patrons": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "can_have_staff": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "parent": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "LabelBatchRequest": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "description": "Lookup by database id."
+          },
+          "include_deleted": {
+            "type": "boolean",
+            "description": "Opt in to also resolve soft-deleted units (flagged with deleted_at).\nDefault false keeps this active-only, so write-time existence checks\nstill reject deleted ids."
+          },
+          "uuids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Lookup by stable uuid (durable references). May be mixed with `ids`;\nentries are deduplicated in the response."
+          }
+        }
+      },
+      "LabelBatchResponse": {
+        "type": "object",
+        "required": [
+          "labels"
+        ],
+        "properties": {
+          "labels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrgUnitLabelEntry"
+            }
+          }
+        }
+      },
+      "ListUnitTypesRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Page"
+          },
+          {
+            "$ref": "#/components/schemas/Sort"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "search": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "OperatingHoursIdRequest": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "OperatingHoursResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "org_unit",
+          "day_of_week",
+          "open_time",
+          "close_time"
+        ],
+        "properties": {
+          "close_time": {
+            "type": "string"
+          },
+          "day_of_week": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "is_closed": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "open_time": {
+            "type": "string"
+          },
+          "org_unit": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "OperatingHoursRow": {
+        "type": "object",
+        "required": [
+          "id",
+          "org_unit",
+          "day_of_week",
+          "open_time",
+          "close_time",
+          "is_closed"
+        ],
+        "properties": {
+          "close_time": {
+            "type": "string"
+          },
+          "day_of_week": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "is_closed": {
+            "type": "boolean"
+          },
+          "open_time": {
+            "type": "string"
+          },
+          "org_unit": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "OrgAdminSuccessResponse": {
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "OrgChildSuccessResponse": {
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "OrgUnitChildrenRequest": {
+        "type": "object",
+        "required": [
+          "org_unit"
+        ],
+        "properties": {
+          "org_unit": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "OrgUnitChildrenResponse": {
+        "type": "object",
+        "required": [
+          "addresses",
+          "closures",
+          "operating_hours"
+        ],
+        "properties": {
+          "addresses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AddressRow"
+            }
+          },
+          "closures": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClosureRow"
+            }
+          },
+          "operating_hours": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OperatingHoursRow"
+            }
+          }
+        }
+      },
+      "OrgUnitDetailResponse": {
+        "type": "object",
+        "required": [
+          "org_unit",
+          "addresses",
+          "operating_hours",
+          "future_closures"
+        ],
+        "properties": {
+          "addresses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AddressResponse"
+            }
+          },
+          "future_closures": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClosureResponse"
+            }
+          },
+          "operating_hours": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OperatingHoursResponse"
+            }
+          },
+          "org_unit": {
+            "$ref": "#/components/schemas/OrgUnitResponse"
+          }
+        }
+      },
+      "OrgUnitLabelEntry": {
+        "type": "object",
+        "required": [
+          "id",
+          "uuid",
+          "code",
+          "label"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "deleted_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "RFC3339 soft-delete timestamp; null for active units."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "label": {
+            "type": "string"
+          },
+          "uuid": {
+            "type": "string"
+          }
+        }
+      },
+      "OrgUnitResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "uuid",
+          "code",
+          "label",
+          "unit_type"
+        ],
+        "properties": {
+          "children": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/OrgUnitResponse"
+            }
+          },
+          "code": {
+            "type": "string"
+          },
+          "deleted_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "RFC3339 soft-delete timestamp; null for active units. Only ever set on\nresolve-by-id responses (GET unit/{id}) — tree/scoping stay active-only."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "label": {
+            "type": "string"
+          },
+          "parent": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "timezone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "unit_type": {
+            "$ref": "#/components/schemas/OrgUnitType"
+          },
+          "uuid": {
+            "type": "string",
+            "description": "Stable, DB-independent identity (see odo-durable-references)."
+          }
+        }
+      },
+      "OrgUnitType": {
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "can_have_staff",
+          "can_have_patrons"
+        ],
+        "properties": {
+          "can_have_patrons": {
+            "type": "boolean"
+          },
+          "can_have_staff": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "label": {
+            "type": "string"
+          },
+          "parent": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "Page": {
+        "type": "object",
+        "description": "Standard pagination inputs for admin list endpoints. Flatten this into a\nper-resource request struct alongside that resource's own filter fields:\n\n```ignore\n#[derive(Deserialize, ToSchema)]\npub struct ListThingsRequest {\n    #[serde(default)]\n    search: Option<String>,\n    #[serde(flatten)]\n    page: Page,\n}\n```",
+        "properties": {
+          "limit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "minimum": 0
+          },
+          "offset": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "Sort": {
+        "type": "object",
+        "description": "Standard sort inputs for admin list endpoints. Flatten this into a\nper-resource request struct alongside `Page`:\n\n```ignore\n#[derive(Deserialize, ToSchema)]\npub struct ListThingsRequest {\n    #[serde(default)]\n    search: Option<String>,\n    #[serde(flatten)]\n    page: Page,\n    #[serde(flatten)]\n    sort: Sort,\n}\n```\n\n`sort_by` is a client-supplied string, so a handler must NEVER map it to a\ncolumn directly — resolve it against an explicit allow-list with\n[`Sort::resolve`], which falls back to the handler's default for any\nunknown or absent key.",
+        "properties": {
+          "sort_by": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Logical column key to sort by (must be one the handler allow-lists)."
+          },
+          "sort_dir": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SortDir",
+                "description": "Sort direction; defaults to ascending when a `sort_by` is given."
+              }
+            ]
+          }
+        }
+      },
+      "SortDir": {
+        "type": "string",
+        "description": "Sort direction for a list endpoint.",
+        "enum": [
+          "asc",
+          "desc"
+        ]
+      },
+      "UnitIdRequest": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "UnitRow": {
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "code",
+          "unit_type",
+          "unit_type_label"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "label": {
+            "type": "string"
+          },
+          "parent": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "timezone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "unit_type": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unit_type_label": {
+            "type": "string"
+          }
+        }
+      },
+      "UnitTypeIdRequest": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "UnitTypePage": {
+        "type": "object",
+        "description": "One page of org unit types.",
+        "required": [
+          "rows",
+          "total"
+        ],
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UnitTypeRow"
+            },
+            "description": "The rows on this page."
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Total rows matching the filter, ignoring limit/offset."
+          }
+        }
+      },
+      "UnitTypeRow": {
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "can_have_staff",
+          "can_have_patrons",
+          "unit_count"
+        ],
+        "properties": {
+          "can_have_patrons": {
+            "type": "boolean"
+          },
+          "can_have_staff": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "label": {
+            "type": "string"
+          },
+          "parent": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "parent_label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "unit_count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Active org units of this type."
+          }
+        }
+      },
+      "UpdateAddressRequest": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "address_line1": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "address_line2": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "address_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "city": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "postal_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "state_province": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "UpdateClosureRequest": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "closure_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "is_emergency": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "UpdateOperatingHoursRequest": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "close_time": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "day_of_week": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "is_closed": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "open_time": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "UpdateUnitRequest": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "parent": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "timezone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Empty string clears the timezone."
+          },
+          "unit_type": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "UpdateUnitTypeRequest": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "can_have_patrons": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "can_have_staff": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "parent": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "bearer": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "org",
+      "description": "Organization unit hierarchy, detail, ancestors, and descendants"
+    },
+    {
+      "name": "org-admin",
+      "description": "Org unit and unit type administration (requires Bearer token)"
+    }
+  ]
+}

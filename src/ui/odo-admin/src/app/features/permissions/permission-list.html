@@ -1,0 +1,87 @@
+<div class="page-header">
+  <h1 i18n="Permissions page heading">Permissions</h1>
+  @if (canWrite()) {
+    <button mat-flat-button (click)="openDialog()">
+      <mat-icon>add</mat-icon>
+      <ng-container i18n="Button that opens the create-permission dialog"
+        >New Permission</ng-container
+      >
+    </button>
+  }
+</div>
+
+<div class="list-controls">
+  <mat-form-field appearance="outline" class="list-filter" subscriptSizing="dynamic">
+    <mat-label i18n="Placeholder for the permission filter input">Filter</mat-label>
+    <input matInput [ngModel]="search()" (ngModelChange)="onSearch($event)" />
+    <mat-icon matSuffix>search</mat-icon>
+  </mat-form-field>
+</div>
+
+@if (loading()) {
+  <div class="list-loading"><mat-spinner diameter="36" /></div>
+} @else if (permissions().length === 0) {
+  <p class="list-empty" i18n="Shown when no permissions match">
+    No permissions found.
+  </p>
+} @else {
+  <odo-table
+    [rows]="permissions()"
+    [displayedColumns]="columns"
+    [sort]="sort()"
+    (sortChange)="onSort($event)"
+  >
+    <ng-container cdkColumnDef="code">
+      <th cdk-header-cell *cdkHeaderCellDef>
+        <odo-sort-header key="code" i18n="Table column header">Code</odo-sort-header>
+      </th>
+      <td cdk-cell *cdkCellDef="let perm" class="cell-code">{{ perm.code }}</td>
+    </ng-container>
+
+    <ng-container cdkColumnDef="description">
+      <th cdk-header-cell *cdkHeaderCellDef>
+        <odo-sort-header key="description" i18n="Table column header"
+          >Description</odo-sort-header
+        >
+      </th>
+      <td cdk-cell *cdkCellDef="let perm">{{ perm.description }}</td>
+    </ng-container>
+
+    <ng-container cdkColumnDef="roles">
+      <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header: number of roles granting the permission">Roles</th>
+      <td cdk-cell *cdkCellDef="let perm">{{ perm.role_count }}</td>
+    </ng-container>
+
+    <ng-container cdkColumnDef="actions">
+      <th cdk-header-cell *cdkHeaderCellDef></th>
+      <td cdk-cell *cdkCellDef="let perm" class="cell-actions">
+        @if (canWrite()) {
+          <button
+            mat-icon-button
+            (click)="openDialog(perm)"
+            i18n-aria-label="Button that edits the permission"
+            aria-label="Edit permission"
+          >
+            <mat-icon>edit</mat-icon>
+          </button>
+          <button
+            mat-icon-button
+            [disabled]="perm.role_count > 0"
+            (click)="deletePermission(perm)"
+            i18n-aria-label="Button that deletes the permission"
+            aria-label="Delete permission"
+          >
+            <mat-icon>delete</mat-icon>
+          </button>
+        }
+      </td>
+    </ng-container>
+  </odo-table>
+
+  <odo-paginator
+    [length]="total()"
+    [pageIndex]="pageIndex()"
+    [pageSize]="pageSize()"
+    (page)="onPage($event)"
+  />
+}

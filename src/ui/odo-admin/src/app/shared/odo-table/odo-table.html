@@ -1,0 +1,19 @@
+<table
+  cdk-table
+  [dataSource]="rows()"
+  class="odo-table"
+  [class.odo-table--plain]="variant() === 'plain'"
+>
+  <!-- Caller-projected column definitions get registered with this table
+       in the component via addColumnDef(). -->
+  <ng-content />
+
+  <tr cdk-header-row *cdkHeaderRowDef="displayedColumns()"></tr>
+  <tr
+    cdk-row
+    *cdkRowDef="let row; columns: displayedColumns()"
+    class="odo-row"
+    [class.odo-row--clickable]="clickableRows()"
+    (click)="clickableRows() && rowClick.emit(row)"
+  ></tr>
+</table>

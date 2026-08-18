@@ -1,0 +1,67 @@
+// Our own table styling over cdk-table's bare markup. No Material component
+// internals are touched — cdk-table emits plain table elements plus
+// `.cdk-*` classes, which are ours to style.
+//
+// This component uses ViewEncapsulation.None so these rules reach the column
+// cells projected in from the host template. Every selector is prefixed with
+// `odo-table` / `.odo-table` to keep it scoped in practice.
+odo-table {
+  display: block;
+}
+
+.odo-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--mat-sys-surface-container-lowest);
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 12px;
+  // Clip the rounded corners against the header/last-row backgrounds.
+  overflow: hidden;
+
+  // Nested-in-a-card variant: let the card supply the surface + frame.
+  &.odo-table--plain {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+  }
+}
+
+// Header cells. Slightly stronger divider so the header reads as distinct
+// from the body rows.
+.odo-table th.cdk-header-cell {
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: var(--mat-sys-on-surface-variant);
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--mat-sys-outline);
+  white-space: nowrap;
+}
+
+// Body cells: a divider line between every row, with roomier padding.
+.odo-table td.cdk-cell {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+  color: var(--mat-sys-on-surface);
+  vertical-align: middle;
+}
+
+// Last row shouldn't carry a divider into the rounded frame.
+.odo-table tr.odo-row:last-child td.cdk-cell {
+  border-bottom: none;
+}
+
+.odo-row--clickable {
+  cursor: pointer;
+
+  &:hover td.cdk-cell {
+    background: var(--mat-sys-surface-container);
+  }
+}
+
+// Right-aligned trailing action column (opt-in via a cell class).
+.odo-table .cell-actions {
+  text-align: right;
+  white-space: nowrap;
+  width: 1%;
+}

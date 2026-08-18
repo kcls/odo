@@ -1,0 +1,26 @@
+# JWT authentication for protected odo routes.
+#
+# Envoy validates RS256 tokens using the public key served by
+# odo-auth's JWKS endpoint.  Validated claims are forwarded to
+# backends as headers for convenience (backends still carry their
+# own require_auth middleware as defense-in-depth).
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: odo-jwt-auth
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: odo-protected
+  jwt:
+    providers:
+      - name: odo-auth
+        issuer: odo-auth
+        remoteJWKS:
+          uri: http://odo-auth.odo-pub.svc.cluster.local:8080/.well-known/jwks.json
+        claimToHeaders:
+          - header: x-user-id
+            claim: sub
+          - header: x-user-email
+            claim: email

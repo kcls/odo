@@ -1,0 +1,307 @@
+@if (loading()) {
+  <div class="list-loading"><mat-spinner diameter="36" /></div>
+} @else if (idp(); as i) {
+  <odo-detail-page
+    backLink="/saml"
+    i18n-backLabel="Back link to the IdP list"
+    backLabel="SAML"
+    [title]="i.name"
+  >
+    <div slot="summary">
+      <span class="cell-code">{{ i.entity_id }}</span>
+      @if (i.is_active) {
+        <span class="status-badge status-active" i18n="Config status badge">Active</span>
+      } @else {
+        <span class="status-badge status-inactive" i18n="Config status badge">Inactive</span>
+      }
+    </div>
+
+    @if (canWrite()) {
+      <div slot="actions">
+        <button mat-stroked-button (click)="editIdp()">
+          <mat-icon>edit</mat-icon>
+          <ng-container i18n="Button that edits the IdP">Edit</ng-container>
+        </button>
+        <button
+          mat-stroked-button
+          class="danger-button"
+          [disabled]="i.sp_count > 0 || i.user_count > 0"
+          (click)="deleteIdp()"
+        >
+          <mat-icon>delete</mat-icon>
+          <ng-container i18n="Button that deletes the IdP">Delete</ng-container>
+        </button>
+      </div>
+    }
+
+    <section class="section">
+      <div class="section-header">
+        <h2 i18n="Identity provider configuration section heading">Configuration</h2>
+      </div>
+      <dl class="facts">
+        <dt i18n="IdP field label">SSO URL</dt>
+        <dd class="cell-code">{{ i.sso_url || '—' }}</dd>
+
+        <dt i18n="IdP field label">SLO URL</dt>
+        <dd class="cell-code">{{ i.slo_url || '—' }}</dd>
+
+        <dt i18n="IdP field label">Metadata URL</dt>
+        <dd class="cell-code">{{ i.metadata_url || '—' }}</dd>
+
+        <dt i18n="IdP field label">Session lifetime</dt>
+        <dd>
+          @if (i.session_lifetime_hours) {
+            <ng-container i18n="Session lifetime in hours"
+              >{{ i.session_lifetime_hours }} hour(s)</ng-container
+            >
+          } @else {
+            —
+          }
+        </dd>
+
+        <dt i18n="IdP field label">IdP-initiated login</dt>
+        <dd>
+          @if (i.allow_idp_initiated) {
+            <ng-container i18n="Yes">Allowed</ng-container>
+          } @else {
+            <ng-container i18n="No">Not allowed</ng-container>
+          }
+        </dd>
+
+        <dt i18n="Label for how many users have identities from this IdP">Users</dt>
+        <dd>{{ i.user_count }}</dd>
+      </dl>
+    </section>
+
+    <section class="section">
+      <div class="section-header">
+        <div>
+          <h2 i18n="Service providers section heading">Service providers</h2>
+          <p class="page-intro" i18n="Explanation of the service providers section">
+            Service provider configurations presented to this identity provider.
+          </p>
+        </div>
+        @if (canWrite()) {
+          <button mat-flat-button (click)="openSpDialog()">
+            <mat-icon>add</mat-icon>
+            <ng-container i18n="Button that opens the create-SP dialog">New SP</ng-container>
+          </button>
+        }
+      </div>
+
+      @if (sps().length === 0) {
+        <p class="list-empty" i18n="Shown when no SPs are configured for this IdP">
+          No service providers for this identity provider.
+        </p>
+      } @else {
+        <odo-table [rows]="sps()" [displayedColumns]="spColumns">
+          <ng-container cdkColumnDef="label">
+            <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">Label</th>
+            <td cdk-cell *cdkCellDef="let sp">
+              {{ sp.label }}
+              <div class="cell-code sp-entity">{{ sp.entity_id }}</div>
+            </td>
+          </ng-container>
+
+          <ng-container cdkColumnDef="acs_url">
+            <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">ACS URL</th>
+            <td cdk-cell *cdkCellDef="let sp" class="cell-code">{{ sp.acs_url }}</td>
+          </ng-container>
+
+          <ng-container cdkColumnDef="status">
+            <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">Status</th>
+            <td cdk-cell *cdkCellDef="let sp">
+              @if (sp.is_active) {
+                <span class="status-badge status-active" i18n="Config status badge">Active</span>
+              } @else {
+                <span class="status-badge status-inactive" i18n="Config status badge">Inactive</span>
+              }
+              @if (!sp.has_private_key) {
+                <span class="status-badge status-warn" i18n="Badge shown when the SP has no signing key stored">No key</span>
+              }
+            </td>
+          </ng-container>
+
+          <ng-container cdkColumnDef="actions">
+            <th cdk-header-cell *cdkHeaderCellDef></th>
+            <td cdk-cell *cdkCellDef="let sp" class="cell-actions">
+              @if (canWrite()) {
+                <button mat-icon-button (click)="openSpDialog(sp)" i18n-aria-label="Button that edits the SP" aria-label="Edit SP">
+                  <mat-icon>edit</mat-icon>
+                </button>
+                <button mat-icon-button (click)="deleteSp(sp)" i18n-aria-label="Button that deletes the SP" aria-label="Delete SP">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              }
+            </td>
+          </ng-container>
+        </odo-table>
+      }
+    </section>
+
+    <section class="section">
+      <div class="section-header">
+        <div>
+          <h2 i18n="Attributes section heading">Attributes</h2>
+          <p class="page-intro" i18n="Explanation of the IdP attributes section">
+            Assertion attributes tracked at login, used for working locations
+            and automatic role assignment.
+          </p>
+        </div>
+        @if (canWrite()) {
+          <button mat-flat-button (click)="openAttributeDialog()">
+            <mat-icon>add</mat-icon>
+            <ng-container i18n="Button that opens the create-attribute dialog">New Attribute</ng-container>
+          </button>
+        }
+      </div>
+
+      @if (attributes().length === 0) {
+        <p class="list-empty" i18n="Shown when no attributes are configured for this IdP">
+          No attributes for this identity provider.
+        </p>
+      } @else {
+        <odo-table [rows]="attributes()" [displayedColumns]="attrColumns">
+          <ng-container cdkColumnDef="key">
+            <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">Key</th>
+            <td cdk-cell *cdkCellDef="let attr" class="cell-code">{{ attr.key }}</td>
+          </ng-container>
+
+          <ng-container cdkColumnDef="label">
+            <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">Label</th>
+            <td cdk-cell *cdkCellDef="let attr">{{ attr.label }}</td>
+          </ng-container>
+
+          <ng-container cdkColumnDef="normalizer">
+            <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">Normalizer</th>
+            <td cdk-cell *cdkCellDef="let attr" class="cell-code">{{ attr.normalizer }}</td>
+          </ng-container>
+
+          <ng-container cdkColumnDef="flags">
+            <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">Used for</th>
+            <td cdk-cell *cdkCellDef="let attr">
+              @if (attr.is_location) {
+                <span class="status-badge status-info" i18n="Badge for location attributes">Location</span>
+              }
+              @if (attr.mapping_count > 0) {
+                <span class="status-badge status-info" i18n="Badge showing how many role mappings use the attribute">{{ attr.mapping_count }} mapping(s)</span>
+              }
+            </td>
+          </ng-container>
+
+          <ng-container cdkColumnDef="actions">
+            <th cdk-header-cell *cdkHeaderCellDef></th>
+            <td cdk-cell *cdkCellDef="let attr" class="cell-actions">
+              @if (canWrite()) {
+                <button mat-icon-button (click)="openAttributeDialog(attr)" i18n-aria-label="Button that edits the attribute" aria-label="Edit attribute">
+                  <mat-icon>edit</mat-icon>
+                </button>
+                <button mat-icon-button [disabled]="attr.mapping_count > 0" (click)="deleteAttribute(attr)" i18n-aria-label="Button that deletes the attribute" aria-label="Delete attribute">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              }
+            </td>
+          </ng-container>
+        </odo-table>
+      }
+    </section>
+
+    <section class="section">
+      <div class="section-header">
+        <div>
+          <h2 i18n="Role mappings section heading">Role mappings</h2>
+          <p class="page-intro" i18n="Explanation of the role mappings section">
+            Users whose attribute matches a value below are automatically
+            granted the mapped role at sign-in.
+          </p>
+        </div>
+        @if (canWrite()) {
+          <button mat-flat-button [disabled]="attributes().length === 0" (click)="openMappingDialog()">
+            <mat-icon>add</mat-icon>
+            <ng-container i18n="Button that opens the create-mapping dialog">New Mapping</ng-container>
+          </button>
+        }
+      </div>
+
+      <form class="mapping-search" (ngSubmit)="applyMappingSearch()">
+        <mat-form-field appearance="outline" class="list-filter" subscriptSizing="dynamic">
+          <mat-label i18n="Placeholder for the mapping value search">Search value</mat-label>
+          <input matInput name="mappingSearch" [(ngModel)]="mappingSearch" />
+          <mat-icon matSuffix>search</mat-icon>
+        </mat-form-field>
+        <button mat-stroked-button type="submit" i18n="Button that runs the mapping search">
+          Search
+        </button>
+      </form>
+
+      @if (mappingsLoading()) {
+        <div class="list-loading"><mat-spinner diameter="32" /></div>
+      } @else if (mappings().length === 0) {
+        <p class="list-empty" i18n="Shown when no role mappings match the current filter">
+          No role mappings found.
+        </p>
+      } @else {
+        <odo-table
+          [rows]="mappings()"
+          [displayedColumns]="mapColumns"
+          [sort]="mappingSort()"
+          (sortChange)="onMappingSort($event)"
+        >
+          <ng-container cdkColumnDef="attribute">
+            <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">Attribute</th>
+            <td cdk-cell *cdkCellDef="let map" class="cell-code">{{ map.attr_key }}</td>
+          </ng-container>
+
+          <ng-container cdkColumnDef="value">
+            <th cdk-header-cell *cdkHeaderCellDef>
+              <odo-sort-header key="value" i18n="Table column header">Value</odo-sort-header>
+            </th>
+            <td cdk-cell *cdkCellDef="let map">{{ map.attr_value }}</td>
+          </ng-container>
+
+          <ng-container cdkColumnDef="role">
+            <th cdk-header-cell *cdkHeaderCellDef>
+              <odo-sort-header key="role" i18n="Table column header">Role</odo-sort-header>
+            </th>
+            <td cdk-cell *cdkCellDef="let map">{{ map.role_label }}</td>
+          </ng-container>
+
+          <ng-container cdkColumnDef="status">
+            <th cdk-header-cell *cdkHeaderCellDef>
+              <odo-sort-header key="active" i18n="Table column header">Status</odo-sort-header>
+            </th>
+            <td cdk-cell *cdkCellDef="let map">
+              @if (map.is_active) {
+                <span class="status-badge status-active" i18n="Config status badge">Active</span>
+              } @else {
+                <span class="status-badge status-inactive" i18n="Config status badge">Inactive</span>
+              }
+            </td>
+          </ng-container>
+
+          <ng-container cdkColumnDef="actions">
+            <th cdk-header-cell *cdkHeaderCellDef></th>
+            <td cdk-cell *cdkCellDef="let map" class="cell-actions">
+              @if (canWrite()) {
+                <button mat-icon-button (click)="openMappingDialog(map)" i18n-aria-label="Button that edits the mapping" aria-label="Edit mapping">
+                  <mat-icon>edit</mat-icon>
+                </button>
+                <button mat-icon-button (click)="deleteMapping(map)" i18n-aria-label="Button that deletes the mapping" aria-label="Delete mapping">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              }
+            </td>
+          </ng-container>
+        </odo-table>
+
+        <odo-paginator
+          [length]="mappingTotal()"
+          [pageSize]="pageSize()"
+          [pageIndex]="pageIndex()"
+          [pageSizeOptions]="[10, 25, 50, 100]"
+          (page)="onMappingPage($event)"
+        />
+      }
+    </section>
+  </odo-detail-page>
+}

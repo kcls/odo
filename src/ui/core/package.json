@@ -1,0 +1,34 @@
+{
+  "name": "@odo/core",
+  "version": "1.0.0",
+  "description": "Core API utilities for Odo UI applications",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./utils": "./dist/utils/index.js",
+    "./api": "./dist/api/index.js",
+    "./api/auth": "./dist/api/auth.js",
+    "./api/zcrud": "./dist/api/zcrud.js",
+    "./api/org-units": "./dist/api/org-units.js",
+    "./api/upload": "./dist/api/upload.js",
+    "./types/*": "./types/*.ts",
+    "./types/auto/*": "./types/auto/*.ts"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "lint": "eslint . --ext .ts",
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^20.5.0",
+    "@typescript-eslint/eslint-plugin": "^6.4.1",
+    "@typescript-eslint/parser": "^6.4.1",
+    "eslint": "^8.48.0",
+    "typescript": "^5.1.6"
+  },
+  "dependencies": {
+    "rxjs": "^7.8.2"
+  }
+}

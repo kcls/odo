@@ -1,0 +1,338 @@
+name: Selective Build and Push Release Images
+
+on:
+  push:
+    branches:
+      - 'deploy/**'
+  pull_request:
+    branches:
+      - 'deploy/**'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository_owner }}
+
+jobs:
+  parse-commit:
+    name: Parse Commit Message
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.parse.outputs.services }}
+      build-all: ${{ steps.parse.outputs.build-all }}
+      skip-build: ${{ steps.parse.outputs.skip-build }}
+      matrix: ${{ steps.parse.outputs.matrix }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup tools
+        run: |
+          # Install yq
+          sudo wget -qO /usr/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/bin/yq
+
+          # Install jq (usually pre-installed)
+          which jq || sudo apt-get install -y jq
+
+      - name: Parse commit message for build instructions
+        id: parse
+        run: |
+          # Get the commit message
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            # For PRs, use the PR title and description
+            COMMIT_MSG="${{ github.event.pull_request.title }} ${{ github.event.pull_request.body }}"
+          else
+            # For pushes, use the most recent commit message
+            COMMIT_MSG=$(git log -1 --pretty=%B)
+          fi
+
+          echo "Commit message: $COMMIT_MSG"
+
+          # Check for skip-build tag
+          if echo "$COMMIT_MSG" | grep -q '\[skip-build\]'; then
+            echo "Found [skip-build] tag, skipping all builds"
+            echo "skip-build=true" >> $GITHUB_OUTPUT
+            echo "build-all=false" >> $GITHUB_OUTPUT
+            echo "services=[]" >> $GITHUB_OUTPUT
+            echo "matrix={\"include\":[]}" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "skip-build=false" >> $GITHUB_OUTPUT
+
+          # Check for specific service builds
+          if echo "$COMMIT_MSG" | grep -q '\[build:'; then
+            # Extract services from [build: service1, service2] tag
+            SERVICES_STR=$(echo "$COMMIT_MSG" | sed -n 's/.*\[build:\s*\([^]]*\)\].*/\1/p' | head -1)
+
+            if [[ "$SERVICES_STR" == "all" ]]; then
+              echo "Found [build: all] tag, building all services"
+              echo "build-all=true" >> $GITHUB_OUTPUT
+              # Get all services from service-map.yaml (ensure single line JSON)
+              ALL_SERVICES=$(yq eval '.services | keys' service-map.yaml -o json | jq -c .)
+              echo "services=$ALL_SERVICES" >> $GITHUB_OUTPUT
+            else
+              echo "Found [build: ...] tag with specific services: $SERVICES_STR"
+              echo "build-all=false" >> $GITHUB_OUTPUT
+
+              # Parse comma-separated services
+              if [[ -n "$SERVICES_STR" ]]; then
+                # Convert comma-separated list to JSON array (compact format)
+                SERVICES_JSON=$(echo "$SERVICES_STR" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -v '^$' | jq -R . | jq -s -c .)
+              else
+                SERVICES_JSON="[]"
+              fi
+              echo "services=$SERVICES_JSON" >> $GITHUB_OUTPUT
+            fi
+          else
+            # Default: build all services
+            echo "No [build:...] tag found, defaulting to build all services"
+            echo "build-all=true" >> $GITHUB_OUTPUT
+
+            # Get all services from service-map.yaml (ensure single line JSON)
+            ALL_SERVICES=$(yq eval '.services | keys' service-map.yaml -o json | jq -c .)
+            echo "services=$ALL_SERVICES" >> $GITHUB_OUTPUT
+          fi
+
+          # Build matrix for services
+          SERVICES=$(cat $GITHUB_OUTPUT | grep "^services=" | cut -d= -f2-)
+
+          # Debug output
+          echo "Debug: SERVICES content: $SERVICES"
+
+          if [[ "$SERVICES" == "[]" ]]; then
+            echo "matrix={\"include\":[]}" >> $GITHUB_OUTPUT
+          else
+            # Build matrix for services
+            MATRIX_INCLUDES=""
+
+            for service in $(echo "$SERVICES" | jq -r '.[]'); do
+              # Get dockerfile path from service-map.yaml
+              DOCKERFILE=$(yq eval ".services.\"$service\".build.dockerfile" service-map.yaml)
+
+              # Skip if dockerfile is null or empty
+              if [[ "$DOCKERFILE" == "null" ]] || [[ -z "$DOCKERFILE" ]]; then
+                echo "Warning: No dockerfile specified for service $service, skipping"
+                continue
+              fi
+
+              if [[ -n "$MATRIX_INCLUDES" ]]; then
+                MATRIX_INCLUDES="${MATRIX_INCLUDES},"
+              fi
+
+              MATRIX_INCLUDES="${MATRIX_INCLUDES}{\"name\":\"${service}\",\"dockerfile\":\"${DOCKERFILE}\"}"
+            done
+
+            if [[ -z "$MATRIX_INCLUDES" ]]; then
+              MATRIX_JSON="{\"include\":[]}"
+            else
+              MATRIX_JSON="{\"include\":[${MATRIX_INCLUDES}]}"
+            fi
+
+            echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
+            echo "Matrix: $MATRIX_JSON"
+          fi
+
+      - name: Display parsing results
+        run: |
+          echo "Services to build: ${{ steps.parse.outputs.services }}"
+          echo "Build all: ${{ steps.parse.outputs.build-all }}"
+          echo "Skip build: ${{ steps.parse.outputs.skip-build }}"
+          echo "Matrix: ${{ steps.parse.outputs.matrix }}"
+
+  build-and-push:
+    name: Build ${{ matrix.name }}
+    needs: parse-commit
+    if: |
+      needs.parse-commit.outputs.skip-build != 'true' &&
+      needs.parse-commit.outputs.services != '[]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.parse-commit.outputs.matrix) }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history and tags for git describe
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate tags
+        id: tags
+        run: |
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          echo "tags=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.name }}:${SHORT_SHA}" >> $GITHUB_OUTPUT
+          VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "${SHORT_SHA}")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Build and push service image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILD_TAG=${{ github.sha }}
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+            BUILD_COMMIT=${{ github.sha }}
+            VERSION=${{ steps.tags.outputs.version }}
+
+  update-manifests:
+    name: Update Kubernetes Manifests
+    needs: [parse-commit, build-and-push]
+    runs-on: ubuntu-latest
+    if: |
+      always() &&
+      needs.parse-commit.outputs.skip-build != 'true' &&
+      needs.parse-commit.outputs.services != '[]' &&
+      needs.build-and-push.result == 'success' &&
+      github.event_name == 'push' &&
+      startsWith(github.ref, 'refs/heads/deploy/')
+    permissions:
+      contents: write
+    steps:
+      - name: Extract manifest branch from deploy branch name
+        id: extract-branch
+        run: |
+          # Map deploy branch to manifests branch
+          # e.g., deploy/host/bizapps04 -> host/bizapps04
+          BRANCH_NAME="${{ github.ref_name }}"
+          if [[ "$BRANCH_NAME" =~ ^deploy/(.+)$ ]]; then
+            MANIFEST_BRANCH="${BASH_REMATCH[1]}"
+            echo "manifest_branch=$MANIFEST_BRANCH" >> $GITHUB_OUTPUT
+            echo "Mapped branch: $BRANCH_NAME -> $MANIFEST_BRANCH"
+          else
+            echo "::error::Could not extract manifest branch from: $BRANCH_NAME"
+            exit 1
+          fi
+
+      - name: Checkout manifests repository
+        uses: actions/checkout@v4
+        with:
+          repository: kcls/odo-manifests
+          ref: ${{ steps.extract-branch.outputs.manifest_branch }}
+          token: ${{ secrets.MANIFESTS_REPO_TOKEN }}
+          path: manifests
+
+      - name: Checkout odo repository (for scripts)
+        uses: actions/checkout@v4
+        with:
+          path: odo
+
+      - name: Update manifests for built services
+        run: |
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          SERVICES='${{ needs.parse-commit.outputs.services }}'
+
+          echo "Using commit SHA: ${SHORT_SHA}"
+          echo "Services to update: ${SERVICES}"
+          echo "Manifest branch: ${{ steps.extract-branch.outputs.manifest_branch }}"
+
+          # Make the script executable
+          chmod +x ./odo/scripts/update-image-tags.sh
+
+          # Update image tags in the manifests repo
+          echo "$SERVICES" | ./odo/scripts/update-image-tags.sh "${SHORT_SHA}" --from-json --manifests-dir ./manifests
+
+      - name: Commit and push manifest updates
+        working-directory: manifests
+        env:
+          SOURCE_REPO: ${{ github.repository }}
+          SOURCE_SHA: ${{ github.sha }}
+          SOURCE_BRANCH: ${{ github.ref_name }}
+        run: |
+          SHORT_SHA=$(echo "$SOURCE_SHA" | cut -c1-7)
+          SERVICES='${{ needs.parse-commit.outputs.services }}'
+          SERVICE_LIST=$(echo "$SERVICES" | jq -r 'join(", ")')
+
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add .
+
+          if ! git diff --staged --quiet; then
+            git commit -m "chore: update image tags for ${SERVICE_LIST} to ${SHORT_SHA}" \
+              -m "Source commit: ${SOURCE_REPO}@${SOURCE_SHA}" \
+              -m "Branch: ${SOURCE_BRANCH}"
+            git push
+          else
+            echo "No changes to commit"
+          fi
+
+  # Summary job that always runs
+  summary:
+    name: Build Summary
+    needs: [parse-commit, build-and-push]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate summary
+        run: |
+          echo "## 📦 Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [[ "${{ needs.parse-commit.outputs.skip-build }}" == "true" ]]; then
+            echo "### ⏭️ Build Skipped" >> $GITHUB_STEP_SUMMARY
+            echo "Build was skipped due to [skip-build] tag in commit message." >> $GITHUB_STEP_SUMMARY
+          elif [[ "${{ needs.parse-commit.outputs.services }}" == "[]" ]]; then
+            echo "### ⚠️ No Services to Build" >> $GITHUB_STEP_SUMMARY
+            echo "No services were specified or found to build." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### 🔧 Services Built" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            if [[ "${{ needs.parse-commit.outputs.build-all }}" == "true" ]]; then
+              echo "**Mode:** Building all services (default)" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "**Mode:** Building specific services from commit message" >> $GITHUB_STEP_SUMMARY
+            fi
+
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Services:**" >> $GITHUB_STEP_SUMMARY
+            echo '```json' >> $GITHUB_STEP_SUMMARY
+            echo '${{ needs.parse-commit.outputs.services }}' | jq . >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+
+            echo "" >> $GITHUB_STEP_SUMMARY
+            if [[ "${{ needs.build-and-push.result }}" == "success" ]]; then
+              echo "### ✅ Build Status: Success" >> $GITHUB_STEP_SUMMARY
+              echo "All services were built and pushed successfully." >> $GITHUB_STEP_SUMMARY
+            elif [[ "${{ needs.build-and-push.result }}" == "failure" ]]; then
+              echo "### ❌ Build Status: Failed" >> $GITHUB_STEP_SUMMARY
+              echo "Some services failed to build. Check the logs for details." >> $GITHUB_STEP_SUMMARY
+            elif [[ "${{ needs.build-and-push.result }}" == "skipped" ]]; then
+              echo "### ⏭️ Build Status: Skipped" >> $GITHUB_STEP_SUMMARY
+              echo "Service builds were skipped." >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📝 Commit Message Tags" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "You can control builds using tags in your commit message:" >> $GITHUB_STEP_SUMMARY
+          echo "- **Default:** Build all services (no tag needed)" >> $GITHUB_STEP_SUMMARY
+          echo "- **\`[build:all]\`** - Explicitly build all services" >> $GITHUB_STEP_SUMMARY
+          echo "- **\`[build:odo-auth,odo-org]\`** - Build only specified services" >> $GITHUB_STEP_SUMMARY
+          echo "- **\`[skip-build]\`** - Skip building entirely" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "_Branch: ${{ github.ref_name }}_" >> $GITHUB_STEP_SUMMARY
+          echo "_Commit: ${{ github.sha }}_" >> $GITHUB_STEP_SUMMARY

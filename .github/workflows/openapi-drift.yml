@@ -1,0 +1,42 @@
+name: OpenAPI Spec Drift Check
+
+# The committed openapi/*.json specs are the source of truth for the admin
+# UI's generated TypeScript types. This job fails if the specs a service
+# would emit differ from what's committed, so a Rust API change can't merge
+# without regenerating the specs (and the generated types).
+
+on:
+  # TEMPORARILY DISABLED: auto-triggers commented out; manual-run only.
+  # Restore by uncommenting push/pull_request below.
+  # push:
+  #   branches:
+  #     - 'main'
+  #     - 'deploy/**'
+  # pull_request:
+  workflow_dispatch:
+
+jobs:
+  openapi-drift:
+    name: Check committed OpenAPI specs are current
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          submodules: recursive
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            src/rust/odo-auth
+            src/rust/odo-org
+            src/rust/odo-notify
+            src/rust/odo-asset
+
+      - name: Verify OpenAPI specs are up to date
+        run: ./scripts/generate-openapi.sh --check

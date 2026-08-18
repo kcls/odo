@@ -1,0 +1,97 @@
+<div class="page-header">
+  <h1 i18n="Email groups page heading">Email Groups</h1>
+  @if (canWrite()) {
+    <button mat-flat-button (click)="createGroup()">
+      <mat-icon>add</mat-icon>
+      <ng-container i18n="Button that opens the create-group dialog"
+        >New Group</ng-container
+      >
+    </button>
+  }
+</div>
+
+<div class="list-controls">
+  <mat-form-field appearance="outline" class="list-filter" subscriptSizing="dynamic">
+    <mat-label i18n="Placeholder for the group filter input">Filter</mat-label>
+    <input matInput [ngModel]="search()" (ngModelChange)="onSearch($event)" />
+    <mat-icon matSuffix>search</mat-icon>
+  </mat-form-field>
+
+  <mat-slide-toggle
+    [checked]="includeInactive()"
+    (change)="toggleInactive($event.checked)"
+    i18n="Toggle that reveals deactivated email groups"
+    >Show inactive</mat-slide-toggle
+  >
+</div>
+
+@if (loading()) {
+  <div class="list-loading"><mat-spinner diameter="36" /></div>
+} @else if (groups().length === 0) {
+  <p class="list-empty" i18n="Shown when no email groups match">
+    No email groups found.
+  </p>
+} @else {
+  <odo-table
+    [rows]="groups()"
+    [displayedColumns]="columns"
+    [clickableRows]="true"
+    [sort]="sort()"
+    (sortChange)="onSort($event)"
+    (rowClick)="open($event)"
+  >
+    <ng-container cdkColumnDef="code">
+      <th cdk-header-cell *cdkHeaderCellDef>
+        <odo-sort-header key="code" i18n="Table column header">Code</odo-sort-header>
+      </th>
+      <td cdk-cell *cdkCellDef="let group" class="cell-code">{{ group.code }}</td>
+    </ng-container>
+
+    <ng-container cdkColumnDef="label">
+      <th cdk-header-cell *cdkHeaderCellDef>
+        <odo-sort-header key="label" i18n="Table column header">Label</odo-sort-header>
+      </th>
+      <td cdk-cell *cdkCellDef="let group">{{ group.label }}</td>
+    </ng-container>
+
+    <ng-container cdkColumnDef="status">
+      <th cdk-header-cell *cdkHeaderCellDef>
+        <odo-sort-header key="active" i18n="Table column header">Status</odo-sort-header>
+      </th>
+      <td cdk-cell *cdkCellDef="let group">
+        @if (group.is_active) {
+          <span class="status-badge status-active" i18n="Group status badge">Active</span>
+        } @else {
+          <span class="status-badge status-inactive" i18n="Group status badge"
+            >Inactive</span
+          >
+        }
+      </td>
+    </ng-container>
+
+    <ng-container cdkColumnDef="members">
+      <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">Members</th>
+      <td
+        cdk-cell
+        *cdkCellDef="let group"
+        i18n="Member counts: active count of total count"
+      >
+        {{ group.active_member_count }} of {{ group.member_count }}
+      </td>
+    </ng-container>
+
+    <ng-container cdkColumnDef="updated">
+      <th cdk-header-cell *cdkHeaderCellDef>
+        <odo-sort-header key="updated" i18n="Table column header">Updated</odo-sort-header>
+      </th>
+      <td cdk-cell *cdkCellDef="let group">{{ group.updated_at | date: 'medium' }}</td>
+    </ng-container>
+  </odo-table>
+
+  <odo-paginator
+    [length]="total()"
+    [pageIndex]="pageIndex()"
+    [pageSize]="pageSize()"
+    (page)="onPage($event)"
+  />
+}

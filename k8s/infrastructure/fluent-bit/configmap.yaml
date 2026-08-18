@@ -1,0 +1,82 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluent-bit-config
+  namespace: fluent-bit
+  labels:
+    app.kubernetes.io/name: fluent-bit
+    app.kubernetes.io/instance: fluent-bit
+data:
+  fluent-bit.yaml: |
+    service:
+      flush: 2
+      daemon: off
+      log_level: info
+      http_server: on
+      http_listen: 0.0.0.0
+      http_port: 2020
+      health_check: on
+
+    parsers:
+      - name: cri
+        format: regex
+        regex: '^(?<time>[^ ]+) (?<stream>stdout|stderr) (?<logtag>[^ ]*) (?<log>.*)$'
+        time_key: time
+        time_format: '%Y-%m-%dT%H:%M:%S.%L%z'
+        time_keep: on
+
+    pipeline:
+      inputs:
+        - name: tail
+          # Collect all odo-* namespaced logs
+          path: /var/log/containers/*odo-*.log
+          parser: cri # CRI line: <time> <stream> F <payload>
+          tag: kube.*
+          # How often to check for new container log files.
+          refresh_interval: 5
+          mem_buf_limit: 2MB
+          skip_long_lines: on
+          buffer_chunk_size: 32KB
+          db: /var/log/fluent-bit/flb-kube.db
+          db.sync: normal
+
+      filters:
+        - name: kubernetes
+          match: kube.*
+          kube_url: https://kubernetes.default.svc:443
+          kube_ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+          kube_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+          kube_tag_prefix: kube.var.log.containers.
+          keep_log: on
+          merge_log: on
+          merge_log_key: log
+          labels: off
+          annotations: off
+
+      outputs:
+        # Example for logging to a remote syslog server.
+        #- name: syslog
+        #  match: kube.*
+        #  #match: .*
+        #  host: 10.3.2.1
+        #  port: 514
+        #  mode: tcp
+        #  syslog_format: rfc5424
+        #  syslog_facility_preset: 17 # LOCAL1
+        #  syslog_hostname_key: kubernetes_host
+        #  syslog_appname_key: kubernetes_pod_name
+        #  syslog_procid_key: kubernetes_container_name
+        #  syslog_message_key: log
+
+        # Log to a local file in /var/log for basic dev setup.
+        - name: file
+          match: kube.*
+          path: /var/log/odo
+          file: services.log
+          format: plain
+          mkdir: on
+
+        # Send everything to stdout for debugging
+        #- name: stdout
+        #  match: kube.*
+        #  format: json_lines

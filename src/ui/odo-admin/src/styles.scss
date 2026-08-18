@@ -1,0 +1,249 @@
+// Global theme + shared utility classes.
+//
+// Theming is done entirely through Angular Material's documented token API:
+// mat.theme() emits `light-dark()` color tokens, and we override the
+// `--mat-sys-*` custom properties below with a GitHub-inspired palette
+// (Primer "light default" / "dark dimmed"). We deliberately do NOT style any
+// Material component internals (`.mat-mdc-*`) — components we want full
+// control over (tables, tabs) are built on CDK with our own CSS instead.
+@use '@angular/material' as mat;
+
+$font-stack: (
+  -apple-system,
+  BlinkMacSystemFont,
+  'Segoe UI',
+  'Noto Sans',
+  Helvetica,
+  Arial,
+  sans-serif
+);
+
+html {
+  height: 100%;
+  color-scheme: light dark;
+
+  @include mat.theme(
+    (
+      color: (
+        primary: mat.$azure-palette,
+        tertiary: mat.$blue-palette,
+      ),
+      typography: (
+        plain-family: $font-stack,
+        brand-family: $font-stack,
+      ),
+      density: 0,
+    )
+  );
+
+  // GitHub Primer palette (light default / dark dimmed) via system tokens.
+  --mat-sys-primary: light-dark(#0969da, #539bf5);
+  --mat-sys-on-primary: light-dark(#ffffff, #1c2128);
+  --mat-sys-primary-container: light-dark(#ddf4ff, #264466);
+  --mat-sys-on-primary-container: light-dark(#0a3069, #c6e6ff);
+
+  --mat-sys-background: light-dark(#ffffff, #22272e);
+  --mat-sys-on-background: light-dark(#1f2328, #adbac7);
+  --mat-sys-surface: light-dark(#ffffff, #22272e);
+  --mat-sys-on-surface: light-dark(#1f2328, #adbac7);
+  --mat-sys-surface-dim: light-dark(#f6f8fa, #1c2128);
+  --mat-sys-surface-bright: light-dark(#ffffff, #2d333b);
+  --mat-sys-surface-container-lowest: light-dark(#ffffff, #1c2128);
+  --mat-sys-surface-container-low: light-dark(#f6f8fa, #252b32);
+  --mat-sys-surface-container: light-dark(#f6f8fa, #2d333b);
+  --mat-sys-surface-container-high: light-dark(#eaeef2, #373e47);
+  --mat-sys-surface-container-highest: light-dark(#e7ebef, #444c56);
+  --mat-sys-on-surface-variant: light-dark(#656d76, #768390);
+  --mat-sys-outline: light-dark(#8c959f, #636e7b);
+  --mat-sys-outline-variant: light-dark(#d0d7de, #444c56);
+  --mat-sys-error: light-dark(#cf222e, #e5534b);
+  --mat-sys-on-error: light-dark(#ffffff, #ffffff);
+  --mat-sys-error-container: light-dark(#cf222e, #862d29);
+  --mat-sys-on-error-container: light-dark(#ffffff, #ffd9d4);
+
+  // Tighter GitHub-style corners.
+  --mat-sys-corner-medium: 8px;
+  --mat-sys-corner-small: 6px;
+  --mat-sys-corner-extra-small: 6px;
+
+  // App tokens with no Material equivalent (Primer success tints).
+  --app-success-bg: light-dark(#dafbe1, #2b3f30);
+  --app-success-fg: light-dark(#1a7f37, #57ab5a);
+}
+
+body {
+  background-color: var(--mat-sys-surface);
+  color: var(--mat-sys-on-surface);
+  font: var(--mat-sys-body-medium);
+  margin: 0;
+  height: 100%;
+}
+
+h1,
+h2,
+h3 {
+  font-weight: 600;
+}
+
+h1 {
+  font-size: 1.5rem;
+}
+
+a {
+  color: var(--mat-sys-primary);
+}
+
+// ===========================================================================
+// Shared admin UI utility classes (our own — no Material internals touched).
+// ===========================================================================
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  h1 {
+    margin: 4px 0 0;
+  }
+
+  a + h1 {
+    margin: 16px 0 12px;
+  }
+}
+
+.page-intro {
+  color: var(--mat-sys-on-surface-variant);
+  margin: 4px 0 0;
+}
+
+// A stacked content section: a heading/intro/action row followed by its
+// content (a table, a form, …). Detail pages stack several of these so a
+// subject reads as one page of facets rather than tabbed, disconnected lists.
+.section {
+  margin-top: 32px;
+
+  &:first-of-type {
+    margin-top: 24px;
+  }
+
+  h2 {
+    margin: 0;
+    font-size: 1.05rem;
+  }
+}
+
+.section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.list-controls {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin: 16px 0;
+}
+
+.list-filter {
+  width: 280px;
+}
+
+.list-loading {
+  display: flex;
+  justify-content: center;
+  padding: 48px;
+}
+
+.list-empty {
+  color: var(--mat-sys-on-surface-variant);
+  padding: 12px 0;
+}
+
+.cell-code {
+  font-family: ui-monospace, monospace;
+  font-size: 0.85rem;
+}
+
+.status-badge {
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 0.75rem;
+  margin-right: 6px;
+}
+
+.status-active {
+  background: var(--app-success-bg);
+  color: var(--app-success-fg);
+}
+
+.status-inactive {
+  background: var(--mat-sys-surface-container-highest);
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.status-info {
+  background: var(--mat-sys-primary-container);
+  color: var(--mat-sys-on-primary-container);
+}
+
+.status-warn {
+  background: var(--mat-sys-error);
+  color: var(--mat-sys-on-error);
+}
+
+.detail-card {
+  margin-top: 16px;
+  background: var(--mat-sys-surface-container-lowest);
+}
+
+.detail-form {
+  display: flex;
+  gap: 16px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  margin-top: 20px;
+}
+
+.detail-flex-field {
+  flex: 1;
+  min-width: 240px;
+}
+
+.inline-form {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin: 20px 0 16px;
+  flex-wrap: wrap;
+}
+
+.form-error {
+  color: var(--mat-sys-error);
+  margin-top: 0;
+}
+
+.dialog-form {
+  padding-top: 16px;
+}
+
+.dialog-field {
+  display: block;
+  width: 100%;
+  margin-bottom: 16px;
+}
+
+.dialog-error {
+  color: var(--mat-sys-error);
+}
+
+// Error-styled snackbar (ErrorHandlerService). These are Material's public
+// snackbar CSS variables (token API), not internal selectors.
+.app-error-snackbar {
+  --mat-snack-bar-container-color: var(--mat-sys-error-container);
+  --mdc-snackbar-container-color: var(--mat-sys-error-container);
+  --mdc-snackbar-supporting-text-color: var(--mat-sys-on-error-container);
+  --mat-snack-bar-button-color: var(--mat-sys-on-error-container);
+}

@@ -1,0 +1,42 @@
+# service-map.yaml
+#
+# language:
+#   - the programming language/framework of the service (rust, node, etc.)
+#
+services:
+
+  odo-auth:
+    language: rust
+    namespace: odo-pub
+    build:
+      dockerfile: src/rust/odo-auth/Dockerfile
+      context: .
+
+  odo-org:
+    language: rust
+    namespace: odo-pub
+    build:
+      dockerfile: src/rust/odo-org/Dockerfile
+      context: .
+
+  odo-notify:
+    language: rust
+    namespace: odo-pub
+    build:
+      dockerfile: src/rust/odo-notify/Dockerfile
+      context: .
+
+  odo-asset:
+    language: rust
+    namespace: odo-pub
+    build:
+      dockerfile: src/rust/odo-asset/Dockerfile
+      context: .
+
+  # ODO admin UI (served at /odo/admin)
+  ui-odo-admin:
+    language: node
+    namespace: odo-pub
+    build:
+      dockerfile: src/ui/odo-admin/Dockerfile
+      context: .

@@ -1,0 +1,43 @@
+:host {
+  display: inline-flex;
+}
+
+.odo-sort-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  // Inherit the header cell's uppercase-ish weight from .cdk-header-cell.
+  text-align: left;
+
+  &:hover .odo-sort-arrow {
+    color: var(--mat-sys-on-surface);
+    opacity: 1;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--mat-sys-primary);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+}
+
+.odo-sort-arrow {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  // Neutral (unsorted) arrow is dim until hover/active.
+  opacity: 0.5;
+  color: var(--mat-sys-on-surface-variant);
+  transition: opacity 0.1s ease;
+
+  &--active {
+    opacity: 1;
+    color: var(--mat-sys-primary);
+  }
+}

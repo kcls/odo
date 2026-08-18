@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: registry-pvc
+  namespace: odo-core
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+  # Leaving this unset fixed issues running on Mac.
+  # Presumably it's unneeded.
+  #storageClassName: microk8s-hostpath

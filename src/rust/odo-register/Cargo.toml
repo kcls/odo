@@ -1,0 +1,11 @@
+[package]
+name = "odo-register"
+version = "0.1.0"
+edition = "2024"
+description = "Apply an app-registration manifest to the odo platform APIs"
+
+[dependencies]
+reqwest = { version = "0.12", features = ["json"], default-features = false }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.35", features = ["macros", "rt-multi-thread"] }

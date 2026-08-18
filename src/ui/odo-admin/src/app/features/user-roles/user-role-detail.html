@@ -1,0 +1,193 @@
+@if (loading()) {
+  <div class="list-loading"><mat-spinner diameter="36" /></div>
+} @else if (user(); as u) {
+  <odo-detail-page
+    backLink="/user-roles"
+    i18n-backLabel="Back link to the user search"
+    backLabel="User Roles"
+    [title]="u.display_name"
+  >
+    <div slot="summary" class="user-meta">
+      @if (u.username) {
+        <span class="cell-code">{{ u.username }}</span>
+      }
+      <span>{{ u.email }}</span>
+    </div>
+
+    <section class="section">
+      <div class="section-header">
+        <h2 i18n="Section heading for the role assignment list">
+          Role Assignments ({{ assignments().length }})
+        </h2>
+      </div>
+
+      <form class="inline-form" (ngSubmit)="addAssignment()">
+        <mat-form-field appearance="outline" class="assign-role" subscriptSizing="dynamic">
+          <mat-label i18n="Field label for choosing a role to assign">Role</mat-label>
+          <mat-select name="newRole" [(ngModel)]="newRole">
+            @for (role of roles(); track role.code) {
+              <mat-option [value]="role.code">{{ role.label }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="assign-org" subscriptSizing="dynamic">
+          <mat-label i18n="Field label for choosing the org unit of the assignment"
+            >Org unit</mat-label
+          >
+          <mat-select name="newOrgUnit" [(ngModel)]="newOrgUnit">
+            @for (unit of orgOptions(); track unit.id) {
+              <mat-option [value]="unit.id">
+                <span [style.padding-left.px]="unit.depth * 16">{{ unit.label }}</span>
+              </mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <button
+          mat-flat-button
+          type="submit"
+          [disabled]="adding() || !newRole || newOrgUnit === null"
+          i18n="Button that assigns the selected role"
+        >
+          Assign
+        </button>
+      </form>
+      @if (addError()) {
+        <p class="form-error" role="alert">{{ addError() }}</p>
+      }
+
+      @if (assignments().length === 0) {
+        <p class="list-empty" i18n="Shown when a user has no role assignments">
+          This user has no role assignments.
+        </p>
+      } @else {
+        <odo-table [rows]="assignments()" [displayedColumns]="columns">
+          <ng-container cdkColumnDef="role">
+            <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">Role</th>
+            <td cdk-cell *cdkCellDef="let a">
+              {{ a.role_label }}
+              <span class="cell-code role-code">{{ a.role }}</span>
+            </td>
+          </ng-container>
+
+          <ng-container cdkColumnDef="org_unit">
+            <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">Org unit</th>
+            <td cdk-cell *cdkCellDef="let a">{{ a.org_unit_label }}</td>
+          </ng-container>
+
+          <ng-container cdkColumnDef="source">
+            <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header: where the assignment came from">Source</th>
+            <td cdk-cell *cdkCellDef="let a">
+              @if (a.is_managed_by_saml) {
+                <span class="status-badge status-info" i18n="Badge for SAML-managed assignments">SAML</span>
+              } @else {
+                <ng-container i18n="Source label for manually-created assignments"
+                  >Manual</ng-container
+                >
+              }
+            </td>
+          </ng-container>
+
+          <ng-container cdkColumnDef="added">
+            <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">Added</th>
+            <td cdk-cell *cdkCellDef="let a">{{ a.created_at | date: 'mediumDate' }}</td>
+          </ng-container>
+
+          <ng-container cdkColumnDef="actions">
+            <th cdk-header-cell *cdkHeaderCellDef></th>
+            <td cdk-cell *cdkCellDef="let a" class="cell-actions">
+              @if (!a.is_managed_by_saml) {
+                <button
+                  mat-icon-button
+                  (click)="removeAssignment(a)"
+                  i18n-aria-label="Button that removes the role assignment"
+                  aria-label="Remove assignment"
+                >
+                  <mat-icon>delete</mat-icon>
+                </button>
+              }
+            </td>
+          </ng-container>
+        </odo-table>
+      }
+    </section>
+
+    <section class="section">
+      <div class="section-header">
+        <div>
+          <h2 i18n="Section heading for the effective permission list">
+            Effective Permissions
+          </h2>
+          <p class="page-intro" i18n="Explanation of the effective permissions section">
+            What this user can do and where, combined across all of their role
+            assignments. Read-only.
+          </p>
+        </div>
+      </div>
+
+      @if (scopesLoading()) {
+        <div class="list-loading"><mat-spinner diameter="28" /></div>
+      } @else if (permScopes().length === 0) {
+        <p class="list-empty" i18n="Shown when a user has no effective permissions">
+          This user has no permissions.
+        </p>
+      } @else {
+        <odo-table [rows]="permScopes()" [displayedColumns]="permColumns">
+          <ng-container cdkColumnDef="perm">
+            <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">Permission</th>
+            <td cdk-cell *cdkCellDef="let p">
+              <span class="cell-code">{{ p.perm }}</span>
+              @if (p.description) {
+                <span class="perm-description">{{ p.description }}</span>
+              }
+            </td>
+          </ng-container>
+
+          <ng-container cdkColumnDef="scope">
+            <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header: where the permission applies">Scope</th>
+            <td cdk-cell *cdkCellDef="let p">
+              @if (p.global) {
+                <span class="status-badge status-info" i18n="Scope: applies at every org unit"
+                  >All org units</span
+                >
+              } @else if (isExpanded(p.perm)) {
+                <ul class="scope-list">
+                  @for (unit of p.scope_units; track unit.id) {
+                    <li i18n="One scope root: the permission applies to this unit and its descendants">
+                      {{ unit.label }} and below
+                    </li>
+                  }
+                </ul>
+                @if (p.scope_units.length > 1) {
+                  <button
+                    type="button"
+                    class="scope-toggle"
+                    (click)="toggleExpanded(p.perm)"
+                    i18n="Collapse the expanded scope list"
+                  >
+                    Show less
+                  </button>
+                }
+              } @else {
+                @if (p.scope_units.length > 0) {
+                  <span>{{ p.scope_units[0].label }} and below</span>
+                  @if (p.scope_units.length > 1) {
+                    <button
+                      type="button"
+                      class="scope-toggle"
+                      (click)="toggleExpanded(p.perm)"
+                      i18n="Reveal the remaining scope roots; placeholder is a count"
+                    >
+                      +{{ p.scope_units.length - 1 }} more
+                    </button>
+                  }
+                }
+              }
+            </td>
+          </ng-container>
+        </odo-table>
+      }
+    </section>
+  </odo-detail-page>
+}

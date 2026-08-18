@@ -1,0 +1,25 @@
+:host {
+  display: block;
+}
+
+.delete-button {
+  color: var(--mat-sys-error);
+}
+
+.grant-add-perm {
+  width: 320px;
+}
+
+.grant-add-depth {
+  width: 110px;
+}
+
+.depth-input {
+  width: 64px;
+  padding: 4px 8px;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 6px;
+  background: var(--mat-sys-surface);
+  color: var(--mat-sys-on-surface);
+  font: var(--mat-sys-body-medium);
+}

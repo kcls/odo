@@ -1,0 +1,71 @@
+<div class="page-header">
+  <h1 i18n="Org units page heading">Org Units</h1>
+</div>
+
+@if (loading()) {
+  <div class="list-loading"><mat-spinner diameter="36" /></div>
+} @else {
+  <section class="section">
+    <div class="section-header">
+      <div>
+        <h2 i18n="Org tree section heading">Organizational tree</h2>
+        <p class="page-intro" i18n="Explanation of the org tree">
+          Select a unit to manage its addresses, closures, and hours. Roles,
+          permissions, and incidents are all scoped to these units.
+        </p>
+      </div>
+      @if (canWrite()) {
+        <button mat-flat-button (click)="openUnitDialog()">
+          <mat-icon>add</mat-icon>
+          <ng-container i18n="Button that opens the create-unit dialog">New Unit</ng-container>
+        </button>
+      }
+    </div>
+
+    <odo-table
+      [rows]="units()"
+      [displayedColumns]="unitColumns"
+      [clickableRows]="true"
+      (rowClick)="open($event)"
+    >
+      <ng-container cdkColumnDef="label">
+        <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">Unit</th>
+        <td cdk-cell *cdkCellDef="let unit">
+          <span [style.padding-left.px]="unit.depth * 20">{{ unit.label }}</span>
+        </td>
+      </ng-container>
+
+      <ng-container cdkColumnDef="code">
+        <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">Code</th>
+        <td cdk-cell *cdkCellDef="let unit" class="cell-code">{{ unit.code }}</td>
+      </ng-container>
+
+      <ng-container cdkColumnDef="type">
+        <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">Type</th>
+        <td cdk-cell *cdkCellDef="let unit">{{ unit.unit_type.label }}</td>
+      </ng-container>
+
+      <ng-container cdkColumnDef="timezone">
+        <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">Timezone</th>
+        <td cdk-cell *cdkCellDef="let unit" class="cell-code">{{ unit.timezone }}</td>
+      </ng-container>
+
+      <ng-container cdkColumnDef="actions">
+        <th cdk-header-cell *cdkHeaderCellDef></th>
+        <td cdk-cell *cdkCellDef="let unit" class="cell-actions">
+          @if (canWrite()) {
+            <button
+              mat-icon-button
+              [disabled]="unit.parent === null || unit.has_children"
+              (click)="deleteUnit(unit, $event)"
+              i18n-aria-label="Button that deletes the org unit"
+              aria-label="Delete unit"
+            >
+              <mat-icon>delete</mat-icon>
+            </button>
+          }
+        </td>
+      </ng-container>
+    </odo-table>
+  </section>
+}

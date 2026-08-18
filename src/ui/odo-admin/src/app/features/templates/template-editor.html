@@ -1,0 +1,181 @@
+@if (loading()) {
+  <div class="list-loading"><mat-spinner diameter="36" /></div>
+} @else {
+  <odo-detail-page
+    backLink="/templates"
+    i18n-backLabel="Back link to the template list"
+    backLabel="Templates"
+    [title]="title()"
+  >
+    <div slot="actions" class="header-actions">
+      @if (dirty()) {
+        <span class="unsaved-note" i18n="Indicator that the form has unsaved edits"
+          >Unsaved changes</span
+        >
+      }
+      @if (canWrite() && !isNew()) {
+        <button mat-stroked-button class="delete-button" (click)="deleteTemplate()">
+          <mat-icon>delete</mat-icon>
+          <ng-container i18n="Button that deletes the template">Delete</ng-container>
+        </button>
+      }
+      @if (canWrite()) {
+        <button mat-flat-button [disabled]="!canSave()" (click)="save()">
+          <ng-container i18n="Button that saves the template">Save</ng-container>
+        </button>
+      }
+    </div>
+
+    <mat-tab-group
+      class="editor-tabs"
+      [selectedIndex]="selectedTab()"
+      (selectedIndexChange)="onTabChange($event)"
+    >
+      <mat-tab>
+        <ng-template mat-tab-label>
+          <span i18n="Tab label">Edit</span>
+        </ng-template>
+
+        <div class="editor-form">
+          <div class="editor-row">
+            <mat-form-field appearance="outline" class="editor-field">
+              <mat-label i18n="Template field label">Code</mat-label>
+              <input
+                matInput
+                name="code"
+                [(ngModel)]="code"
+                [errorStateMatcher]="codeMatcher"
+                [disabled]="!canWrite()"
+              />
+              @if (codeError()) {
+                <mat-error>{{ codeError() }}</mat-error>
+              }
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="editor-field">
+              <mat-label i18n="Template field label">Name</mat-label>
+              <input matInput name="name" [(ngModel)]="name" [disabled]="!canWrite()" />
+            </mat-form-field>
+          </div>
+
+          <div class="editor-row">
+            <mat-form-field appearance="outline" class="editor-field editor-field--wide">
+              <mat-label i18n="Template field label">Description</mat-label>
+              <input
+                matInput
+                name="description"
+                [(ngModel)]="description"
+                [disabled]="!canWrite()"
+              />
+            </mat-form-field>
+
+            <mat-slide-toggle
+              name="isActive"
+              [(ngModel)]="isActive"
+              [disabled]="!canWrite()"
+              class="editor-toggle"
+              i18n="Toggle controlling whether the template is active"
+              >Active</mat-slide-toggle
+            >
+          </div>
+
+          <mat-form-field appearance="outline" class="editor-field editor-field--full">
+            <mat-label i18n="Template field label">Subject template</mat-label>
+            <input
+              matInput
+              name="subjectTemplate"
+              [(ngModel)]="subjectTemplate"
+              [disabled]="!canWrite()"
+            />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="editor-field editor-field--full">
+            <mat-label i18n="Template field label">Body template (plain text / in-app)</mat-label>
+            <textarea
+              matInput
+              name="bodyTemplate"
+              rows="4"
+              [(ngModel)]="bodyTemplate"
+              [disabled]="!canWrite()"
+            ></textarea>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="editor-field editor-field--full">
+            <mat-label i18n="Template field label">HTML body template (email; optional)</mat-label>
+            <textarea
+              matInput
+              name="bodyTemplateHtml"
+              rows="16"
+              [(ngModel)]="bodyTemplateHtml"
+              [disabled]="!canWrite()"
+            ></textarea>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="editor-field editor-field--full">
+            <mat-label i18n="Template field label">Sample data (JSON, used for previews)</mat-label>
+            <textarea
+              matInput
+              name="sampleData"
+              rows="6"
+              [(ngModel)]="sampleData"
+              [disabled]="!canWrite()"
+            ></textarea>
+          </mat-form-field>
+
+          @if (formError()) {
+            <p class="form-error" role="alert">{{ formError() }}</p>
+          }
+        </div>
+      </mat-tab>
+
+      <mat-tab>
+        <ng-template mat-tab-label>
+          <span i18n="Tab label">Preview</span>
+          @if (dirty()) {
+            <span class="tab-dirty-dot" aria-hidden="true"></span>
+          }
+        </ng-template>
+
+        <div class="editor-preview">
+          @if (previewIsDirty()) {
+            <div class="preview-unsaved" role="status">
+              <mat-icon>info</mat-icon>
+              <span i18n="Notice that the preview reflects edits that are not saved yet"
+                >This preview includes unsaved changes.</span
+              >
+            </div>
+          }
+
+          @if (previewing()) {
+            <div class="list-loading"><mat-spinner diameter="32" /></div>
+          } @else if (previewError()) {
+            <p class="form-error" role="alert">{{ previewError() }}</p>
+          } @else if (preview(); as p) {
+            @if (p.subject != null) {
+              <div class="preview-section">
+                <h3 i18n="Preview section heading">Subject</h3>
+                <div class="preview-box">{{ p.subject }}</div>
+              </div>
+            }
+            @if (p.body != null) {
+              <div class="preview-section">
+                <h3 i18n="Preview section heading">Body</h3>
+                <pre class="preview-box">{{ p.body }}</pre>
+              </div>
+            }
+            @if (p.body_html != null) {
+              <div class="preview-section">
+                <h3 i18n="Preview section heading">HTML body</h3>
+                <div class="preview-box preview-html" [innerHTML]="p.body_html"></div>
+              </div>
+            }
+          } @else {
+            <p class="list-empty" i18n="Shown when there is nothing to preview">
+              Nothing to preview yet.
+            </p>
+          }
+        </div>
+      </mat-tab>
+    </mat-tab-group>
+  </odo-detail-page>
+}

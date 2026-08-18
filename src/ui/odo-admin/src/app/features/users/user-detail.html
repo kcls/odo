@@ -1,0 +1,224 @@
+@if (loading()) {
+  <div class="list-loading"><mat-spinner diameter="36" /></div>
+} @else if (detail(); as d) {
+  <odo-detail-page
+    backLink="/users"
+    i18n-backLabel="Back link to the user search"
+    backLabel="Users"
+    [title]="d.user.display_name"
+  >
+    <div slot="summary" class="user-meta">
+      @if (d.user.username) {
+        <span class="cell-code">{{ d.user.username }}</span>
+      }
+      <span>{{ d.user.email }}</span>
+      @if (d.user.status === 'active') {
+        <span class="status-badge status-active" i18n="Account status badge">Active</span>
+      } @else if (d.user.status) {
+        <span class="status-badge status-inactive">{{ d.user.status }}</span>
+      }
+      <span class="status-badge status-info">{{ d.user.auth_method }}</span>
+      @if (d.user.deleted_at) {
+        <span class="status-badge status-warn" i18n="Badge for deleted accounts">Deleted</span>
+      }
+    </div>
+
+    @if (editable()) {
+      <div slot="actions" class="header-actions">
+        <button mat-stroked-button (click)="edit()">
+          <mat-icon>edit</mat-icon>
+          <ng-container i18n="Button that edits the user's name">Edit</ng-container>
+        </button>
+        @if (d.user.deleted_at) {
+          <button mat-stroked-button (click)="setDeleted(false)">
+            <mat-icon>restore</mat-icon>
+            <ng-container i18n="Button that restores a deleted account">Restore</ng-container>
+          </button>
+        } @else {
+          <button mat-stroked-button class="danger-button" (click)="setDeleted(true)">
+            <mat-icon>person_off</mat-icon>
+            <ng-container i18n="Button that marks an account deleted">Mark Deleted</ng-container>
+          </button>
+        }
+      </div>
+    }
+
+    <section class="section">
+      <div class="section-header">
+        <h2 i18n="Section heading for account metadata">Account</h2>
+      </div>
+      <dl class="facts">
+        <dt i18n="Account field label">Name</dt>
+        <dd>{{ d.user.first_given_name }} {{ d.user.family_name }}</dd>
+
+        <dt i18n="Account field label">Created</dt>
+        <dd>{{ d.user.created_at | date: 'medium' }}</dd>
+
+        <dt i18n="Account field label">Last login</dt>
+        <dd>{{ (d.user.last_login_at | date: 'medium') || '—' }}</dd>
+
+        @if (d.user.deleted_at) {
+          <dt i18n="Account field label">Deleted</dt>
+          <dd>{{ d.user.deleted_at | date: 'medium' }}</dd>
+        }
+
+        <dt i18n="Account field label">Password login</dt>
+        <dd>
+          @if (d.local_account; as la) {
+            <ng-container i18n="Shown when the user has a password account">Yes</ng-container>
+            @if (la.failed_login_attempts > 0) {
+              <span class="status-badge status-warn"
+                >{{ la.failed_login_attempts }}<ng-container
+                  i18n="Suffix after a failed-attempts count"
+                >
+                  failed</ng-container
+                ></span
+              >
+            }
+            @if (la.locked_until) {
+              <span class="status-badge status-warn" i18n="Badge for locked accounts">Locked</span>
+            }
+          } @else {
+            <ng-container i18n="Shown when the user has no password account">No (SSO only)</ng-container>
+          }
+        </dd>
+      </dl>
+    </section>
+
+    <section class="section">
+      <div class="section-header">
+        <h2 i18n="Section heading for the user's roles">Roles ({{ d.roles.length }})</h2>
+        @if (canManageRoles()) {
+          <a mat-stroked-button [routerLink]="['/user-roles', d.user.id]">
+            <mat-icon>manage_accounts</mat-icon>
+            <ng-container i18n="Link to the role management page">Manage</ng-container>
+          </a>
+        }
+      </div>
+      @if (d.roles.length === 0) {
+        <p class="list-empty" i18n="Shown when the user has no roles">No role assignments.</p>
+      } @else {
+        <odo-table [rows]="d.roles" [displayedColumns]="['role', 'org_unit', 'source']">
+          <ng-container cdkColumnDef="role">
+            <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">Role</th>
+            <td cdk-cell *cdkCellDef="let r">
+              {{ r.role_label }}
+              <span class="cell-code role-code">{{ r.role }}</span>
+            </td>
+          </ng-container>
+          <ng-container cdkColumnDef="org_unit">
+            <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">Org unit</th>
+            <td cdk-cell *cdkCellDef="let r">{{ r.org_unit_label }}</td>
+          </ng-container>
+          <ng-container cdkColumnDef="source">
+            <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header: where the assignment came from">Source</th>
+            <td cdk-cell *cdkCellDef="let r">
+              @if (r.is_managed_by_saml) {
+                <span class="status-badge status-info" i18n="Badge for SAML-managed assignments">SAML</span>
+              } @else {
+                <span class="status-badge status-inactive" i18n="Badge for manual assignments">Manual</span>
+              }
+            </td>
+          </ng-container>
+        </odo-table>
+      }
+    </section>
+
+    <section class="section">
+      <div class="section-header">
+        <h2 i18n="Section heading for SAML identity and attributes">SAML</h2>
+      </div>
+      @if (d.saml_identities.length === 0 && d.saml_attributes.length === 0) {
+        <p class="list-empty" i18n="Shown when the user has no SAML data">
+          No SAML identity linked.
+        </p>
+      } @else {
+        @if (d.saml_identities.length > 0) {
+          <div class="summary-subhead" i18n="Sub-heading for linked SAML identities">
+            Identities
+          </div>
+          <ul class="summary-list">
+            @for (i of d.saml_identities; track i.idp) {
+              <li>
+                <div class="summary-list-main">
+                  <span class="summary-list-title">{{ i.idp_name }}</span>
+                  <span class="summary-list-sub cell-code">{{ i.name_id }}</span>
+                </div>
+              </li>
+            }
+          </ul>
+        }
+        @if (d.saml_attributes.length > 0) {
+          <div class="summary-subhead" i18n="Sub-heading for captured SAML attributes">
+            Attributes
+          </div>
+          <dl class="facts">
+            @for (a of d.saml_attributes; track a.key) {
+              <dt [title]="a.key">{{ a.label || a.key }}</dt>
+              <dd>{{ a.value }}</dd>
+            }
+          </dl>
+        }
+      }
+    </section>
+
+    <section class="section">
+      <div class="section-header">
+        <h2 i18n="Section heading for recent sessions">Recent Sessions ({{ d.sessions.length }})</h2>
+      </div>
+      @if (d.sessions.length === 0) {
+        <p class="list-empty" i18n="Shown when the user has no sessions">
+          This user has no recorded sessions.
+        </p>
+      } @else {
+        <odo-table [rows]="d.sessions" [displayedColumns]="sessionColumns">
+          <ng-container cdkColumnDef="created">
+            <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">Started</th>
+            <td cdk-cell *cdkCellDef="let s">{{ s.created_at | date: 'short' }}</td>
+          </ng-container>
+
+          <ng-container cdkColumnDef="last_activity">
+            <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">Last activity</th>
+            <td cdk-cell *cdkCellDef="let s">{{ s.last_activity_at | date: 'short' }}</td>
+          </ng-container>
+
+          <ng-container cdkColumnDef="expires">
+            <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">Expires</th>
+            <td cdk-cell *cdkCellDef="let s">{{ s.expires_at | date: 'short' }}</td>
+          </ng-container>
+
+          <ng-container cdkColumnDef="method">
+            <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">Method</th>
+            <td cdk-cell *cdkCellDef="let s" class="cell-code">{{ s.auth_method }}</td>
+          </ng-container>
+
+          <ng-container cdkColumnDef="org_unit">
+            <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">Org unit</th>
+            <td cdk-cell *cdkCellDef="let s">{{ s.org_unit_label }}</td>
+          </ng-container>
+
+          <ng-container cdkColumnDef="ip">
+            <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">IP</th>
+            <td cdk-cell *cdkCellDef="let s" class="cell-code">{{ s.ip_address }}</td>
+          </ng-container>
+
+          <ng-container cdkColumnDef="agent">
+            <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">Client</th>
+            <td cdk-cell *cdkCellDef="let s" class="cell-agent" [title]="s.user_agent">
+              {{ s.user_agent }}
+            </td>
+          </ng-container>
+
+          <ng-container cdkColumnDef="status">
+            <th cdk-header-cell *cdkHeaderCellDef></th>
+            <td cdk-cell *cdkCellDef="let s">
+              @if (s.is_active) {
+                <span class="status-badge status-active" i18n="Session status badge">Active</span>
+              }
+            </td>
+          </ng-container>
+        </odo-table>
+      }
+    </section>
+  </odo-detail-page>
+}

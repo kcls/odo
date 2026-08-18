@@ -1,0 +1,567 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "odo-asset",
+    "description": "File upload and retrieval service",
+    "license": {
+      "name": ""
+    },
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/v1/odo/asset/directory/create": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "create_directory",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDirectoryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectoryRow"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/asset/directory/delete": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "delete_directory",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteDirectoryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteDirectoryResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/asset/directory/list": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "list_directories",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ListDirectoriesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DirectoryRow"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/asset/files/delete": {
+      "post": {
+        "tags": [
+          "asset"
+        ],
+        "operationId": "delete_file",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteFileRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Soft-deletes the file_upload row and unlinks the on-disk file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteFileResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/asset/files/get": {
+      "post": {
+        "tags": [
+          "asset"
+        ],
+        "operationId": "get_files",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GetFilesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "File metadata for the requested ids (missing/deleted ids are silently omitted)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetFilesResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/asset/files/{path}": {
+      "get": {
+        "tags": [
+          "asset"
+        ],
+        "operationId": "retrieve",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "path",
+            "description": "Relative file path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File contents"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/asset/upload": {
+      "post": {
+        "tags": [
+          "asset"
+        ],
+        "operationId": "upload",
+        "responses": {
+          "200": {
+            "description": "File uploaded"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CreateDirectoryRequest": {
+        "type": "object",
+        "required": [
+          "path",
+          "read_perm",
+          "write_perm"
+        ],
+        "properties": {
+          "category": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Restrict the mapping to one upload category; omit for the\nentity_type's catch-all. Requires entity_type."
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "entity_type": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Route uploads with this entity_type under `path`. Optional: omit\nfor a pure path-protection row."
+          },
+          "path": {
+            "type": "string",
+            "description": "Path prefix (no leading/trailing slash), e.g. `current/patron`."
+          },
+          "read_perm": {
+            "type": "string",
+            "description": "Permission code required to read files under this prefix."
+          },
+          "write_perm": {
+            "type": "string",
+            "description": "Permission code required to upload/delete files under this prefix."
+          }
+        }
+      },
+      "DeleteDirectoryRequest": {
+        "type": "object",
+        "required": [
+          "path"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          }
+        }
+      },
+      "DeleteDirectoryResponse": {
+        "type": "object",
+        "required": [
+          "deleted"
+        ],
+        "properties": {
+          "deleted": {
+            "type": "boolean"
+          }
+        }
+      },
+      "DeleteFileRequest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Database id of the file; alternatively pass `uuid`."
+          },
+          "uuid": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Stable uuid of the file (durable references)."
+          }
+        }
+      },
+      "DeleteFileResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "id",
+          "file_removed"
+        ],
+        "properties": {
+          "file_removed": {
+            "type": "boolean",
+            "description": "True when the on-disk file was unlinked. False when the file was\nmissing or couldn't be removed (the DB row is deleted either way)."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "DirectoryRow": {
+        "type": "object",
+        "required": [
+          "path",
+          "read_perm",
+          "write_perm"
+        ],
+        "properties": {
+          "category": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Exact upload category this mapping serves; absent = the\nentity_type's catch-all."
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "entity_type": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Uploads with this entity_type route under `path` (absent = a pure\npath-protection row with no upload routing)."
+          },
+          "path": {
+            "type": "string"
+          },
+          "read_perm": {
+            "type": "string"
+          },
+          "write_perm": {
+            "type": "string"
+          }
+        }
+      },
+      "FileMetadata": {
+        "type": "object",
+        "required": [
+          "id",
+          "uuid",
+          "file_name",
+          "storage_path",
+          "relative_path",
+          "uploaded_by",
+          "uploaded_at"
+        ],
+        "properties": {
+          "deleted_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "RFC3339 soft-delete timestamp; null for active files."
+          },
+          "file_name": {
+            "type": "string"
+          },
+          "file_size": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "file_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "relative_path": {
+            "type": "string"
+          },
+          "storage_path": {
+            "type": "string"
+          },
+          "uploaded_at": {
+            "type": "string"
+          },
+          "uploaded_by": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "uploaded_by_uuid": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Stable uuid of the uploader (durable references)."
+          },
+          "uuid": {
+            "type": "string",
+            "description": "Stable, DB-independent identity (see odo-durable-references)."
+          }
+        }
+      },
+      "GetFilesRequest": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "description": "Lookup by database id."
+          },
+          "include_deleted": {
+            "type": "boolean",
+            "description": "Opt in to also return soft-deleted files (flagged with deleted_at).\nDefault false keeps this active-only, so write-time attachment\nvalidation still rejects deleted ids."
+          },
+          "uuids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Lookup by stable uuid (durable references). May be mixed with `ids`;\nunparseable/unknown uuids are silently dropped like unknown ids."
+          }
+        }
+      },
+      "GetFilesResponse": {
+        "type": "object",
+        "required": [
+          "files"
+        ],
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FileMetadata"
+            }
+          }
+        }
+      },
+      "ListDirectoriesRequest": {
+        "type": "object"
+      },
+      "UploadResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "uuid",
+          "filename",
+          "original_name",
+          "relative_path",
+          "size",
+          "mime_type",
+          "uploaded_by",
+          "uploaded_at",
+          "category"
+        ],
+        "properties": {
+          "category": {
+            "type": "string",
+            "description": "Echo of the multipart `category` field (\"photo\" | \"document\" |\n\"video\"). The DB doesn't persist this — it's derived from the\ndestination directory. UI consumers use it to filter rendered\nattachment lists by kind."
+          },
+          "entity_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "entity_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "filename": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "mime_type": {
+            "type": "string"
+          },
+          "original_name": {
+            "type": "string"
+          },
+          "relative_path": {
+            "type": "string"
+          },
+          "size": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "uploaded_at": {
+            "type": "string"
+          },
+          "uploaded_by": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "uuid": {
+            "type": "string",
+            "description": "Stable, DB-independent identity (see odo-durable-references)."
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "bearer": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "asset",
+      "description": "File upload and retrieval"
+    }
+  ]
+}

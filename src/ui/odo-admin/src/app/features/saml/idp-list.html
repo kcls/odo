@@ -1,0 +1,60 @@
+<div class="page-header">
+  <h1 i18n="SAML page heading">SAML Identity Providers</h1>
+  @if (canWrite()) {
+    <button mat-flat-button (click)="createIdp()">
+      <mat-icon>add</mat-icon>
+      <ng-container i18n="Button that opens the create-IdP dialog">New IdP</ng-container>
+    </button>
+  }
+</div>
+<p class="page-intro" i18n="SAML list page introduction">
+  Identity providers your users sign in with. Select one to manage its
+  service providers, attributes, and role mappings.
+</p>
+
+@if (loading()) {
+  <div class="list-loading"><mat-spinner diameter="36" /></div>
+} @else if (idps().length === 0) {
+  <p class="list-empty" i18n="Shown when no IdPs are configured">
+    No identity providers configured.
+  </p>
+} @else {
+  <odo-table
+    [rows]="idps()"
+    [displayedColumns]="columns"
+    [clickableRows]="true"
+    (rowClick)="open($event)"
+  >
+    <ng-container cdkColumnDef="name">
+      <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">Name</th>
+      <td cdk-cell *cdkCellDef="let idp">{{ idp.name }}</td>
+    </ng-container>
+
+    <ng-container cdkColumnDef="entity_id">
+      <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">Entity ID</th>
+      <td cdk-cell *cdkCellDef="let idp" class="cell-code">{{ idp.entity_id }}</td>
+    </ng-container>
+
+    <ng-container cdkColumnDef="status">
+      <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">Status</th>
+      <td cdk-cell *cdkCellDef="let idp">
+        @if (idp.is_active) {
+          <span class="status-badge status-active" i18n="Config status badge">Active</span>
+        } @else {
+          <span class="status-badge status-inactive" i18n="Config status badge">Inactive</span>
+        }
+      </td>
+    </ng-container>
+
+    <ng-container cdkColumnDef="usage">
+      <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header: linked SPs and users">Usage</th>
+      <td
+        cdk-cell
+        *cdkCellDef="let idp"
+        i18n="Counts of service providers and users linked to the IdP"
+      >
+        {{ idp.sp_count }} SP(s) · {{ idp.user_count }} user(s)
+      </td>
+    </ng-container>
+  </odo-table>
+}

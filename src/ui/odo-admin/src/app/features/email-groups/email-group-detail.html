@@ -1,0 +1,150 @@
+@if (loading()) {
+  <div class="list-loading"><mat-spinner diameter="36" /></div>
+} @else if (group(); as g) {
+  <odo-detail-page
+    backLink="/email-groups"
+    i18n-backLabel="Back link to the email group list"
+    backLabel="Email Groups"
+    [title]="g.label"
+  >
+    <div slot="summary">
+      <span class="cell-code">{{ g.code }}</span>
+      @if (g.is_active) {
+        <span class="status-badge status-active" i18n="Group status badge">Active</span>
+      } @else {
+        <span class="status-badge status-inactive" i18n="Group status badge">Inactive</span>
+      }
+    </div>
+
+    @if (canWrite()) {
+      <div slot="actions">
+        <mat-slide-toggle
+          #groupToggle
+          [checked]="g.is_active"
+          (change)="toggleGroupActive($event.checked, groupToggle)"
+          i18n="Toggle controlling whether the group is active"
+          >Active</mat-slide-toggle
+        >
+      </div>
+    }
+
+    <section class="section">
+      <div class="section-header">
+        <h2 i18n="Group settings section heading">Details</h2>
+      </div>
+      <div class="detail-form">
+        <mat-form-field appearance="outline">
+          <mat-label i18n="Email group field label">Code</mat-label>
+          <input matInput name="code" [(ngModel)]="code" [disabled]="!canWrite()" />
+          @if (codeError()) {
+            <mat-error>{{ codeError() }}</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="detail-flex-field">
+          <mat-label i18n="Email group field label">Label</mat-label>
+          <input matInput name="label" [(ngModel)]="label" [disabled]="!canWrite()" />
+        </mat-form-field>
+
+        @if (canWrite()) {
+          <button
+            mat-flat-button
+            [disabled]="saving() || !groupDirty() || !code.trim() || !label.trim()"
+            (click)="saveGroup()"
+            i18n="Button that saves group edits"
+          >
+            Save
+          </button>
+        }
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-header">
+        <div>
+          <h2 i18n="Members section heading">Members</h2>
+          <p class="page-intro" i18n="Explanation of the members section">
+            {{ g.active_member_count }} of {{ g.member_count }} active.
+          </p>
+        </div>
+      </div>
+
+      @if (canWrite()) {
+        <form class="inline-form" (ngSubmit)="addMember()">
+          <mat-form-field appearance="outline" class="member-add-field" subscriptSizing="dynamic">
+            <mat-label i18n="Field label for adding a member email"
+              >Add email address</mat-label
+            >
+            <input
+              matInput
+              type="email"
+              name="newEmail"
+              [(ngModel)]="newEmail"
+              autocomplete="off"
+            />
+          </mat-form-field>
+          <button
+            mat-flat-button
+            type="submit"
+            [disabled]="addingMember() || !newEmail.trim()"
+            i18n="Button that adds a member to the group"
+          >
+            Add
+          </button>
+        </form>
+        @if (memberError()) {
+          <p class="form-error" role="alert">{{ memberError() }}</p>
+        }
+      }
+
+      @if (members().length === 0) {
+        <p class="list-empty" i18n="Shown when a group has no members">
+          This group has no members yet.
+        </p>
+      } @else {
+        <odo-table [rows]="members()" [displayedColumns]="memberColumns">
+          <ng-container cdkColumnDef="email">
+            <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">Email</th>
+            <td cdk-cell *cdkCellDef="let member">{{ member.email }}</td>
+          </ng-container>
+
+          <ng-container cdkColumnDef="active">
+            <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">Active</th>
+            <td cdk-cell *cdkCellDef="let member">
+              <mat-slide-toggle
+                [checked]="member.is_active"
+                [disabled]="!canWrite()"
+                (change)="toggleMemberActive(member, $event.checked)"
+                i18n-aria-label="Toggle controlling whether the member is active"
+                aria-label="Member active"
+              />
+            </td>
+          </ng-container>
+
+          <ng-container cdkColumnDef="added">
+            <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">Added</th>
+            <td cdk-cell *cdkCellDef="let member">
+              {{ member.created_at | date: 'mediumDate' }}
+            </td>
+          </ng-container>
+
+          <ng-container cdkColumnDef="actions">
+            <th cdk-header-cell *cdkHeaderCellDef></th>
+            <td cdk-cell *cdkCellDef="let member" class="cell-actions">
+              @if (canWrite()) {
+                <button
+                  mat-icon-button
+                  (click)="deleteMember(member)"
+                  i18n-aria-label="Button that removes the member"
+                  aria-label="Remove member"
+                >
+                  <mat-icon>delete</mat-icon>
+                </button>
+              }
+            </td>
+          </ng-container>
+        </odo-table>
+      }
+    </section>
+  </odo-detail-page>
+}

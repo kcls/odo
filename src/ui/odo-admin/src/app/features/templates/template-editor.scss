@@ -1,0 +1,118 @@
+:host {
+  display: block;
+}
+
+.header-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.unsaved-note {
+  color: var(--mat-sys-on-surface-variant);
+  font-style: italic;
+  font-size: 0.85rem;
+}
+
+.delete-button {
+  color: var(--mat-sys-error);
+}
+
+.editor-tabs {
+  margin-top: 8px;
+}
+
+.editor-form {
+  max-width: 1100px;
+  margin-top: 20px;
+}
+
+.editor-row {
+  display: flex;
+  gap: 16px;
+  align-items: baseline;
+
+  .editor-field {
+    flex: 1;
+  }
+}
+
+.editor-field {
+  display: block;
+  margin-bottom: 16px;
+
+  textarea {
+    font-family: ui-monospace, monospace;
+    font-size: 0.85rem;
+  }
+}
+
+.editor-field--full {
+  width: 100%;
+}
+
+.editor-field--wide {
+  flex: 3;
+}
+
+.editor-toggle {
+  flex: 0 0 auto;
+  align-self: center;
+}
+
+// Small dot on the Preview tab label while there are unsaved edits.
+.tab-dirty-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--mat-sys-primary);
+  margin-left: 8px;
+}
+
+.editor-preview {
+  max-width: 1100px;
+  margin-top: 20px;
+}
+
+.preview-unsaved {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  margin-bottom: 16px;
+  border-radius: 8px;
+  background: var(--mat-sys-primary-container);
+  color: var(--mat-sys-on-primary-container);
+
+  mat-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+  }
+}
+
+.preview-section {
+  margin-top: 16px;
+
+  h3 {
+    margin: 0 0 6px;
+    font-size: 0.85rem;
+    color: var(--mat-sys-on-surface-variant);
+  }
+}
+
+.preview-box {
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 8px;
+  background: var(--mat-sys-surface-container-lowest);
+  padding: 12px;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.9rem;
+}
+
+.preview-html {
+  white-space: normal;
+}

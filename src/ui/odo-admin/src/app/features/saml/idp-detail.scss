@@ -1,0 +1,36 @@
+:host {
+  display: block;
+}
+
+.danger-button {
+  color: var(--mat-sys-error);
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 24px;
+  margin: 0;
+
+  dt {
+    color: var(--mat-sys-on-surface-variant);
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+
+  dd {
+    margin: 0;
+    word-break: break-word;
+  }
+}
+
+.sp-entity {
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.mapping-search {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}

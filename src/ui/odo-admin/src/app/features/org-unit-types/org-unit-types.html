@@ -1,0 +1,75 @@
+<div class="page-header">
+  <h1 i18n="Org unit types page heading">Org Unit Types</h1>
+  @if (canWrite()) {
+    <button mat-flat-button (click)="openTypeDialog()">
+      <mat-icon>add</mat-icon>
+      <ng-container i18n="Button that opens the create-unit-type dialog">New Type</ng-container>
+    </button>
+  }
+</div>
+<p class="page-intro" i18n="Explanation of unit types">
+  Categories of org units (system, region, branch, …) and what each may contain.
+  Every org unit has a type.
+</p>
+
+@if (loading()) {
+  <div class="list-loading"><mat-spinner diameter="36" /></div>
+} @else if (unitTypes().length === 0) {
+  <p class="list-empty" i18n="Shown when no unit types exist">
+    No unit types configured.
+  </p>
+} @else {
+  <odo-table [rows]="unitTypes()" [displayedColumns]="typeColumns">
+    <ng-container cdkColumnDef="label">
+      <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">Label</th>
+      <td cdk-cell *cdkCellDef="let t">{{ t.label }}</td>
+    </ng-container>
+
+    <ng-container cdkColumnDef="parent">
+      <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">Parent type</th>
+      <td cdk-cell *cdkCellDef="let t">{{ t.parent_label }}</td>
+    </ng-container>
+
+    <ng-container cdkColumnDef="capabilities">
+      <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header">May contain</th>
+      <td cdk-cell *cdkCellDef="let t">
+        @if (t.can_have_staff) {
+          <span class="status-badge status-info" i18n="Unit type capability badge">Staff</span>
+        }
+        @if (t.can_have_patrons) {
+          <span class="status-badge status-info" i18n="Unit type capability badge">Patrons</span>
+        }
+      </td>
+    </ng-container>
+
+    <ng-container cdkColumnDef="units">
+      <th cdk-header-cell *cdkHeaderCellDef i18n="Table column header: active units of this type">Units</th>
+      <td cdk-cell *cdkCellDef="let t">{{ t.unit_count }}</td>
+    </ng-container>
+
+    <ng-container cdkColumnDef="actions">
+      <th cdk-header-cell *cdkHeaderCellDef></th>
+      <td cdk-cell *cdkCellDef="let t" class="cell-actions">
+        @if (canWrite()) {
+          <button
+            mat-icon-button
+            (click)="openTypeDialog(t)"
+            i18n-aria-label="Button that edits the unit type"
+            aria-label="Edit unit type"
+          >
+            <mat-icon>edit</mat-icon>
+          </button>
+          <button
+            mat-icon-button
+            [disabled]="t.unit_count > 0"
+            (click)="deleteType(t)"
+            i18n-aria-label="Button that deletes the unit type"
+            aria-label="Delete unit type"
+          >
+            <mat-icon>delete</mat-icon>
+          </button>
+        }
+      </td>
+    </ng-container>
+  </odo-table>
+}

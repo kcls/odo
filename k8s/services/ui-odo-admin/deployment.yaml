@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: ui-odo-admin
+    part-of: odo
+    version: v1
+  name: ui-odo-admin
+  namespace: odo-pub
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ui-odo-admin
+      version: v1
+  template:
+    metadata:
+      labels:
+        app: ui-odo-admin
+        component: ui-odo-admin
+        part-of: odo
+        version: v1
+    spec:
+      containers:
+        - image: localhost:32000/ui-odo-admin:latest
+          imagePullPolicy: Always
+          livenessProbe:
+            httpGet:
+              path: /odo/admin
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          name: ui-odo-admin
+          ports:
+            - containerPort: 8080
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /odo/admin
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 256Mi
+      imagePullSecrets:
+        - name: ghcr-secret

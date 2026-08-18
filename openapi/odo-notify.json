@@ -1,0 +1,1528 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "odo-notify",
+    "description": "Notification service",
+    "license": {
+      "name": ""
+    },
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/v1/odo/notify/email-group/create": {
+      "post": {
+        "tags": [
+          "email-group"
+        ],
+        "operationId": "create_email_group",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEmailGroupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Newly-created email group",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailGroupRow"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/notify/email-group/get": {
+      "post": {
+        "tags": [
+          "email-group"
+        ],
+        "operationId": "get_email_group",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailGroupIdRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Email group with its members",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailGroupDetailResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/notify/email-group/list": {
+      "post": {
+        "tags": [
+          "email-group"
+        ],
+        "operationId": "list_email_groups",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ListEmailGroupsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Email groups with member counts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailGroupPage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/notify/email-group/member/create": {
+      "post": {
+        "tags": [
+          "email-group"
+        ],
+        "operationId": "create_email_group_member",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEmailGroupMemberRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Newly-added email group member",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailGroupMemberRow"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/notify/email-group/member/delete": {
+      "post": {
+        "tags": [
+          "email-group"
+        ],
+        "operationId": "delete_email_group_member",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailGroupMemberIdRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Email group member deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/notify/email-group/member/update": {
+      "post": {
+        "tags": [
+          "email-group"
+        ],
+        "operationId": "update_email_group_member",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateEmailGroupMemberRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Updated email group member",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailGroupMemberRow"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/notify/email-group/update": {
+      "post": {
+        "tags": [
+          "email-group"
+        ],
+        "operationId": "update_email_group",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateEmailGroupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Updated email group",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailGroupRow"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/notify/enqueue": {
+      "post": {
+        "tags": [
+          "enqueue"
+        ],
+        "operationId": "enqueue",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnqueueRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Notification enqueued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnqueueResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/notify/inbox/dismiss": {
+      "post": {
+        "tags": [
+          "inbox"
+        ],
+        "operationId": "dismiss",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeliveryIdRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Notification dismissed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/notify/inbox/dismiss-all": {
+      "post": {
+        "tags": [
+          "inbox"
+        ],
+        "operationId": "dismiss_all",
+        "responses": {
+          "200": {
+            "description": "All notifications dismissed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/notify/inbox/list": {
+      "post": {
+        "tags": [
+          "inbox"
+        ],
+        "operationId": "list",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ListRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "User's in-app notifications",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/notify/inbox/mark-all-read": {
+      "post": {
+        "tags": [
+          "inbox"
+        ],
+        "operationId": "mark_all_read",
+        "responses": {
+          "200": {
+            "description": "All notifications marked as read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/notify/inbox/mark-read": {
+      "post": {
+        "tags": [
+          "inbox"
+        ],
+        "operationId": "mark_read",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeliveryIdRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Notification marked as read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/notify/template/create": {
+      "post": {
+        "tags": [
+          "template-admin"
+        ],
+        "operationId": "create_template",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTemplateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Newly-created template",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateRow"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/notify/template/delete": {
+      "post": {
+        "tags": [
+          "template-admin"
+        ],
+        "operationId": "delete_template",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TemplateIdRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Template soft-deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/notify/template/list": {
+      "post": {
+        "tags": [
+          "template-admin"
+        ],
+        "operationId": "list_templates",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ListTemplatesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Notification templates",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplatePage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/notify/template/preview": {
+      "post": {
+        "tags": [
+          "template-admin"
+        ],
+        "operationId": "preview_template",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Rendered template preview",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/notify/template/update": {
+      "post": {
+        "tags": [
+          "template-admin"
+        ],
+        "operationId": "update_template",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTemplateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Updated template",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateRow"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CreateEmailGroupMemberRequest": {
+        "type": "object",
+        "required": [
+          "email_group",
+          "email"
+        ],
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "email_group": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "is_active": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        }
+      },
+      "CreateEmailGroupRequest": {
+        "type": "object",
+        "required": [
+          "code",
+          "label"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "is_active": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "label": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateTemplateRequest": {
+        "type": "object",
+        "required": [
+          "code",
+          "name",
+          "subject_template",
+          "body_template"
+        ],
+        "properties": {
+          "body_template": {
+            "type": "string"
+          },
+          "body_template_html": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "code": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "is_active": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "org_unit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Defaults to the root org unit."
+          },
+          "sample_data": {},
+          "subject_template": {
+            "type": "string"
+          }
+        }
+      },
+      "DeliveryIdRequest": {
+        "type": "object",
+        "required": [
+          "delivery_id"
+        ],
+        "properties": {
+          "delivery_id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "DeliveryInfo": {
+        "type": "object",
+        "required": [
+          "id",
+          "channel",
+          "status"
+        ],
+        "properties": {
+          "channel": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "recipient_email_group": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "recipient_user": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "EmailGroupDetailResponse": {
+        "type": "object",
+        "required": [
+          "group",
+          "members"
+        ],
+        "properties": {
+          "group": {
+            "$ref": "#/components/schemas/EmailGroupRow"
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EmailGroupMemberRow"
+            }
+          }
+        }
+      },
+      "EmailGroupIdRequest": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "EmailGroupMemberIdRequest": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "EmailGroupMemberRow": {
+        "type": "object",
+        "required": [
+          "id",
+          "email_group",
+          "email",
+          "is_active",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "email": {
+            "type": "string"
+          },
+          "email_group": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "is_active": {
+            "type": "boolean"
+          }
+        }
+      },
+      "EmailGroupPage": {
+        "type": "object",
+        "description": "One page of email groups.",
+        "required": [
+          "rows",
+          "total"
+        ],
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EmailGroupRow"
+            },
+            "description": "The rows on this page."
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Total rows matching the filter, ignoring limit/offset."
+          }
+        }
+      },
+      "EmailGroupRow": {
+        "type": "object",
+        "required": [
+          "id",
+          "code",
+          "label",
+          "is_active",
+          "created_at",
+          "updated_at",
+          "member_count",
+          "active_member_count"
+        ],
+        "properties": {
+          "active_member_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "code": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "is_active": {
+            "type": "boolean"
+          },
+          "label": {
+            "type": "string"
+          },
+          "member_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "EnqueueRequest": {
+        "type": "object",
+        "required": [
+          "recipients",
+          "template_code"
+        ],
+        "properties": {
+          "dedup_key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "recipients": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Recipient"
+            }
+          },
+          "scheduled_for": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_entity_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "source_entity_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_service": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "template_code": {
+            "type": "string"
+          },
+          "template_variables": {}
+        }
+      },
+      "EnqueueResponse": {
+        "type": "object",
+        "required": [
+          "event_id",
+          "deliveries",
+          "is_duplicate"
+        ],
+        "properties": {
+          "deliveries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeliveryInfo"
+            }
+          },
+          "event_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "is_duplicate": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ListEmailGroupsRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Page"
+          },
+          {
+            "$ref": "#/components/schemas/Sort"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "include_inactive": {
+                "type": "boolean"
+              },
+              "search": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "ListRequest": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "offset": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "ListResponse": {
+        "type": "object",
+        "required": [
+          "notifications",
+          "total",
+          "unread_count"
+        ],
+        "properties": {
+          "notifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotificationItem"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "unread_count": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ListTemplatesRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Page"
+          },
+          {
+            "$ref": "#/components/schemas/Sort"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "search": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "NotificationItem": {
+        "type": "object",
+        "required": [
+          "delivery_id",
+          "event_id",
+          "title",
+          "is_read",
+          "created_at"
+        ],
+        "properties": {
+          "action_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "body": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "delivery_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "event_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "is_read": {
+            "type": "boolean"
+          },
+          "source_entity_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "source_entity_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_service": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "template_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
+      "Page": {
+        "type": "object",
+        "description": "Standard pagination inputs for admin list endpoints. Flatten this into a\nper-resource request struct alongside that resource's own filter fields:\n\n```ignore\n#[derive(Deserialize, ToSchema)]\npub struct ListThingsRequest {\n    #[serde(default)]\n    search: Option<String>,\n    #[serde(flatten)]\n    page: Page,\n}\n```",
+        "properties": {
+          "limit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "minimum": 0
+          },
+          "offset": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "PreviewRequest": {
+        "type": "object",
+        "properties": {
+          "body_template": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "body_template_html": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "subject_template": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "variables": {}
+        }
+      },
+      "PreviewResponse": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "body_html": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "subject": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "Recipient": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "user_id",
+              "channels",
+              "type"
+            ],
+            "properties": {
+              "channels": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "user"
+                ]
+              },
+              "user_id": {
+                "type": "integer",
+                "format": "int64"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "email_group_id",
+              "channels",
+              "type"
+            ],
+            "properties": {
+              "channels": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "email_group_id": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "email_group"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "Sort": {
+        "type": "object",
+        "description": "Standard sort inputs for admin list endpoints. Flatten this into a\nper-resource request struct alongside `Page`:\n\n```ignore\n#[derive(Deserialize, ToSchema)]\npub struct ListThingsRequest {\n    #[serde(default)]\n    search: Option<String>,\n    #[serde(flatten)]\n    page: Page,\n    #[serde(flatten)]\n    sort: Sort,\n}\n```\n\n`sort_by` is a client-supplied string, so a handler must NEVER map it to a\ncolumn directly — resolve it against an explicit allow-list with\n[`Sort::resolve`], which falls back to the handler's default for any\nunknown or absent key.",
+        "properties": {
+          "sort_by": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Logical column key to sort by (must be one the handler allow-lists)."
+          },
+          "sort_dir": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SortDir",
+                "description": "Sort direction; defaults to ascending when a `sort_by` is given."
+              }
+            ]
+          }
+        }
+      },
+      "SortDir": {
+        "type": "string",
+        "description": "Sort direction for a list endpoint.",
+        "enum": [
+          "asc",
+          "desc"
+        ]
+      },
+      "SuccessResponse": {
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "TemplateIdRequest": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "TemplatePage": {
+        "type": "object",
+        "description": "One page of email templates.",
+        "required": [
+          "rows",
+          "total"
+        ],
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TemplateRow"
+            },
+            "description": "The rows on this page."
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Total rows matching the filter, ignoring limit/offset."
+          }
+        }
+      },
+      "TemplateRow": {
+        "type": "object",
+        "required": [
+          "id",
+          "code",
+          "name",
+          "org_unit",
+          "subject_template",
+          "body_template",
+          "is_active",
+          "created_by",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "body_template": {
+            "type": "string"
+          },
+          "body_template_html": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "code": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "created_by": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "is_active": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "org_unit": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sample_data": {},
+          "subject_template": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "UpdateEmailGroupMemberRequest": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "is_active": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        }
+      },
+      "UpdateEmailGroupRequest": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "is_active": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "UpdateTemplateRequest": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "body_template": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "body_template_html": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Empty string clears the HTML variant."
+          },
+          "code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "is_active": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sample_data": {},
+          "subject_template": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "bearer": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "inbox",
+      "description": "Notification inbox (list, read, dismiss)"
+    },
+    {
+      "name": "enqueue",
+      "description": "Send notifications"
+    },
+    {
+      "name": "email-group",
+      "description": "Email group administration"
+    },
+    {
+      "name": "template-admin",
+      "description": "Notification template administration"
+    }
+  ]
+}

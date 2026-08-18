@@ -1,0 +1,23 @@
+# Routes for the ODO Admin UI.
+#
+# The SPA is served publicly (no SecurityPolicy); authentication happens
+# in-app against odo-auth (the SPA convention used across the cluster).
+# The APIs it calls live under /api/v1/odo/* and are routed + JWT-protected
+# by odo-routes.yaml / odo-security.yaml. Cross-namespace backend access is
+# granted by the existing allow-envoy-to-odo-pub ReferenceGrant in odo-pub.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: odo-admin-ui-routes
+spec:
+  parentRefs:
+    - name: envoy
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /odo/admin
+      backendRefs:
+        - name: ui-odo-admin
+          namespace: odo-pub
+          port: 80
