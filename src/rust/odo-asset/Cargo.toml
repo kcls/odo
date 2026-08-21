@@ -8,7 +8,7 @@ odo-client = { path = "../odo-client" }
 odo-service = { path = "../odo-service" }
 odo-entity = { path = "../odo-entity" }
 
-sea-orm = { version = "2.0.0-rc", features = [
+sea-orm = { version = "2.0", features = [
     "sqlx-postgres",
     "runtime-tokio-rustls",
     "macros",
