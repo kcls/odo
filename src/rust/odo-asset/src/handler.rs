@@ -378,29 +378,29 @@ pub async fn retrieve(
     Path(path): Path<String>,
     Query(params): Query<FileQueryParams>,
     headers: axum::http::HeaderMap,
-) -> Result<Response, Response> {
+) -> Response {
     // Accept token from Authorization header or ?token= query param
-    let token = headers
+    let Some(token) = headers
         .get("authorization")
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.strip_prefix("Bearer "))
         .map(|s| s.to_string())
         .or(params.token)
-        .ok_or_else(|| {
-            (
-                StatusCode::UNAUTHORIZED,
-                Json(serde_json::json!({"code": "UNAUTHENTICATED", "message": "Missing authorization"})),
-            )
-                .into_response()
-        })?;
+    else {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(serde_json::json!({"code": "UNAUTHENTICATED", "message": "Missing authorization"})),
+        )
+            .into_response();
+    };
 
-    let claims = state.tokens.verify(&token).map_err(|_| {
-        (
+    let Ok(claims) = state.tokens.verify(&token) else {
+        return (
             StatusCode::UNAUTHORIZED,
             Json(serde_json::json!({"code": "UNAUTHENTICATED", "message": "Invalid token"})),
         )
-            .into_response()
-    })?;
+            .into_response();
+    };
 
     let user_id = claims.user_id().unwrap_or(0);
 
@@ -414,7 +414,7 @@ pub async fn retrieve(
 
     if !full_path.starts_with(&state.storage_base_path) {
         warn!(user_id = user_id, path = %path, "Path traversal attempt");
-        return Err((StatusCode::BAD_REQUEST, "Invalid file path").into_response());
+        return (StatusCode::BAD_REQUEST, "Invalid file path").into_response();
     }
 
     // Enforce the read permission for the file's directory. This route runs
@@ -424,25 +424,29 @@ pub async fn retrieve(
     // caller's JWT and lets `require_directory_access` read the org unit.
     let rel_path = clean_path.to_string_lossy().replace('\\', "/");
     let ctx = RequestContext::generate().with_auth(token.clone(), claims.clone());
-    ctx.scope(require_directory_access(&state, &rel_path, Access::Read))
+    if let Err(e) = ctx
+        .scope(require_directory_access(&state, &rel_path, Access::Read))
         .await
-        .map_err(|e| {
-            warn!(user_id = user_id, path = %path, "Asset read denied");
-            odo_client::error::ApiError(e).into_response()
-        })?;
-
-    let metadata = fs::metadata(&full_path)
-        .await
-        .map_err(|_| (StatusCode::NOT_FOUND, "File not found").into_response())?;
-
-    if !metadata.is_file() {
-        return Err((StatusCode::BAD_REQUEST, "Cannot serve directories").into_response());
+    {
+        warn!(user_id = user_id, path = %path, "Asset read denied");
+        return odo_client::error::ApiError(e).into_response();
     }
 
-    let contents = fs::read(&full_path).await.map_err(|e| {
-        error!(error = %e, "Failed to read file");
-        (StatusCode::INTERNAL_SERVER_ERROR, "Failed to read file").into_response()
-    })?;
+    let Ok(metadata) = fs::metadata(&full_path).await else {
+        return (StatusCode::NOT_FOUND, "File not found").into_response();
+    };
+
+    if !metadata.is_file() {
+        return (StatusCode::BAD_REQUEST, "Cannot serve directories").into_response();
+    }
+
+    let contents = match fs::read(&full_path).await {
+        Ok(c) => c,
+        Err(e) => {
+            error!(error = %e, "Failed to read file");
+            return (StatusCode::INTERNAL_SERVER_ERROR, "Failed to read file").into_response();
+        }
+    };
 
     let ext = full_path
         .extension()
@@ -468,9 +472,10 @@ pub async fn retrieve(
         }
     }
 
-    builder
-        .body(Body::from(contents))
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response())
+    match builder.body(Body::from(contents)) {
+        Ok(resp) => resp,
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
 }
 
 // ---------------------------------------------------------------------------

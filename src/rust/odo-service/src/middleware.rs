@@ -99,25 +99,28 @@ pub async fn require_auth<S: HasTokenManager + Send + Sync + 'static>(
     State(state): State<Arc<S>>,
     request: Request,
     next: Next,
-) -> Result<Response, Response> {
-    let header = request
+) -> Response {
+    let Some(header) = request
         .headers()
         .get("authorization")
         .and_then(|v| v.to_str().ok())
-        .ok_or_else(auth_error)?;
+    else {
+        return auth_error();
+    };
 
-    let token = header.strip_prefix("Bearer ").ok_or_else(auth_error)?;
+    let Some(token) = header.strip_prefix("Bearer ") else {
+        return auth_error();
+    };
 
-    let claims = state
-        .token_manager()
-        .verify(token)
-        .map_err(|_| auth_error())?;
+    let Ok(claims) = state.token_manager().verify(token) else {
+        return auth_error();
+    };
 
     let ctx = RequestContext::current()
         .unwrap_or_else(RequestContext::generate)
         .with_auth(token.to_string(), claims);
 
-    Ok(ctx.scope(next.run(request)).await)
+    ctx.scope(next.run(request)).await
 }
 
 fn auth_error() -> Response {
