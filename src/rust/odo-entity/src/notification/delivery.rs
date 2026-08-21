@@ -8,9 +8,9 @@ use serde::{Deserialize, Serialize};
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i64,
-    #[sea_orm(unique_key = "uq_delivery_event_channel_email_group")]
+    #[sea_orm(unique_key = "uq_delivery_event_channel_user")]
     pub event_id: i64,
-    #[sea_orm(unique_key = "uq_delivery_event_channel_email_group")]
+    #[sea_orm(unique_key = "uq_delivery_event_channel_user")]
     pub channel: String,
     pub template_code: Option<String>,
     #[sea_orm(column_type = "Text")]
