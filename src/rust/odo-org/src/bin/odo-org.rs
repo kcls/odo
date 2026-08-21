@@ -2,10 +2,10 @@ use axum::Router;
 use axum::middleware;
 use axum::routing::{get, post};
 use odo_client::auth::TokenManager;
-use odo_service::health;
-use odo_service::middleware::{log_access, request_tracing, require_auth};
 use odo_org::AppState;
 use odo_org::{admin, handler, org_children};
+use odo_service::health;
+use odo_service::middleware::{log_access, request_tracing, require_auth};
 use std::env;
 use std::sync::Arc;
 use tracing::{error, info};
@@ -121,9 +121,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/v1/odo/org/tree", get(handler::org_unit_tree))
         .route("/api/v1/odo/org/root", get(handler::org_unit_root))
         .route("/api/v1/odo/org/unit/{id}", get(handler::org_unit_detail))
-        .route("/api/v1/odo/org/unit/uuid/{uuid}", get(handler::org_unit_detail_by_uuid))
-        .route("/api/v1/odo/org/unit/uuid/{uuid}/ancestors", get(handler::org_unit_ancestors_by_uuid))
-        .route("/api/v1/odo/org/unit/uuid/{uuid}/descendants", get(handler::org_unit_descendants_by_uuid))
+        .route(
+            "/api/v1/odo/org/unit/uuid/{uuid}",
+            get(handler::org_unit_detail_by_uuid),
+        )
+        .route(
+            "/api/v1/odo/org/unit/uuid/{uuid}/ancestors",
+            get(handler::org_unit_ancestors_by_uuid),
+        )
+        .route(
+            "/api/v1/odo/org/unit/uuid/{uuid}/descendants",
+            get(handler::org_unit_descendants_by_uuid),
+        )
         .route(
             "/api/v1/odo/org/unit/{id}/ancestors",
             get(handler::org_unit_ancestors),
@@ -152,9 +161,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "/api/v1/odo/org/admin/unit-type/delete",
             post(admin::delete_unit_type),
         )
-        .route("/api/v1/odo/org/admin/unit/create", post(admin::create_unit))
-        .route("/api/v1/odo/org/admin/unit/update", post(admin::update_unit))
-        .route("/api/v1/odo/org/admin/unit/delete", post(admin::delete_unit))
+        .route(
+            "/api/v1/odo/org/admin/unit/create",
+            post(admin::create_unit),
+        )
+        .route(
+            "/api/v1/odo/org/admin/unit/update",
+            post(admin::update_unit),
+        )
+        .route(
+            "/api/v1/odo/org/admin/unit/delete",
+            post(admin::delete_unit),
+        )
         .route(
             "/api/v1/odo/org/admin/unit-children",
             post(org_children::list_unit_children),

@@ -1,7 +1,7 @@
 // For helpers see https://docs.rs/handlebars/latest/handlebars/#custom-helper
 
-use odo_client::date;
 use handlebars::{Handlebars, handlebars_helper};
+use odo_client::date;
 use serde_json::Value;
 
 handlebars_helper!(date_format_helper: |value: str, format: str, timezone: str| {

@@ -3,8 +3,8 @@
 //! These functions are used both internally (e.g. login's auth.session check)
 //! and exposed as HTTP endpoints for other services.
 
-use odo_entity::authz::usr_role_org_map;
 use odo_client::error::LocalResult;
+use odo_entity::authz::usr_role_org_map;
 use sea_orm::prelude::*;
 use sea_orm::{ConnectionTrait, DatabaseConnection, DbBackend, QueryOrder, Statement};
 

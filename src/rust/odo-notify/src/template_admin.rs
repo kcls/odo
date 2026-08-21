@@ -10,14 +10,14 @@
 use axum::Json;
 use axum::extract::State;
 use chrono::Utc;
+use odo_client::context::RequestContext;
+use odo_client::error::{ApiResult, LocalError};
+use odo_entity::notification::template;
+use odo_entity::org::unit;
 use odo_service::admin::{
     Page, Paginated, Sort, clean_code, clean_optional, clean_required, clean_search,
     map_unique_violation,
 };
-use odo_client::context::RequestContext;
-use odo_entity::notification::template;
-use odo_entity::org::unit;
-use odo_client::error::{ApiResult, LocalError};
 use sea_orm::prelude::*;
 use sea_orm::{Condition, Order, QueryOrder, QuerySelect, Set};
 use serde::{Deserialize, Serialize};
@@ -165,7 +165,10 @@ pub async fn list_templates(
     Json(params): Json<ListTemplatesRequest>,
 ) -> ApiResult<Json<TemplatePage>> {
     RequestContext::user_id().ok_or(LocalError::unauthenticated())?;
-    state.auth_client.permission_required(READ_PERM, None).await?;
+    state
+        .auth_client
+        .permission_required(READ_PERM, None)
+        .await?;
 
     let mut condition = Condition::all().add(template::Column::DeletedAt.is_null());
     if let Some(search) = clean_search(params.search.as_deref()) {
@@ -219,7 +222,10 @@ pub async fn create_template(
     Json(params): Json<CreateTemplateRequest>,
 ) -> ApiResult<Json<TemplateRow>> {
     let user_id = RequestContext::user_id().ok_or(LocalError::unauthenticated())? as i32;
-    state.auth_client.permission_required(WRITE_PERM, None).await?;
+    state
+        .auth_client
+        .permission_required(WRITE_PERM, None)
+        .await?;
 
     let code = clean_code(&params.code, "code")?;
     let name = clean_required(&params.name, "name")?;
@@ -278,7 +284,10 @@ pub async fn update_template(
     Json(params): Json<UpdateTemplateRequest>,
 ) -> ApiResult<Json<TemplateRow>> {
     RequestContext::user_id().ok_or(LocalError::unauthenticated())?;
-    state.auth_client.permission_required(WRITE_PERM, None).await?;
+    state
+        .auth_client
+        .permission_required(WRITE_PERM, None)
+        .await?;
 
     let existing = find_template(&state.db, params.id).await?;
 
@@ -355,7 +364,10 @@ pub async fn delete_template(
     Json(params): Json<TemplateIdRequest>,
 ) -> ApiResult<Json<SuccessResponse>> {
     RequestContext::user_id().ok_or(LocalError::unauthenticated())?;
-    state.auth_client.permission_required(WRITE_PERM, None).await?;
+    state
+        .auth_client
+        .permission_required(WRITE_PERM, None)
+        .await?;
 
     let existing = find_template(&state.db, params.id).await?;
 
@@ -381,15 +393,19 @@ pub async fn preview_template(
     Json(params): Json<PreviewRequest>,
 ) -> ApiResult<Json<PreviewResponse>> {
     RequestContext::user_id().ok_or(LocalError::unauthenticated())?;
-    state.auth_client.permission_required(READ_PERM, None).await?;
+    state
+        .auth_client
+        .permission_required(READ_PERM, None)
+        .await?;
 
     let vars = params.variables.unwrap_or(serde_json::json!({}));
 
     let render = |field: &str, text: &Option<String>| -> Result<Option<String>, LocalError> {
         match text {
-            Some(t) => Ok(Some(odo_service::template::render(t, &vars).map_err(|e| {
-                LocalError::invalid_input(format!("{field}: {e}"))
-            })?)),
+            Some(t) => Ok(Some(
+                odo_service::template::render(t, &vars)
+                    .map_err(|e| LocalError::invalid_input(format!("{field}: {e}")))?,
+            )),
             None => Ok(None),
         }
     };
@@ -405,10 +421,7 @@ pub async fn preview_template(
 // Helpers
 // ===========================================================================
 
-async fn find_template(
-    db: &DatabaseConnection,
-    id: i32,
-) -> Result<template::Model, LocalError> {
+async fn find_template(db: &DatabaseConnection, id: i32) -> Result<template::Model, LocalError> {
     template::Entity::find_by_id(id)
         .filter(template::Column::DeletedAt.is_null())
         .one(db)
@@ -436,11 +449,7 @@ async fn root_org_unit(db: &DatabaseConnection) -> Result<i32, LocalError> {
 
 /// Compile-check a handlebars template against sample variables; render
 /// errors surface as 400s naming the offending field.
-fn validate_template(
-    field: &str,
-    text: &str,
-    vars: &serde_json::Value,
-) -> Result<(), LocalError> {
+fn validate_template(field: &str, text: &str, vars: &serde_json::Value) -> Result<(), LocalError> {
     odo_service::template::render(text, vars)
         .map(|_| ())
         .map_err(|e| LocalError::invalid_input(format!("{field}: {e}")))

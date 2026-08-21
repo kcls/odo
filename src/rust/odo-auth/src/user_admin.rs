@@ -11,6 +11,9 @@
 
 use axum::Json;
 use axum::extract::State;
+use chrono::Utc;
+use odo_client::context::RequestContext;
+use odo_client::error::{ApiResult, LocalError};
 use odo_entity::auth::{
     local_account, saml_idp_attribute, saml_idp_config, saml_usr_attr, session, usr,
     usr_saml_identities,
@@ -18,9 +21,6 @@ use odo_entity::auth::{
 use odo_entity::authz::usr_role_org_map;
 use odo_entity::org::unit;
 use odo_service::admin::clean_optional;
-use odo_client::context::RequestContext;
-use odo_client::error::{ApiResult, LocalError};
-use chrono::Utc;
 use sea_orm::prelude::*;
 use sea_orm::{QueryOrder, QuerySelect, Set};
 use serde::{Deserialize, Serialize};
@@ -288,8 +288,7 @@ pub async fn update_user(
     State(state): State<Arc<AppState>>,
     Json(params): Json<UpdateUserRequest>,
 ) -> ApiResult<Json<UserAccountRow>> {
-    let caller_id =
-        RequestContext::user_id().ok_or(LocalError::unauthenticated())? as i32;
+    let caller_id = RequestContext::user_id().ok_or(LocalError::unauthenticated())? as i32;
     require_perm(&state, WRITE_PERM, None).await?;
 
     let existing = usr::Entity::find_by_id(params.id)
@@ -307,9 +306,7 @@ pub async fn update_user(
     }
 
     if params.deleted == Some(true) && existing.id == caller_id {
-        return Err(
-            LocalError::invalid_input("You may not delete your own account.").into(),
-        );
+        return Err(LocalError::invalid_input("You may not delete your own account.").into());
     }
 
     tracing::info!(id = params.id, "UpdateUser");
@@ -319,8 +316,7 @@ pub async fn update_user(
         model.first_given_name = Set(clean_optional(params.first_given_name.as_deref()));
     }
     if params.second_given_name.is_some() {
-        model.second_given_name =
-            Set(clean_optional(params.second_given_name.as_deref()));
+        model.second_given_name = Set(clean_optional(params.second_given_name.as_deref()));
     }
     if params.family_name.is_some() {
         model.family_name = Set(clean_optional(params.family_name.as_deref()));
@@ -406,7 +402,9 @@ pub async fn create_user(
     let username = params.username.trim().to_string();
     let email = params.email.trim().to_string();
     if username.is_empty() || username.chars().any(char::is_whitespace) {
-        return Err(LocalError::invalid_input("username must be non-empty without whitespace").into());
+        return Err(
+            LocalError::invalid_input("username must be non-empty without whitespace").into(),
+        );
     }
     if email.is_empty() || !email.contains('@') {
         return Err(LocalError::invalid_input("email must be a valid address").into());
@@ -485,7 +483,9 @@ pub async fn create_user(
             ))
             .await?
             .ok_or_else(|| LocalError::internal("hash_password returned nothing"))?;
-        let hash: String = hashed.try_get("", "hash").map_err(|e| LocalError::internal(e.to_string()))?;
+        let hash: String = hashed
+            .try_get("", "hash")
+            .map_err(|e| LocalError::internal(e.to_string()))?;
 
         let account = local_account::ActiveModel {
             usr: Set(created.id),

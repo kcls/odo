@@ -8,11 +8,11 @@ use chrono::Utc;
 use flate2::Compression;
 use flate2::write::DeflateEncoder;
 use odo_client::auth::generate_session_id;
+use odo_client::error::{LocalError, LocalResult};
 use odo_entity::auth::{
     saml_auth_requests, saml_idp_config, saml_session, saml_sp_config, session, usr,
     usr_saml_identities,
 };
-use odo_client::error::{LocalError, LocalResult};
 use openssl::x509::X509;
 use samael::crypto::verify_signed_xml;
 use samael::metadata::EntityDescriptor;

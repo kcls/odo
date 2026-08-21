@@ -269,7 +269,9 @@ fn parse_jwks(json: &str) -> LocalResult<Vec<DecodingKey>> {
         .collect();
 
     if keys.is_empty() {
-        return Err(LocalError::internal("JWKS document contains no usable RSA keys"));
+        return Err(LocalError::internal(
+            "JWKS document contains no usable RSA keys",
+        ));
     }
     Ok(keys)
 }
@@ -439,7 +441,14 @@ mod tests {
     fn org_unit_round_trips() {
         let tm = hmac_manager();
         let (access, _, _) = tm
-            .generate_token_pair(1, Some("e2e00000-0000-4000-a000-000000000042".into()), "a@b.com", "local", "s1", Some("e2e00000-0000-4000-a000-000000000099".into()))
+            .generate_token_pair(
+                1,
+                Some("e2e00000-0000-4000-a000-000000000042".into()),
+                "a@b.com",
+                "local",
+                "s1",
+                Some("e2e00000-0000-4000-a000-000000000099".into()),
+            )
             .unwrap();
 
         let claims = tm.validate_token(&access).unwrap();

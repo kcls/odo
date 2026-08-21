@@ -46,11 +46,7 @@ impl Error {
         Error::Unauthenticated
     }
 
-    pub fn conflict(
-        code: &'static str,
-        field: Option<&str>,
-        message: impl Into<String>,
-    ) -> Self {
+    pub fn conflict(code: &'static str, field: Option<&str>, message: impl Into<String>) -> Self {
         Error::Conflict {
             code,
             field: field.map(String::from),

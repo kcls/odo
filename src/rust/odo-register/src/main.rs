@@ -278,10 +278,7 @@ async fn apply(client: &Client, manifest: &Manifest) -> Result<(), String> {
         // the install has no SSO or the IdP lacks the attribute.
         let (status, attrs) = client
             .post(
-                format!(
-                    "{}/api/v1/odo/auth/saml/admin/attribute/list",
-                    client.base
-                ),
+                format!("{}/api/v1/odo/auth/saml/admin/attribute/list", client.base),
                 &json!({}),
             )
             .await?;
@@ -360,9 +357,10 @@ async fn apply(client: &Client, manifest: &Manifest) -> Result<(), String> {
 
         let mut t = Tally::new();
         for a in &manifest.user_role_assignments {
-            let org_unit_uuid = units
-                .get(&a.org_unit_code)
-                .ok_or(format!("org unit code '{}' not in the tree", a.org_unit_code))?;
+            let org_unit_uuid = units.get(&a.org_unit_code).ok_or(format!(
+                "org unit code '{}' not in the tree",
+                a.org_unit_code
+            ))?;
             let label = format!("assignment {} @ {}", a.role, a.org_unit_code);
             t.add(
                 client

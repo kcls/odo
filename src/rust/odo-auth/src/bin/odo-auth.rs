@@ -1,17 +1,16 @@
 use axum::Router;
 use axum::middleware;
 use axum::routing::{get, post};
-use odo_client::auth::TokenManager;
-use odo_service::health;
-use odo_service::middleware::{log_access, request_tracing, require_auth};
 use odo_auth::handler;
 #[cfg(feature = "saml")]
 use odo_auth::saml;
 use odo_auth::user;
 use odo_auth::{
-    AppState, CookieConfig, authz_admin, role_assignments, saml_admin, saml_attr_admin,
-    user_admin,
+    AppState, CookieConfig, authz_admin, role_assignments, saml_admin, saml_attr_admin, user_admin,
 };
+use odo_client::auth::TokenManager;
+use odo_service::health;
+use odo_service::middleware::{log_access, request_tracing, require_auth};
 use std::env;
 use std::sync::Arc;
 use tracing::{error, info};
@@ -378,9 +377,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let user_routes = Router::new()
         .route("/api/v1/odo/auth/user/get", post(user::get_user))
         .route("/api/v1/odo/auth/user/search", post(user::user_search))
-        .route("/api/v1/odo/auth/user/detail", post(user_admin::user_detail))
-        .route("/api/v1/odo/auth/user/update", post(user_admin::update_user))
-        .route("/api/v1/odo/auth/user/create", post(user_admin::create_user))
+        .route(
+            "/api/v1/odo/auth/user/detail",
+            post(user_admin::user_detail),
+        )
+        .route(
+            "/api/v1/odo/auth/user/update",
+            post(user_admin::update_user),
+        )
+        .route(
+            "/api/v1/odo/auth/user/create",
+            post(user_admin::create_user),
+        )
         .layer(middleware::from_fn(log_access))
         .layer(middleware::from_fn_with_state(state.clone(), require_auth));
 

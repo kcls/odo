@@ -8,11 +8,11 @@
 
 use axum::Json;
 use axum::extract::State;
-use odo_service::admin::map_unique_violation;
+use odo_client::error::{ApiResult, LocalError};
 use odo_entity::auth::usr;
 use odo_entity::authz::{permission, role, usr_role_org_map};
 use odo_entity::org::unit;
-use odo_client::error::{ApiResult, LocalError};
+use odo_service::admin::map_unique_violation;
 use sea_orm::prelude::*;
 use sea_orm::{DbBackend, QueryOrder, Set, Statement};
 use serde::{Deserialize, Serialize};
@@ -238,10 +238,13 @@ pub async fn create_assignment(
     // target org unit.
     let usr_id =
         crate::handler::resolve_usr_ref(&state.db, params.usr, params.usr_uuid.as_deref()).await?;
-    let org_unit_id =
-        crate::handler::resolve_org_ref(&state.db, params.org_unit, params.org_unit_uuid.as_deref())
-            .await?
-            .ok_or_else(|| LocalError::invalid_input("org_unit or org_unit_uuid required"))?;
+    let org_unit_id = crate::handler::resolve_org_ref(
+        &state.db,
+        params.org_unit,
+        params.org_unit_uuid.as_deref(),
+    )
+    .await?
+    .ok_or_else(|| LocalError::invalid_input("org_unit or org_unit_uuid required"))?;
 
     find_user(&state.db, usr_id).await?;
 

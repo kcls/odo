@@ -9,10 +9,10 @@
 use axum::Json;
 use axum::extract::State;
 use chrono::Utc;
-use odo_service::admin::{clean_optional, clean_required, map_unique_violation};
 use odo_client::context::RequestContext;
-use odo_entity::org::{address, closure, operating_hours};
 use odo_client::error::{ApiResult, LocalError};
+use odo_entity::org::{address, closure, operating_hours};
+use odo_service::admin::{clean_optional, clean_required, map_unique_violation};
 use sea_orm::prelude::*;
 use sea_orm::{QueryOrder, Set};
 use serde::{Deserialize, Serialize};
@@ -31,7 +31,10 @@ async fn require_read(state: &AppState) -> Result<(), LocalError> {
 }
 
 async fn require_write(state: &AppState) -> Result<(), LocalError> {
-    state.auth_client.permission_required(WRITE_PERM, None).await
+    state
+        .auth_client
+        .permission_required(WRITE_PERM, None)
+        .await
 }
 
 // ===========================================================================
@@ -518,7 +521,12 @@ pub async fn create_operating_hours(
 
     find_unit(&state.db, params.org_unit).await?;
     let is_closed = params.is_closed.unwrap_or(false);
-    validate_hours(params.day_of_week, params.open_time, params.close_time, is_closed)?;
+    validate_hours(
+        params.day_of_week,
+        params.open_time,
+        params.close_time,
+        is_closed,
+    )?;
 
     tracing::info!(org_unit = params.org_unit, "CreateOperatingHours");
 
@@ -606,10 +614,7 @@ pub async fn delete_operating_hours(
 // Helpers
 // ===========================================================================
 
-async fn find_address(
-    db: &DatabaseConnection,
-    id: i32,
-) -> Result<address::Model, LocalError> {
+async fn find_address(db: &DatabaseConnection, id: i32) -> Result<address::Model, LocalError> {
     address::Entity::find_by_id(id)
         .filter(address::Column::DeletedAt.is_null())
         .one(db)

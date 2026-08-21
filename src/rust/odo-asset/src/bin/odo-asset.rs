@@ -2,12 +2,12 @@ use axum::Router;
 use axum::extract::DefaultBodyLimit;
 use axum::middleware;
 use axum::routing::{get, post};
-use odo_client::auth::TokenManager;
-use odo_service::health;
-use odo_service::middleware::{log_access, request_tracing, require_auth};
 use odo_asset::AppState;
 use odo_asset::admin;
 use odo_asset::handler;
+use odo_client::auth::TokenManager;
+use odo_service::health;
+use odo_service::middleware::{log_access, request_tracing, require_auth};
 use std::env;
 use std::sync::Arc;
 use tracing::{error, info};
@@ -94,9 +94,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // *before* the layer call.
         .route("/api/v1/odo/asset/files/get", post(handler::get_files))
         .route("/api/v1/odo/asset/files/delete", post(handler::delete_file))
-        .route("/api/v1/odo/asset/directory/list", post(admin::list_directories))
-        .route("/api/v1/odo/asset/directory/create", post(admin::create_directory))
-        .route("/api/v1/odo/asset/directory/delete", post(admin::delete_directory))
+        .route(
+            "/api/v1/odo/asset/directory/list",
+            post(admin::list_directories),
+        )
+        .route(
+            "/api/v1/odo/asset/directory/create",
+            post(admin::create_directory),
+        )
+        .route(
+            "/api/v1/odo/asset/directory/delete",
+            post(admin::delete_directory),
+        )
         .layer(middleware::from_fn(log_access))
         .layer(middleware::from_fn_with_state(state.clone(), require_auth))
         .layer(middleware::from_fn(request_tracing))

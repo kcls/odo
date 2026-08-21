@@ -9,13 +9,13 @@
 use axum::Json;
 use axum::extract::State;
 use chrono::Utc;
+use odo_client::context::RequestContext;
+use odo_client::error::{ApiResult, LocalError};
+use odo_entity::notification::{email_group, email_group_member};
 use odo_service::admin::{
     Page, Paginated, Sort, clean_code, clean_email, clean_required, clean_search,
     map_unique_violation,
 };
-use odo_client::context::RequestContext;
-use odo_entity::notification::{email_group, email_group_member};
-use odo_client::error::{ApiResult, LocalError};
 use sea_orm::prelude::*;
 use sea_orm::{Condition, Order, QueryOrder, QuerySelect, Set};
 use serde::{Deserialize, Serialize};
@@ -161,7 +161,10 @@ pub async fn list_email_groups(
 ) -> ApiResult<Json<EmailGroupPage>> {
     RequestContext::user_id().ok_or(LocalError::unauthenticated())?;
 
-    state.auth_client.permission_required(READ_PERM, None).await?;
+    state
+        .auth_client
+        .permission_required(READ_PERM, None)
+        .await?;
 
     let mut condition = Condition::all();
     if !params.include_inactive {
@@ -228,7 +231,10 @@ pub async fn get_email_group(
 ) -> ApiResult<Json<EmailGroupDetailResponse>> {
     RequestContext::user_id().ok_or(LocalError::unauthenticated())?;
 
-    state.auth_client.permission_required(READ_PERM, None).await?;
+    state
+        .auth_client
+        .permission_required(READ_PERM, None)
+        .await?;
 
     let group = find_group(&state.db, params.id).await?;
 
@@ -261,7 +267,10 @@ pub async fn create_email_group(
 ) -> ApiResult<Json<EmailGroupRow>> {
     RequestContext::user_id().ok_or(LocalError::unauthenticated())?;
 
-    state.auth_client.permission_required(WRITE_PERM, None).await?;
+    state
+        .auth_client
+        .permission_required(WRITE_PERM, None)
+        .await?;
 
     let code = clean_code(&params.code, "code")?;
     let label = clean_required(&params.label, "label")?;
@@ -296,7 +305,10 @@ pub async fn update_email_group(
 ) -> ApiResult<Json<EmailGroupRow>> {
     RequestContext::user_id().ok_or(LocalError::unauthenticated())?;
 
-    state.auth_client.permission_required(WRITE_PERM, None).await?;
+    state
+        .auth_client
+        .permission_required(WRITE_PERM, None)
+        .await?;
 
     let existing = find_group(&state.db, params.id).await?;
     let group_id = existing.id;
@@ -340,7 +352,10 @@ pub async fn create_email_group_member(
 ) -> ApiResult<Json<EmailGroupMemberRow>> {
     RequestContext::user_id().ok_or(LocalError::unauthenticated())?;
 
-    state.auth_client.permission_required(WRITE_PERM, None).await?;
+    state
+        .auth_client
+        .permission_required(WRITE_PERM, None)
+        .await?;
 
     let email = clean_email(&params.email)?;
 
@@ -380,7 +395,10 @@ pub async fn update_email_group_member(
 ) -> ApiResult<Json<EmailGroupMemberRow>> {
     RequestContext::user_id().ok_or(LocalError::unauthenticated())?;
 
-    state.auth_client.permission_required(WRITE_PERM, None).await?;
+    state
+        .auth_client
+        .permission_required(WRITE_PERM, None)
+        .await?;
 
     let existing = email_group_member::Entity::find_by_id(params.id)
         .one(&state.db)
@@ -419,7 +437,10 @@ pub async fn delete_email_group_member(
 ) -> ApiResult<Json<SuccessResponse>> {
     RequestContext::user_id().ok_or(LocalError::unauthenticated())?;
 
-    state.auth_client.permission_required(WRITE_PERM, None).await?;
+    state
+        .auth_client
+        .permission_required(WRITE_PERM, None)
+        .await?;
 
     tracing::info!(id = params.id, "DeleteEmailGroupMember");
 
@@ -474,7 +495,10 @@ async fn member_counts(
     Ok(counts)
 }
 
-async fn member_counts_for(db: &DatabaseConnection, group_id: i32) -> Result<(i64, i64), LocalError> {
+async fn member_counts_for(
+    db: &DatabaseConnection,
+    group_id: i32,
+) -> Result<(i64, i64), LocalError> {
     let members = email_group_member::Entity::find()
         .filter(email_group_member::Column::EmailGroup.eq(group_id))
         .all(db)

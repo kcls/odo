@@ -11,10 +11,10 @@
 
 use axum::Json;
 use axum::extract::State;
-use odo_service::admin::{Page, Paginated, Sort, clean_required, map_unique_violation};
+use odo_client::error::{ApiResult, LocalError};
 use odo_entity::auth::{saml_idp_attribute, saml_idp_config};
 use odo_entity::authz::{role, saml_attr_role_map};
-use odo_client::error::{ApiResult, LocalError};
+use odo_service::admin::{Page, Paginated, Sort, clean_required, map_unique_violation};
 use sea_orm::prelude::*;
 use sea_orm::{Condition, Order, QueryOrder, QuerySelect, Set};
 use serde::{Deserialize, Serialize};
@@ -401,8 +401,8 @@ pub async fn list_attr_role_maps(
                 .replace('\\', "\\\\")
                 .replace('%', "\\%")
                 .replace('_', "\\_");
-            condition = condition
-                .add(saml_attr_role_map::Column::AttrValue.ilike(format!("%{escaped}%")));
+            condition =
+                condition.add(saml_attr_role_map::Column::AttrValue.ilike(format!("%{escaped}%")));
         }
     }
 
@@ -544,9 +544,7 @@ pub async fn delete_attr_role_map(
         .await?;
 
     if result.rows_affected == 0 {
-        return Err(
-            LocalError::not_found(format!("attribute role mapping {}", params.id)).into(),
-        );
+        return Err(LocalError::not_found(format!("attribute role mapping {}", params.id)).into());
     }
 
     Ok(Json(SamlAttrSuccessResponse { success: true }))

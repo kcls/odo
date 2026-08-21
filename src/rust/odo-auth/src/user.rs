@@ -1,8 +1,8 @@
 use axum::Json;
 use axum::extract::State;
+use odo_client::error::LocalError;
 use odo_entity::auth::{saml_usr_working_location, usr};
 use odo_entity::org::unit as org_unit_entity;
-use odo_client::error::LocalError;
 use sea_orm::prelude::*;
 use sea_orm::sea_query::{Expr, extension::postgres::PgExpr};
 use sea_orm::{Condition, QueryOrder, QuerySelect};
@@ -188,12 +188,11 @@ async fn fetch_working_locations(
         .filter(org_unit_entity::Column::Id.is_in(ids.iter().copied()))
         .all(db)
         .await?;
-    let by_id: std::collections::HashMap<i32, String> =
-        units.into_iter().map(|u| (u.id, u.uuid.to_string())).collect();
-    let uuids = ids
-        .iter()
-        .filter_map(|id| by_id.get(id).cloned())
+    let by_id: std::collections::HashMap<i32, String> = units
+        .into_iter()
+        .map(|u| (u.id, u.uuid.to_string()))
         .collect();
+    let uuids = ids.iter().filter_map(|id| by_id.get(id).cloned()).collect();
 
     Ok((ids, uuids))
 }

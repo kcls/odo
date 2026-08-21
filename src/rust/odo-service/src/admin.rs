@@ -183,7 +183,9 @@ macro_rules! page_type {
 pub fn clean_required(value: &str, field: &str) -> Result<String, LocalError> {
     let value = value.trim();
     if value.is_empty() {
-        return Err(LocalError::invalid_input(format!("{field} may not be empty")));
+        return Err(LocalError::invalid_input(format!(
+            "{field} may not be empty"
+        )));
     }
     Ok(value.to_string())
 }
@@ -224,14 +226,18 @@ pub fn clean_search(value: Option<&str>) -> Option<String> {
 pub fn clean_email(email: &str) -> Result<String, LocalError> {
     let email = clean_required(email, "email")?;
     if email.len() > 255 {
-        return Err(LocalError::invalid_input("email may not exceed 255 characters"));
+        return Err(LocalError::invalid_input(
+            "email may not exceed 255 characters",
+        ));
     }
     let valid = match email.split_once('@') {
         Some((local, domain)) => !local.is_empty() && !domain.is_empty(),
         None => false,
     };
     if !valid || email.chars().any(char::is_whitespace) {
-        return Err(LocalError::invalid_input(format!("Invalid email address: {email}")));
+        return Err(LocalError::invalid_input(format!(
+            "Invalid email address: {email}"
+        )));
     }
     Ok(email)
 }

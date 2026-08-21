@@ -2,8 +2,8 @@ use axum::Json;
 use axum::extract::State;
 use chrono::Utc;
 use odo_client::context::RequestContext;
-use odo_entity::notification::{delivery, event, template};
 use odo_client::error::{ApiResult, LocalError};
+use odo_entity::notification::{delivery, event, template};
 use sea_orm::prelude::*;
 use sea_orm::{Condition, Set};
 use serde::{Deserialize, Serialize};
@@ -142,8 +142,9 @@ pub async fn enqueue(
         )))?;
 
     // Render subject
-    let title_rendered = odo_service::template::render(&tmpl.subject_template, &params.template_variables)
-        .map_err(|e| LocalError::internal(format!("Template render error: {e}")))?;
+    let title_rendered =
+        odo_service::template::render(&tmpl.subject_template, &params.template_variables)
+            .map_err(|e| LocalError::internal(format!("Template render error: {e}")))?;
 
     // Validate action_url
     let action_url = params
@@ -199,8 +200,9 @@ pub async fn enqueue(
                 &tmpl.body_template
             };
 
-            let body_rendered = odo_service::template::render(body_template, &params.template_variables)
-                .map_err(|e| LocalError::internal(format!("Template render error: {e}")))?;
+            let body_rendered =
+                odo_service::template::render(body_template, &params.template_variables)
+                    .map_err(|e| LocalError::internal(format!("Template render error: {e}")))?;
 
             let (recipient_user, recipient_email_group) = match recipient {
                 Recipient::User { user_id, .. } => (Some(*user_id as i32), None),

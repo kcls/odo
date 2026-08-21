@@ -3,9 +3,9 @@ use axum::extract::State;
 use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
 use chrono::Utc;
 use odo_client::auth::generate_session_id;
+use odo_client::error::{ApiResult, LocalError};
 use odo_entity::auth::{local_account, session, usr};
 use odo_entity::org::unit as org_unit_entity;
-use odo_client::error::{ApiResult, LocalError};
 use sea_orm::prelude::*;
 use sea_orm::sea_query::Expr;
 use sea_orm::{DbBackend, FromQueryResult, QuerySelect, Set, Statement};
@@ -63,7 +63,6 @@ pub struct LoginRequest {
     #[serde(default)]
     user_agent: Option<String>,
 }
-
 
 /// Resolve an org unit's stable uuid for the JWT dual claim (uuid
 /// migration phase 1: the token carries both the integer id and the

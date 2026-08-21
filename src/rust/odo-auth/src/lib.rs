@@ -2,12 +2,12 @@ pub mod authz;
 pub mod authz_admin;
 pub mod handler;
 pub mod role_assignments;
-pub mod saml_admin;
-pub mod saml_attr_admin;
-pub mod user_admin;
 #[cfg(feature = "saml")]
 pub mod saml;
+pub mod saml_admin;
+pub mod saml_attr_admin;
 pub mod user;
+pub mod user_admin;
 
 use odo_client::auth::TokenManager;
 use odo_service::health::HasDatabase;

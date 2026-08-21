@@ -1,10 +1,10 @@
 use axum::Json;
 use axum::extract::{Path, State};
 use chrono::Utc;
-use odo_entity::org::{address, closure, operating_hours, unit, unit_type};
 use odo_client::error::{ApiResult, LocalError};
-use sea_orm::*;
+use odo_entity::org::{address, closure, operating_hours, unit, unit_type};
 use sea_orm::prelude::Uuid;
+use sea_orm::*;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
@@ -405,14 +405,10 @@ pub async fn org_unit_label_batch(
     }))
 }
 
-
 /// Resolve a unit's database id from its stable uuid: active map first,
 /// then the DB (so soft-deleted units resolve too, matching the id-based
 /// detail fallback). 404 when unknown.
-async fn unit_id_by_uuid(
-    state: &AppState,
-    raw: &str,
-) -> Result<i32, ApiError> {
+async fn unit_id_by_uuid(state: &AppState, raw: &str) -> Result<i32, ApiError> {
     let uuid: Uuid = raw
         .parse()
         .map_err(|_| LocalError::invalid_input("invalid uuid"))?;

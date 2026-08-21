@@ -8,15 +8,13 @@
 
 use axum::Json;
 use axum::extract::State;
+use odo_client::context::RequestContext;
+use odo_client::error::{ApiResult, LocalError};
+use odo_entity::authz::{permission, role, role_permission, saml_attr_role_map, usr_role_org_map};
 use odo_service::admin::{
     Page, Paginated, Sort, clean_code, clean_optional, clean_required, clean_search,
     map_unique_violation,
 };
-use odo_client::context::RequestContext;
-use odo_entity::authz::{
-    permission, role, role_permission, saml_attr_role_map, usr_role_org_map,
-};
-use odo_client::error::{ApiResult, LocalError};
 use sea_orm::prelude::*;
 use sea_orm::{Condition, Order, QueryOrder, QuerySelect, Set, TransactionTrait};
 use serde::{Deserialize, Serialize};
@@ -364,9 +362,7 @@ pub async fn delete_permission(
         return Err(LocalError::conflict(
             "PERMISSION_IN_USE",
             None,
-            format!(
-                "Permission is granted to {grant_count} role(s); revoke the grants first."
-            ),
+            format!("Permission is granted to {grant_count} role(s); revoke the grants first."),
         )
         .into());
     }
@@ -775,7 +771,11 @@ pub async fn update_role_permission(
         .await?
         .ok_or_else(|| LocalError::not_found(format!("permission grant {}", params.id)))?;
 
-    tracing::info!(id = params.id, min_depth = params.min_depth, "UpdateRolePermission");
+    tracing::info!(
+        id = params.id,
+        min_depth = params.min_depth,
+        "UpdateRolePermission"
+    );
 
     let mut model = role_permission::ActiveModel::from(existing);
     model.min_depth = Set(params.min_depth);

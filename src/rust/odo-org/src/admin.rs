@@ -10,12 +10,12 @@
 use axum::Json;
 use axum::extract::State;
 use chrono::Utc;
+use odo_client::error::{ApiResult, LocalError};
+use odo_entity::org::{unit, unit_type};
 use odo_service::admin::{
     Page, Paginated, Sort, clean_code, clean_optional, clean_required, clean_search,
     map_unique_violation,
 };
-use odo_entity::org::{unit, unit_type};
-use odo_client::error::{ApiResult, LocalError};
 use sea_orm::prelude::*;
 use sea_orm::{Condition, Order, QueryOrder, QuerySelect, Set};
 use serde::{Deserialize, Serialize};
@@ -149,7 +149,10 @@ pub async fn list_unit_types(
     State(state): State<Arc<AppState>>,
     Json(params): Json<ListUnitTypesRequest>,
 ) -> ApiResult<Json<UnitTypePage>> {
-    state.auth_client.permission_required(READ_PERM, None).await?;
+    state
+        .auth_client
+        .permission_required(READ_PERM, None)
+        .await?;
 
     let mut condition = Condition::all().add(unit_type::Column::DeletedAt.is_null());
     if let Some(search) = clean_search(params.search.as_deref()) {
@@ -183,8 +186,7 @@ pub async fn list_unit_types(
 
     // Parent labels may point at types outside the current page, so resolve
     // them directly rather than from the page's own rows.
-    let mut labels: HashMap<i32, String> =
-        types.iter().map(|t| (t.id, t.label.clone())).collect();
+    let mut labels: HashMap<i32, String> = types.iter().map(|t| (t.id, t.label.clone())).collect();
     let parent_ids: Vec<i32> = types
         .iter()
         .filter_map(|t| t.parent)
@@ -242,7 +244,10 @@ pub async fn create_unit_type(
     State(state): State<Arc<AppState>>,
     Json(params): Json<CreateUnitTypeRequest>,
 ) -> ApiResult<Json<UnitTypeRow>> {
-    state.auth_client.permission_required(WRITE_PERM, None).await?;
+    state
+        .auth_client
+        .permission_required(WRITE_PERM, None)
+        .await?;
 
     let label = clean_required(&params.label, "label")?;
 
@@ -265,7 +270,10 @@ pub async fn create_unit_type(
         model.can_have_patrons = Set(v);
     }
 
-    let inserted = model.insert(&state.db).await.map_err(map_type_label_taken)?;
+    let inserted = model
+        .insert(&state.db)
+        .await
+        .map_err(map_type_label_taken)?;
 
     Ok(Json(UnitTypeRow {
         parent_label,
@@ -290,7 +298,10 @@ pub async fn update_unit_type(
     State(state): State<Arc<AppState>>,
     Json(params): Json<UpdateUnitTypeRequest>,
 ) -> ApiResult<Json<UnitTypeRow>> {
-    state.auth_client.permission_required(WRITE_PERM, None).await?;
+    state
+        .auth_client
+        .permission_required(WRITE_PERM, None)
+        .await?;
 
     let existing = find_unit_type(&state.db, params.id).await?;
     let type_id = existing.id;
@@ -303,9 +314,7 @@ pub async fn update_unit_type(
     }
     if let Some(parent_id) = params.parent {
         if parent_id == type_id {
-            return Err(
-                LocalError::invalid_input("a unit type may not be its own parent").into(),
-            );
+            return Err(LocalError::invalid_input("a unit type may not be its own parent").into());
         }
         find_unit_type(&state.db, parent_id).await?;
         assert_no_type_cycle(&state.db, type_id, parent_id).await?;
@@ -318,7 +327,10 @@ pub async fn update_unit_type(
         model.can_have_patrons = Set(v);
     }
 
-    let updated = model.update(&state.db).await.map_err(map_type_label_taken)?;
+    let updated = model
+        .update(&state.db)
+        .await
+        .map_err(map_type_label_taken)?;
 
     let parent_label = match updated.parent {
         Some(p) => unit_type::Entity::find_by_id(p)
@@ -356,7 +368,10 @@ pub async fn delete_unit_type(
     State(state): State<Arc<AppState>>,
     Json(params): Json<UnitTypeIdRequest>,
 ) -> ApiResult<Json<OrgAdminSuccessResponse>> {
-    state.auth_client.permission_required(WRITE_PERM, None).await?;
+    state
+        .auth_client
+        .permission_required(WRITE_PERM, None)
+        .await?;
 
     let existing = find_unit_type(&state.db, params.id).await?;
 
@@ -413,7 +428,10 @@ pub async fn create_unit(
     State(state): State<Arc<AppState>>,
     Json(params): Json<CreateUnitRequest>,
 ) -> ApiResult<Json<UnitRow>> {
-    state.auth_client.permission_required(WRITE_PERM, None).await?;
+    state
+        .auth_client
+        .permission_required(WRITE_PERM, None)
+        .await?;
 
     let label = clean_required(&params.label, "label")?;
     let code = clean_code(&params.code, "code")?;
@@ -457,7 +475,10 @@ pub async fn update_unit(
     State(state): State<Arc<AppState>>,
     Json(params): Json<UpdateUnitRequest>,
 ) -> ApiResult<Json<UnitRow>> {
-    state.auth_client.permission_required(WRITE_PERM, None).await?;
+    state
+        .auth_client
+        .permission_required(WRITE_PERM, None)
+        .await?;
 
     let existing = find_unit(&state.db, params.id).await?;
     let unit_id = existing.id;
@@ -474,14 +495,10 @@ pub async fn update_unit(
     }
     if let Some(parent_id) = params.parent {
         if is_root {
-            return Err(
-                LocalError::invalid_input("the root org unit may not be moved").into(),
-            );
+            return Err(LocalError::invalid_input("the root org unit may not be moved").into());
         }
         if parent_id == unit_id {
-            return Err(
-                LocalError::invalid_input("an org unit may not be its own parent").into(),
-            );
+            return Err(LocalError::invalid_input("an org unit may not be its own parent").into());
         }
         find_unit(&state.db, parent_id).await?;
         assert_no_unit_cycle(&state.db, unit_id, parent_id).await?;
@@ -526,7 +543,10 @@ pub async fn delete_unit(
     State(state): State<Arc<AppState>>,
     Json(params): Json<UnitIdRequest>,
 ) -> ApiResult<Json<OrgAdminSuccessResponse>> {
-    state.auth_client.permission_required(WRITE_PERM, None).await?;
+    state
+        .auth_client
+        .permission_required(WRITE_PERM, None)
+        .await?;
 
     let existing = find_unit(&state.db, params.id).await?;
 
@@ -566,10 +586,7 @@ pub async fn delete_unit(
 // Helpers
 // ===========================================================================
 
-pub(crate) async fn find_unit(
-    db: &DatabaseConnection,
-    id: i32,
-) -> Result<unit::Model, LocalError> {
+pub(crate) async fn find_unit(db: &DatabaseConnection, id: i32) -> Result<unit::Model, LocalError> {
     unit::Entity::find_by_id(id)
         .filter(unit::Column::DeletedAt.is_null())
         .one(db)
@@ -577,10 +594,7 @@ pub(crate) async fn find_unit(
         .ok_or_else(|| LocalError::not_found(format!("org unit {id}")))
 }
 
-async fn find_unit_type(
-    db: &DatabaseConnection,
-    id: i32,
-) -> Result<unit_type::Model, LocalError> {
+async fn find_unit_type(db: &DatabaseConnection, id: i32) -> Result<unit_type::Model, LocalError> {
     unit_type::Entity::find_by_id(id)
         .filter(unit_type::Column::DeletedAt.is_null())
         .one(db)

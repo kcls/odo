@@ -12,9 +12,9 @@
 use axum::Json;
 use axum::extract::State;
 use chrono::Utc;
-use odo_service::admin::{clean_optional, clean_required, map_unique_violation};
-use odo_entity::auth::{saml_idp_config, saml_sp_config, usr_saml_identities};
 use odo_client::error::{ApiResult, LocalError};
+use odo_entity::auth::{saml_idp_config, saml_sp_config, usr_saml_identities};
+use odo_service::admin::{clean_optional, clean_required, map_unique_violation};
 use sea_orm::prelude::*;
 use sea_orm::{QueryOrder, Set};
 use serde::{Deserialize, Serialize};
@@ -639,10 +639,7 @@ pub async fn delete_sp(
 // Helpers
 // ===========================================================================
 
-async fn find_idp(
-    db: &DatabaseConnection,
-    id: i32,
-) -> Result<saml_idp_config::Model, LocalError> {
+async fn find_idp(db: &DatabaseConnection, id: i32) -> Result<saml_idp_config::Model, LocalError> {
     saml_idp_config::Entity::find_by_id(id)
         .one(db)
         .await?
@@ -655,8 +652,8 @@ async fn ensure_sp_entity_id_free(
     entity_id: &str,
     exclude_id: Option<i32>,
 ) -> Result<(), LocalError> {
-    let mut query = saml_sp_config::Entity::find()
-        .filter(saml_sp_config::Column::EntityId.eq(entity_id));
+    let mut query =
+        saml_sp_config::Entity::find().filter(saml_sp_config::Column::EntityId.eq(entity_id));
     if let Some(id) = exclude_id {
         query = query.filter(saml_sp_config::Column::Id.ne(id));
     }

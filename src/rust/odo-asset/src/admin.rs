@@ -62,7 +62,10 @@ pub async fn list_directories(
     State(state): State<Arc<AppState>>,
     Json(_params): Json<ListDirectoriesRequest>,
 ) -> ApiResult<Json<Vec<DirectoryRow>>> {
-    state.auth_client.permission_required(READ_PERM, None).await?;
+    state
+        .auth_client
+        .permission_required(READ_PERM, None)
+        .await?;
 
     let rows = directory::Entity::find()
         .order_by_asc(directory::Column::Path)
@@ -100,16 +103,25 @@ fn clean_path(path: &str) -> Result<String, LocalError> {
         return Err(LocalError::invalid_input("path may not be empty"));
     }
     if path.len() > 200 {
-        return Err(LocalError::invalid_input("path may not exceed 200 characters"));
+        return Err(LocalError::invalid_input(
+            "path may not exceed 200 characters",
+        ));
     }
     if path.starts_with('/') || path.ends_with('/') {
-        return Err(LocalError::invalid_input("path may not start or end with '/'"));
+        return Err(LocalError::invalid_input(
+            "path may not start or end with '/'",
+        ));
     }
     if path.chars().any(char::is_whitespace) {
         return Err(LocalError::invalid_input("path may not contain whitespace"));
     }
-    if path.split('/').any(|seg| seg.is_empty() || seg == "." || seg == "..") {
-        return Err(LocalError::invalid_input("path may not contain empty or relative segments"));
+    if path
+        .split('/')
+        .any(|seg| seg.is_empty() || seg == "." || seg == "..")
+    {
+        return Err(LocalError::invalid_input(
+            "path may not contain empty or relative segments",
+        ));
     }
     Ok(path.to_string())
 }
@@ -135,7 +147,10 @@ pub async fn create_directory(
     State(state): State<Arc<AppState>>,
     Json(params): Json<CreateDirectoryRequest>,
 ) -> ApiResult<Json<DirectoryRow>> {
-    state.auth_client.permission_required(WRITE_PERM, None).await?;
+    state
+        .auth_client
+        .permission_required(WRITE_PERM, None)
+        .await?;
 
     let path = clean_path(&params.path)?;
     let read_perm = clean_perm(&params.read_perm, "read_perm")?;
@@ -157,7 +172,11 @@ pub async fn create_directory(
         return Err(LocalError::invalid_input("category requires entity_type").into());
     }
 
-    if directory::Entity::find_by_id(&path).one(&state.db).await?.is_some() {
+    if directory::Entity::find_by_id(&path)
+        .one(&state.db)
+        .await?
+        .is_some()
+    {
         return Err(LocalError::conflict(
             "DIRECTORY_EXISTS",
             Some("path"),
@@ -172,7 +191,10 @@ pub async fn create_directory(
         path: Set(path),
         read_perm: Set(read_perm),
         write_perm: Set(write_perm),
-        description: Set(params.description.map(|d| d.trim().to_string()).filter(|d| !d.is_empty())),
+        description: Set(params
+            .description
+            .map(|d| d.trim().to_string())
+            .filter(|d| !d.is_empty())),
         entity_type: Set(entity_type),
         category: Set(category),
     };
@@ -220,7 +242,10 @@ pub async fn delete_directory(
     State(state): State<Arc<AppState>>,
     Json(params): Json<DeleteDirectoryRequest>,
 ) -> ApiResult<Json<DeleteDirectoryResponse>> {
-    state.auth_client.permission_required(WRITE_PERM, None).await?;
+    state
+        .auth_client
+        .permission_required(WRITE_PERM, None)
+        .await?;
 
     let existing = directory::Entity::find_by_id(params.path.trim())
         .one(&state.db)
@@ -232,8 +257,7 @@ pub async fn delete_directory(
     let in_use = file_upload::Entity::find()
         .filter(file_upload::Column::DeletedAt.is_null())
         .filter(
-            file_upload::Column::RelativePath
-                .like(format!("{}/%", existing.path.replace('%', ""))),
+            file_upload::Column::RelativePath.like(format!("{}/%", existing.path.replace('%', ""))),
         )
         .count(&state.db)
         .await?;
@@ -247,7 +271,9 @@ pub async fn delete_directory(
     }
 
     tracing::info!(path = %existing.path, "DeleteAssetDirectory");
-    directory::Entity::delete_by_id(existing.path).exec(&state.db).await?;
+    directory::Entity::delete_by_id(existing.path)
+        .exec(&state.db)
+        .await?;
 
     Ok(Json(DeleteDirectoryResponse { deleted: true }))
 }

@@ -5,11 +5,11 @@ use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use chrono::Utc;
 use odo_client::context::RequestContext;
+use odo_client::error::{ApiResult, LocalError};
 use odo_entity::asset::directory as asset_directory;
 use odo_entity::asset::file_upload;
-use odo_client::error::{ApiResult, LocalError};
-use sea_orm::{Condition, Set};
 use sea_orm::prelude::*;
+use sea_orm::{Condition, Set};
 use serde::{Deserialize, Serialize};
 use std::path::{Path as StdPath, PathBuf};
 use std::sync::Arc;
@@ -283,7 +283,8 @@ pub async fn upload(
 
     // One registry fetch serves both routing and the write-perm check.
     let dirs = asset_directory::Entity::find().all(&state.db).await?;
-    let target_dir = resolve_target_directory(&dirs, entity_type.as_deref(), &category)?.to_string();
+    let target_dir =
+        resolve_target_directory(&dirs, entity_type.as_deref(), &category)?.to_string();
 
     require_directory_access(&state, &target_dir, Access::Write).await?;
 
@@ -389,7 +390,9 @@ pub async fn retrieve(
     else {
         return (
             StatusCode::UNAUTHORIZED,
-            Json(serde_json::json!({"code": "UNAUTHENTICATED", "message": "Missing authorization"})),
+            Json(
+                serde_json::json!({"code": "UNAUTHENTICATED", "message": "Missing authorization"}),
+            ),
         )
             .into_response();
     };
@@ -544,11 +547,8 @@ pub async fn get_files(
     // permission gate here — file metadata is not sensitive on its own
     // (the storage path can't be turned into a URL without going
     // through `/files/{path}` which re-validates auth).
-    let uuids: Vec<sea_orm::prelude::Uuid> = params
-        .uuids
-        .iter()
-        .filter_map(|u| u.parse().ok())
-        .collect();
+    let uuids: Vec<sea_orm::prelude::Uuid> =
+        params.uuids.iter().filter_map(|u| u.parse().ok()).collect();
     if params.ids.is_empty() && uuids.is_empty() {
         return Ok(Json(GetFilesResponse { files: Vec::new() }));
     }
@@ -707,7 +707,11 @@ mod tests {
 
     // --- resolve_target_directory (registry-driven upload routing) ---
 
-    fn dir_row(path: &str, entity_type: Option<&str>, category: Option<&str>) -> asset_directory::Model {
+    fn dir_row(
+        path: &str,
+        entity_type: Option<&str>,
+        category: Option<&str>,
+    ) -> asset_directory::Model {
         asset_directory::Model {
             path: path.to_string(),
             read_perm: "r".to_string(),
