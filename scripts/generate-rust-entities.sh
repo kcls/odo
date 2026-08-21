@@ -34,7 +34,7 @@ fi
 # Check sea-orm-cli
 if ! command -v sea-orm-cli &>/dev/null; then
     echo -e "${RED}sea-orm-cli not found. Install with:${NC}"
-    echo "  cargo install sea-orm-cli --version 2.0.0-rc.2"
+    echo "  cargo install sea-orm-cli"
     exit 1
 fi
 
