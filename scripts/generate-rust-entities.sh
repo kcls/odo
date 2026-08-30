@@ -8,9 +8,9 @@ set -euo pipefail
 #      Use this for non-k8s setups, e.g.:
 #        DATABASE_URL=postgres://odo:demo123@localhost:5432/odo?sslmode=disable \
 #          ./scripts/generate-rust-entities.sh
-#   2. The postgres-credentials secret (EXTERNAL_DATABASE_URL, the
-#      host-reachable endpoint), resolved via common.sh's
-#      init_pg_connection; PG* environment variables act as overrides.
+#   2. The postgres-credentials secret (DATABASE_URL), resolved via
+#      common.sh's init_pg_connection; PG* environment variables act as
+#      overrides.
 #      DB_SSLMODE overrides the sslmode (default: disable).
 #
 # Usage:

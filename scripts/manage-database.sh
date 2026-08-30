@@ -103,6 +103,14 @@ execute_psql() {
     fi
 }
 
+# Connectivity check against the maintenance database. `setup` runs before
+# $PGDATABASE exists, so test_connection - which dials $PGDATABASE - cannot
+# answer "can this role log in?" on a server that has never been set up.
+test_maintenance_connection() {
+    PGPASSWORD="$PGPASSWORD" psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" \
+        -d postgres -c "SELECT 1" &>/dev/null
+}
+
 # Function to check if database exists
 database_exists() {
     local db=$1
@@ -280,7 +288,7 @@ setup_database() {
     echo -e "\n${YELLOW}Setting up PostgreSQL database for Odo${NC}"
 
     # First, test if we can connect with the superuser account
-    if test_connection; then
+    if test_maintenance_connection; then
         echo -e "${GREEN}Successfully connected with existing superuser account${NC}"
 
         # User already exists and we can connect - no sudo needed
@@ -290,6 +298,25 @@ setup_database() {
 
     else
         echo -e "${YELLOW}Cannot connect with superuser account, checking if initial setup is needed...${NC}"
+
+        # The role can only be created from here over a local peer
+        # connection. PostgreSQL runs outside the cluster and DATABASE_URL
+        # names it by a routable address, so that path exists only when
+        # this script runs on the database host itself (PGHOST overridden
+        # to localhost). Otherwise the role has to be created there.
+        if [ "$PGHOST" != "localhost" ] && [ "$PGHOST" != "127.0.0.1" ]; then
+            echo -e "${RED}Cannot log in to ${PGHOST}:${PGPORT} as '${PGUSER}'.${NC}"
+            echo
+            echo "That role must exist on the database server and be a superuser."
+            echo "On Ubuntu, ./scripts/setup/install-postgres-server-ubuntu.sh"
+            echo "creates it; elsewhere, create it by hand:"
+            echo
+            echo "  CREATE ROLE \"$PGUSER\" WITH SUPERUSER LOGIN PASSWORD '...';"
+            echo
+            echo "Then check the password in the postgres-credentials secret"
+            echo "matches (./scripts/manage-secrets.sh update-db-url)."
+            exit 1
+        fi
 
         # Check if this is initial setup (user doesn't exist)
         check_sudo  # This will exit if not running with sudo
@@ -304,7 +331,7 @@ setup_database() {
         fi
 
         # Test connection again
-        if ! test_connection; then
+        if ! test_maintenance_connection; then
             echo -e "${RED}Failed to establish connection after user setup${NC}"
             exit 1
         fi

@@ -22,12 +22,9 @@ usage() {
     echo "Commands:"
     echo "  show-secret              Show current secret values (default)"
     echo "  show-namespace-secrets <ns>  Show all secrets in a namespace, values decoded"
-    echo "  update-db-url [url]  Set the in-cluster database connection from a"
-    echo "                  single URL (derives the POSTGRES_* fields the"
-    echo "                  statefulset consumes; refreshes the external URL creds)"
-    echo "  update-external-db-url [url]  Set EXTERNAL_DATABASE_URL (the"
-    echo "                  host-reachable endpoint dev tooling resolves from"
-    echo "                  the secret); prompts when the url is omitted"
+    echo "  update-db-url [url]  Set DATABASE_URL, the one connection URL"
+    echo "                  the service pods and the host tooling share;"
+    echo "                  prompts when the url is omitted"
     echo "  update-jwt      Update JWT secret"
     echo "  update-ghcr     Create or update GitHub Container Registry secret"
     echo "  update-smtp     Update SMTP notification settings"
@@ -215,25 +212,20 @@ show_secret() {
     echo
 }
 
-# Function to update PostgreSQL connection details for all services.
-# Prompts once, then updates:
-#   odo-core  → individual fields (POSTGRES_HOST, etc.)
-#   odo-core    → single DATABASE_URL
-#   odo-pub     → single DATABASE_URL
-# Set the database connection from a single URL. Writes the in-cluster
-# DATABASE_URL verbatim (odo-core + odo-pub), derives the POSTGRES_*
-# fields the postgres statefulset consumes (odo-core), and refreshes
-# EXTERNAL_DATABASE_URL with the new credentials (keeping its own
-# host:port endpoint). All merge patches - nothing else in the secrets
-# is disturbed.
+# Set the database connection. PostgreSQL runs outside the cluster and
+# there is one URL for it: the service pods and the host tooling
+# (manage-database.sh, the test runners) both read DATABASE_URL, so the
+# host in it has to be reachable from inside a pod AND from the host - a
+# LAN address or a DNS name, never localhost. Written to odo-core and
+# odo-pub as a merge patch, so nothing else in the secrets is disturbed.
 update_db_url() {
-    echo -e "${YELLOW}Updating DATABASE_URL (in-cluster)${NC}"
+    echo -e "${YELLOW}Updating DATABASE_URL${NC}"
 
     local new_url="$1"
     if [ -z "$new_url" ]; then
         local current
         current=$(get_secret_value $POSTGRES_NAMESPACE postgres-credentials DATABASE_URL 2>/dev/null)
-        current=${current:-postgres://odo:demo123@postgres.odo-core.svc.cluster.local:5432/odo?sslmode=disable}
+        current=${current:-postgres://odo:demo123@postgres.example.org:5432/odo?sslmode=disable}
         read -p "Database URL [$current]: " new_url
         new_url=${new_url:-$current}
     fi
@@ -267,75 +259,11 @@ update_db_url() {
     fi
     [ "$pg_port" = "$pg_host" ] && pg_port="5432"
 
-    # Keep the external endpoint (host:port) but refresh its creds/db.
-    local ext_url ext_hostport
-    ext_url=$(get_secret_value $POSTGRES_NAMESPACE postgres-credentials EXTERNAL_DATABASE_URL 2>/dev/null)
-    if [ -n "$ext_url" ]; then
-        ext_hostport="${ext_url#*://}"; ext_hostport="${ext_hostport#*@}"
-        ext_hostport="${ext_hostport%%/*}"
-    else
-        ext_hostport="localhost:5432"
-    fi
-    local external_url="postgres://${pg_user}:${pg_password}@${ext_hostport}/${pg_db}?sslmode=disable"
-
-    # odo-core also carries the POSTGRES_* fields the postgres
-    # statefulset consumes at pod start.
-    kubectl -n "$POSTGRES_NAMESPACE" patch secret postgres-credentials --type=merge -p "{\"stringData\":{
-        \"POSTGRES_HOST\": \"$pg_host\",
-        \"POSTGRES_PORT\": \"$pg_port\",
-        \"POSTGRES_DB\": \"$pg_db\",
-        \"POSTGRES_USER\": \"$pg_user\",
-        \"POSTGRES_PASSWORD\": \"$pg_password\"}}"
-    echo -e "${GREEN}  ✓ postgres-credentials → ${POSTGRES_NAMESPACE} (POSTGRES_* fields)${NC}"
-
-    for ns in odo-core odo-pub; do
-        if kubectl get secret postgres-credentials -n "$ns" > /dev/null 2>&1; then
-            kubectl -n "$ns" patch secret postgres-credentials --type=merge -p "{\"stringData\":{
-                \"DATABASE_URL\": \"$new_url\",
-                \"EXTERNAL_DATABASE_URL\": \"$external_url\"}}"
-            echo -e "${GREEN}  ✓ postgres-credentials → ${ns} (DATABASE_URL + EXTERNAL_DATABASE_URL)${NC}"
-        fi
-    done
-
-    echo -e "\n${YELLOW}Updated values:${NC}"
-    echo "  URL:      postgres://${pg_user}:****@${pg_host}:${pg_port}/${pg_db}"
-    echo "  External: postgres://${pg_user}:****@${ext_hostport}/${pg_db}"
-    echo -e "\n${YELLOW}Restart the services (and the postgres statefulset if its${NC}"
-    echo -e "${YELLOW}credentials changed) to pick this up.${NC}"
-}
-
-# Set EXTERNAL_DATABASE_URL: the host-reachable endpoint dev tooling
-# (manage-database.sh, test runners) resolves from the secret. The
-# in-cluster DATABASE_URL is untouched. Patched (merge), so nothing else
-# in the secret is disturbed.
-update_external_db_url() {
-    echo -e "${YELLOW}Updating EXTERNAL_DATABASE_URL${NC}"
-
-    local new_url="$1"
-    if [ -z "$new_url" ]; then
-        local current
-        current=$(get_secret_value $POSTGRES_NAMESPACE postgres-credentials EXTERNAL_DATABASE_URL 2>/dev/null)
-        if [ -z "$current" ]; then
-            # Suggest the in-cluster URL with the host swapped to localhost.
-            local in_cluster rest
-            in_cluster=$(get_secret_value $POSTGRES_NAMESPACE postgres-credentials DATABASE_URL 2>/dev/null)
-            if [ -n "$in_cluster" ]; then
-                rest="${in_cluster#*://}"
-                local userinfo="${rest%%@*}" tail="${rest#*@}" dbpart="${tail#*/}"
-                current="postgres://${userinfo}@localhost:5432/${dbpart}"
-            fi
-        fi
-        read -p "External database URL [$current]: " new_url
-        new_url=${new_url:-$current}
-    fi
-    if [ -z "$new_url" ]; then
-        echo -e "${RED}No URL provided${NC}"
-        exit 1
-    fi
-    case "$new_url" in
-        postgres://*|postgresql://*) ;;
-        *)
-            echo -e "${RED}URL must start with postgres:// or postgresql://${NC}"
+    # A loopback host resolves to the pod itself once the services read it.
+    case "$(echo "$pg_host" | tr '[:upper:]' '[:lower:]')" in
+        localhost|localhost.localdomain|127.*|::1|0.0.0.0)
+            echo -e "${RED}'${pg_host}' is a loopback address: inside a pod it points at the pod.${NC}"
+            echo "Use a LAN address or a DNS name reachable from the cluster and this host."
             exit 1
             ;;
     esac
@@ -343,13 +271,15 @@ update_external_db_url() {
     for ns in odo-core odo-pub; do
         if kubectl get secret postgres-credentials -n "$ns" > /dev/null 2>&1; then
             kubectl -n "$ns" patch secret postgres-credentials --type=merge \
-                -p "{\"stringData\":{\"EXTERNAL_DATABASE_URL\":\"$new_url\"}}"
-            echo -e "${GREEN}  ✓ postgres-credentials → ${ns} (EXTERNAL_DATABASE_URL)${NC}"
+                -p "{\"stringData\":{\"DATABASE_URL\":\"$new_url\"}}"
+            echo -e "${GREEN}  ✓ postgres-credentials → ${ns} (DATABASE_URL)${NC}"
         fi
     done
 
-    echo -e "\n${BLUE}Dev tooling (manage-database.sh, run-tests.sh) resolves this${NC}"
-    echo -e "${BLUE}endpoint automatically; no pod restarts needed.${NC}"
+    echo -e "\n${YELLOW}Updated value:${NC}"
+    echo "  postgres://${pg_user}:****@${pg_host}:${pg_port}/${pg_db}"
+    echo -e "\n${BLUE}The host tooling picks this up immediately.${NC}"
+    echo -e "${YELLOW}Restart the services for the pods to pick it up.${NC}"
 }
 
 # Function to update JWT secrets
@@ -693,9 +623,6 @@ case "$COMMAND" in
         ;;
     update-db-url)
         update_db_url "$2"
-        ;;
-    update-external-db-url)
-        update_external_db_url "$2"
         ;;
     update-jwt)
         update_jwt_secret

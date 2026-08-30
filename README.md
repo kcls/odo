@@ -1,72 +1,70 @@
 # Odobenus (Odo)
 
-## Goals
-
-Kubernetes cluster hosting a mix of applications with common tools for shared
-data and actions.
+I am the walrus.
 
 ## Common Tools, Data, and Components
 
-* Authentication with SSO (SAML)
 * User Roles and Permission APIs
 * Notification APIs
+* Authentication with SSO (SAML)
+* Asset storage APIs
 * Common data APIs (e.g. organizational data like library branches)
 
-## Installation
+## Applications
 
-### Ubuntu (k3s)
+The reference application is `Current`, an incident tracker for community
+libraries (the seed project from which Odo sprung), maintained at
+https://github.com/kcls/current.
 
-Run from the project root directory.
+Applications build atop Odo by consuming the HTTP APIs
+exposed by each Odo service.  OpenAPI specs are available at
+[openapi](openapi) and through each API end point, for example,
+`/api/v1/odo/auth/api-doc/openapi.json`.
 
-The installer adds the current user ($USER) to the k3s group to allow access
-to `kubectl` for managing the cluster.
+## Quick Install Guide for Developers
 
-#### Install Dev Cluster
+Install PostgreSQL, [K3S](https://k3s.io/), Docker, dev tools, and initialize 
+the cluster.
 
-Install k3s, Docker, dev tools, and initialize the cluster.
+### 1. Install PosgreSQL
+
+PG runs outside of the Kubernetes cluster.  Skip this step if you already have
+an PG server.
 
 ```bash
-./scripts/setup/k3s/install-dev-cluster-ubuntu.sh
+./scripts/setup/install-postgres-server-ubuntu.sh --with-pgtap
+```
+
+### 2. Setup K3S, Docker, and Cluster Infrastructure
+
+This will create a new `k3s` user group and add the current user to
+the new group to allow access to `kubectl` for managing the cluster.
+
+```bash
+./scripts/setup/install-k3s-cluster-ubuntu.sh
 ```
 
 > [!NOTE]
 > Log out and back in to activate k3s and docker group memberships.
 
-#### Optional: Install test dependencies and run tests
+### 3. Dev toolchains, database schema, and all services.
 
 ```bash
-./scripts/setup/k3s/install-test-dependencies-ubuntu.sh
-./scripts/run-tests.sh --db --integration --e2e
+./scripts/setup/setup-dev-cluster-ubuntu.sh
 ```
 
-### Mac (Docker Desktop)
-
-#### Prerequisites
-
-* Install [Docker Desktop](https://www.docker.com/products/docker-desktop/)
-* Enable Kubernetes in the Docker Desktop settings.
-  * Choose 'Kubeadm' as the 'Cluster provisioning method'
-* Install [Homebrew](https://brew.sh).
-
-#### Install Dev Cluster
+### Run Tests
 
 ```bash
-./scripts/setup/docker-desktop/install-dev-cluster-mac.sh
+./scripts/run-tests.sh --db --integration --e2e # --unit --load
 ```
 
-#### Optional: Install test dependencies and run tests
+### Admin UI
 
-```bash
-./scripts/setup/docker-desktop/install-test-dependencies-mac.sh
-./scripts/run-tests.sh --db --integration --e2e
-```
+Navigate in your browser to http://DEV-HOST-IP:30080/odo/admin and log in
+with `e2e.odo.admin` and defualt password `test123!`.
 
-## Applications
+## Addtional Documentation
 
-Applications build atop Odo by consuming the odo-* HTTP APIs and the
-`odo-client` crate, running against their own databases, and owning their
-own gateway routes and JWT policy — see `docs/app-repo-structure.md`.
-
-The reference application is `Current`, an incident tracker for community
-libraries (the seed project from which Odo sprung), maintained at
-https://github.com/kcls/current.
+* [Advanced PostgreSQL Setup](docs/tech-docs/postgres-setup.md)
+* [Mac Setup (Docker Desktop)](docs/tech-docs/mac-setup.md)

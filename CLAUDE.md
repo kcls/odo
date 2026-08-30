@@ -30,8 +30,19 @@ templates, or fixtures.
   `src/db-tests/` (pgTAP), `src/load-tests/` (weighted API load harness).
 - `src/ui/odo-admin/` — Angular admin SPA (`/odo/admin`); `src/ui/core` —
   shared UI lib it depends on.
-- `k8s/` — gateway, envoy routes/security, postgres, registry. The README
+- `k8s/` — gateway, envoy routes/security, registry. The README
   carries the gateway routing registry (claimed path prefixes).
+  PostgreSQL is NOT in the cluster: it runs on the host (or an external
+  server). The installers write ONE `DATABASE_URL` into the
+  `postgres-credentials` secret, read by the pods and by the host
+  tooling alike — so its host must be reachable from both (a LAN
+  address or DNS name; `localhost` is rejected).
+- `scripts/setup/` — Ubuntu installs split three ways:
+  `install-postgres-server-ubuntu.sh` (PG only),
+  `install-k3s-cluster-ubuntu.sh` (k3s/Docker/infra), both
+  production-usable, then `setup-dev-cluster-ubuntu.sh` (toolchains,
+  schema, test data, services — dev only). `setup-common.sh` holds
+  their shared helpers. macOS remains a single script.
 
 ## Build / deploy / test (dev k3s cluster)
 
@@ -41,8 +52,8 @@ templates, or fixtures.
   then `./scripts/deploy-service.sh <name>` (or build-and-deploy).
   Wait ~20s after deploy before hitting the service.
 - `./scripts/run-tests.sh --db --integration --e2e --unit --load`
-  (dev DB password: `PGPASSWORD=demo123`, `PGHOST=localhost PGPORT=5432`
-  when using the direct cluster DB).
+  (the DB endpoint resolves from the secret's `DATABASE_URL`; `PG*` env
+  vars only override it).
 - e2e locally: `cd src/e2e && BASE_URL=http://localhost:30080 npm test`.
   The UIs need a recent Node (the Angular CLI requires >= 20).
 - OpenAPI: `./scripts/generate-openapi.sh` regenerates `openapi/*.json` +

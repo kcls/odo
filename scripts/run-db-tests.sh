@@ -2,8 +2,7 @@
 # Run the pgTAP database tests (src/db-tests/) against the odo database.
 #
 # Connection details resolve from the postgres-credentials secret
-# (EXTERNAL_DATABASE_URL, the host-reachable endpoint); any PG*
-# environment variables act as overrides.
+# (DATABASE_URL); any PG* environment variables act as overrides.
 #
 #   scripts/run-db-tests.sh
 #   VERBOSE=1 scripts/run-db-tests.sh

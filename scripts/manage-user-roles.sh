@@ -28,8 +28,8 @@ usage() {
     echo "  mapping_id      ID of the usr_role_org_map entry"
     echo
     echo "Environment variables:"
-    echo "  PGHOST=hostname           Override database host (default: localhost)"
-    echo "  PGPORT=port               Override database port (default: 32345)"
+    echo "  PGHOST=hostname           Override database host (default: from the secret)"
+    echo "  PGPORT=port               Override database port (default: from the secret)"
     echo "  PGDATABASE=dbname         Override database name (default: from secret)"
     echo "  PGUSER=username           Override database user (default: from secret)"
     echo "  PGPASSWORD=password       Override database password (default: from secret)"

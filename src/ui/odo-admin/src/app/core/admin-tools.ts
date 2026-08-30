@@ -6,7 +6,7 @@ import { PERMS, type PermCode } from './perms';
 /**
  * Registry of admin tools. Adding a tool here wires up its lazy route, its
  * sidenav entry, and its home-page card in one place — the only other thing
- * a new tool needs is its feature folder. See docs/adding-a-tool.md.
+ * a new tool needs is its feature folder.
  */
 export interface AdminTool {
   /** Top-level route path segment (e.g. 'org-units'). */

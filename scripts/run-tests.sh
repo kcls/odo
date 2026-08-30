@@ -9,8 +9,10 @@
 #   --load         odo API load test (read-only smoke; fails on concerns)
 #   --all          every suite above
 #
-# Requires install-test-dependencies-ubuntu.sh (or equivalent) to have
-# been run first.
+# Requires the test dependencies to have been installed first: on Ubuntu,
+# ./scripts/setup/setup-dev-cluster-ubuntu.sh --with-test-deps (with the
+# pgtap extension on the database server); on macOS, the cluster installer
+# with --with-test-deps.
 #
 # Usage:
 #   scripts/run-tests.sh --db --integration --e2e   # the cluster suites
@@ -51,8 +53,8 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$SCRIPT_DIR/common.sh"
 
 # PGHOST/PGPORT are NOT pre-defaulted here: init_pg_connection resolves
-# them from the secret's EXTERNAL_DATABASE_URL, and setting them first
-# would override it. Export them only to override the secret.
+# them from the secret's DATABASE_URL, and setting them first would
+# override it. Export them only to override the secret.
 
 print_section() {
     echo
@@ -68,8 +70,8 @@ resolve_pg_password() {
     print_section "Reading PostgreSQL password from k8s secrets"
 
     # The shared resolver fills host/port/user/db/password from the
-    # secret (EXTERNAL_DATABASE_URL preferred); any PG* env vars the
-    # caller exported act as overrides.
+    # secret's DATABASE_URL; any PG* env vars the caller exported act as
+    # overrides.
     if ! init_pg_connection odo-core; then
         echo -e "${RED}Error: could not read postgres password from k8s secrets.${NC}"
         echo "Set PGPASSWORD manually or check that the odo-core postgres-credentials"
