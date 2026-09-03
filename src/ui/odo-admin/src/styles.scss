@@ -8,6 +8,18 @@
 // control over (tables, tabs) are built on CDK with our own CSS instead.
 @use '@angular/material' as mat;
 
+// Only the Filled variant is used, so pull in that one face rather than
+// material-icons.css, which declares all five (Filled/Outlined/Round/Sharp/
+// Two Tone) and drags ~1.6MB of fonts into the build.
+//
+// font-display defaults to `block` in this package, which leaves every icon
+// an invisible box until the 128kB font lands — up to three seconds on a
+// slow link. `swap` paints the fallback immediately and swaps the glyphs in
+// when they arrive.
+@use 'material-icons/iconfont/filled' with (
+  $material-icons-font-display: swap
+);
+
 $font-stack: (
   -apple-system,
   BlinkMacSystemFont,

@@ -33,10 +33,7 @@
                 "input": "public"
               }
             ],
-            "styles": [
-              "node_modules/material-icons/iconfont/material-icons.css",
-              "src/styles.scss"
-            ],
+            "styles": ["src/styles.scss"],
             "polyfills": ["@angular/localize/init"]
           },
           "configurations": {

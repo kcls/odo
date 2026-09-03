@@ -1,5 +1,15 @@
-# UI build artifacts and dependencies
+# UI build artifacts and dependencies.
+# Docker only reads the .dockerignore at the build context root, and every
+# service builds with context "." (see service-map.yaml) — so per-directory
+# .dockerignore files under src/ui/ are inert and these patterns have to
+# live here. Leaving a stale dist/ or .angular/ in the context both bloats
+# the transfer and risks shadowing what `npm ci` + `ng build` produce in the
+# image.
 **/node_modules
+src/ui/*/dist
+src/ui/*/.angular
+src/ui/*/out-tsc
+src/ui/*/__screenshots__
 
 # Rust build artifacts
 **/target
