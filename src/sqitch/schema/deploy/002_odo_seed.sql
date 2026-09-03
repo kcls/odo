@@ -179,15 +179,31 @@ VALUES ((SELECT id FROM auth.usr WHERE username = 'odo-notify-service'),
         'odo-notify-service',
         (SELECT id FROM org.root()));
 
--- odo-registration: machine account apps use to register their seed data
--- via the odo APIs. Dev-default password; change in production.
+-- odo-registration: machine account used to register app seed data via
+-- the odo APIs. It holds write permissions across auth, notify and asset
+-- (see the grants above), so it ships switched off:
+--
+--   * status 'inactive' -- auth.verify_user_credentials() filters on
+--     status = 'active', so local login is refused in the database, not
+--     merely in the application layer.
+--   * an unknowable password -- not a placeholder anyone could guess and
+--     not the same value in every install.
+--
+-- scripts/load-data-manifest.sh activates the account, sets a password it
+-- generates, applies the manifests and switches it back off. Dev and CI
+-- get a known password from src/test-data/ instead; a production install
+-- that never loads test data has no usable credential for this account.
+--
+-- A random hash rather than NULL on purpose: a null password_hash would
+-- leave verify_password() comparing against SQL NULL, and a real hash for
+-- an unknown secret is the safer failure mode.
 INSERT INTO auth.usr (username, email, auth_method, status, display_name, uuid)
-VALUES ('odo-registration', 'odo-registration@odo.example.org', 'local', 'active', '',
+VALUES ('odo-registration', 'odo-registration@odo.example.org', 'local', 'inactive', '',
         '5eed0000-0000-4000-a000-000000000002');
 
 INSERT INTO auth.local_account (usr, password_hash)
 VALUES ((SELECT id FROM auth.usr WHERE username = 'odo-registration'),
-        crypt('odo-registration-dev-only', gen_salt('bf', 10)));
+        crypt(gen_random_uuid()::text || gen_random_uuid()::text, gen_salt('bf', 10)));
 
 INSERT INTO authz.usr_role_org_map (usr, role, org_unit)
 VALUES ((SELECT id FROM auth.usr WHERE username = 'odo-registration'),

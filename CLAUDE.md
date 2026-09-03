@@ -12,6 +12,8 @@ templates, or fixtures.
 
 - Do not add 'Co-authored-by' metadata to commit messages.
 - Author all git commits as the human user.
+- Keep commit message bodies concise, limited to 2 paragraphs; no need to
+  fully document features in commit messages.
 
 ## Layout
 
@@ -73,9 +75,15 @@ templates, or fixtures.
   manifest applied by `odo-register` with the `odo-registration` machine
   account. Upsert-only; 409 = already
   registered; never deletes. New registration surface belongs behind
-  perms held by that account (see the seed).
-- Machine accounts (seeded, dev-only default passwords, must-change in
-  prod): `odo-registration`, `odo-notify-service`.
+  perms held by that account (see the seed). Manifests live in the app's
+  own repo; run `./scripts/load-data-manifest.sh <manifest.json>` from here —
+  it activates the account, applies the manifests and disables it again,
+  so hosted apps never hold registration credentials.
+- Machine accounts: `odo-registration` ships disabled with an unknowable
+  password (the seed plus `004_registration_account_lockdown`); only
+  `load-data-manifest.sh` enables it, and `src/test-data/` restores a known
+  dev password for dev/CI. `odo-notify-service` still has a dev-only
+  seeded password that must be changed in prod.
 - Paginated admin lists use `odo_service::page_type!` (a generic
   Paginated<T> produces untyped rows in the generated TS).
 - Soft deletes only (`deleted_at`); a DB trigger blocks hard deletes.

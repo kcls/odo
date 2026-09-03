@@ -24,12 +24,11 @@ exposed by each Odo service.  OpenAPI specs are available at
 ## Quick Install Guide for Developers
 
 Install PostgreSQL, [K3S](https://k3s.io/), Docker, dev tools, and initialize 
-the cluster.
+the cluster on Ubuntu.
 
 ### 1. Install PosgreSQL
 
-PG runs outside of the Kubernetes cluster.  Skip this step if you already have
-an PG server.
+Install and run Postgres on the host, outside of the k8s cluster.
 
 ```bash
 ./scripts/setup/install-postgres-server-ubuntu.sh --with-pgtap

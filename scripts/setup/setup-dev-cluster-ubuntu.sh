@@ -2,9 +2,9 @@
 # Turn an Odo k3s cluster into a development machine (Ubuntu).
 #
 # Installs the language toolchains and build dependencies, starts the local
-# Docker registry, creates and populates the database, and builds and
-# deploys every service. Development only - nothing here belongs on a
-# production node.
+# Docker registry, creates and populates the database, deploys every
+# service and builds the odo-register CLI. Development only - nothing here
+# belongs on a production node.
 #
 # Prerequisites, in order:
 #   1. ./scripts/setup/install-postgres-server-ubuntu.sh --with-pgtap
@@ -108,10 +108,10 @@ require_cluster() {
 confirm() {
     echo
     echo -e "${YELLOW}This will install Node, Rust, and the build dependencies, create"
-    echo -e "the odo database, deploy the schema, and build and deploy every"
-    echo -e "service. It also installs the pgTAP client runner, the Playwright"
-    echo -e "system libraries, the e2e npm packages, and the e2e fixtures"
-    echo -e "It will take a while and requires sudo.${NC}"
+    echo -e "the odo database, deploy the schema, build and deploy every service,"
+    echo -e "and build the odo-register CLI. It also installs the pgTAP client"
+    echo -e "runner, the Playwright system libraries, the e2e npm packages, and"
+    echo -e "the e2e fixtures. It will take a while and requires sudo.${NC}"
     echo
 
     read -rp "Continue? [y/N] " response
@@ -274,10 +274,25 @@ build_and_deploy_services() {
     echo "All services deployed"
 }
 
+build_odo_register() {
+    print_section "Building odo-register"
+
+    # Not in service-map.yaml, so --all does not cover it: odo-register is
+    # a CLI that runs on the host rather than a deployed service.
+    # load-data-manifest.sh looks for it on PATH and then in this crate's
+    # target/release, target/debug -- so a release build here is what it
+    # picks up. Rebuilding with a plain `cargo build` later leaves the
+    # older release binary winning that search; use --release to iterate.
+    with_dev_env "cd src/rust/odo-register && cargo build --release"
+
+    echo "odo-register built at src/rust/odo-register/target/release/odo-register"
+}
+
 print_post_install() {
     print_section "Dev Cluster Setup Complete!"
 
-    echo -e "${GREEN}All services are built and deployed.${NC}"
+    echo -e "${GREEN}All services are built and deployed, and odo-register is built"
+    echo -e "at src/rust/odo-register/target/release/odo-register.${NC}"
     echo
     echo "The database carries the platform seed: the demo org tree 'Odo"
     echo "Library System' and the machine accounts."
@@ -288,6 +303,8 @@ print_post_install() {
     echo "Admin UI: http://<this-host>:30080/odo/admin"
     echo
     echo "Machine accounts: odo-registration (apps register their data"
+    echo "via ./scripts/load-data-manifest.sh; disabled outside dev/test data),"
+    echo "odo-notify-service."
 }
 
 # ---------------------------------------------------------------------------
@@ -313,6 +330,7 @@ main() {
     deploy_database_schema
     deploy_test_data
     build_and_deploy_services
+    build_odo_register
 
     print_post_install
 }
@@ -322,8 +340,8 @@ usage() {
     echo
     echo "Turns an Odo k3s cluster into a development machine: installs Node,"
     echo "Rust, and the build dependencies, starts the local Docker registry,"
-    echo "creates the database, deploys the schema and platform seed, and"
-    echo "builds and deploys every service."
+    echo "creates the database, deploys the schema and platform seed, builds"
+    echo "and deploys every service, and builds the odo-register CLI."
     echo
     echo "Run the PostgreSQL and cluster installers first:"
     echo "  ./scripts/setup/install-postgres-server-ubuntu.sh --with-pgtap"

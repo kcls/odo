@@ -5,3 +5,4 @@
 001_odo_baseline 2026-08-18T00:00:00Z Bill Erickson <bserickson@kcls.org> # Baseline: complete odo platform schema (squashed at the repo split)
 002_odo_seed [001_odo_baseline] 2026-08-18T00:05:00Z Bill Erickson <bserickson@kcls.org> # Platform seed: odo.* permissions, platform roles, machine accounts, demo org tree
 003_directory_upload_mapping [001_odo_baseline] 2026-08-19T00:00:00Z Bill Erickson <bserickson@kcls.org> # Upload routing (entity_type/category -> path) moves into the directory registry
+004_registration_account_lockdown [002_odo_seed] 2026-09-03T19:49:46Z Bill Erickson <bserickson@kcls.org> # Ship the odo-registration machine account disabled with an unknowable password

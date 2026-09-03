@@ -22,10 +22,17 @@
 //! All calls go through the Envoy gateway (every endpoint this tool uses
 //! is gateway-routed), so one base URL suffices.
 //!
-//! Environment (all optional):
-//!   ODO_URL         gateway base, default http://localhost:30080
-//!   REGISTRATION_USERNAME / REGISTRATION_PASSWORD
-//!                   default odo-registration / the seed's dev-only value
+//! Environment:
+//!   ODO_URL         gateway base, default http://localhost:30080 (optional)
+//!   REGISTRATION_USERNAME
+//!                   default odo-registration (optional)
+//!   REGISTRATION_PASSWORD
+//!                   required. The account ships disabled with an
+//!                   unknowable password, so there is no default worth
+//!                   falling back to. Normally you do not set this by
+//!                   hand: scripts/load-data-manifest.sh generates a password,
+//!                   activates the account for the run and disables it
+//!                   again afterwards.
 //!
 //! This is the interim client-side mechanism until odo exposes a
 //! declarative app-manifest registration endpoint; the manifest format is
@@ -391,7 +398,17 @@ async fn main() -> ExitCode {
     }
 
     let username = env_or("REGISTRATION_USERNAME", "odo-registration");
-    let password = env_or("REGISTRATION_PASSWORD", "odo-registration-dev-only");
+    // No default: the seeded account is disabled with a password nobody
+    // holds, so falling back to a baked-in value would only turn a
+    // configuration mistake into a confusing 401.
+    let Ok(password) = std::env::var("REGISTRATION_PASSWORD") else {
+        eprintln!("REGISTRATION_PASSWORD is not set.");
+        eprintln!(
+            "Run this through scripts/load-data-manifest.sh, which activates the \
+             odo-registration account for the duration of the run."
+        );
+        return ExitCode::from(2);
+    };
 
     let client = match Client::login(&username, &password).await {
         Ok(c) => c,
