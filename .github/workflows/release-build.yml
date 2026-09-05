@@ -27,7 +27,10 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_PREFIX: ${{ github.repository_owner }}
+  # Each project owns its own GHCR namespace -- ghcr.io/<owner>/<repo>/<service>
+  # -- so image names never collide between repositories that ship a service of
+  # the same name.
+  IMAGE_PREFIX: ${{ github.repository }}
 
 jobs:
   plan:
@@ -132,7 +135,10 @@ jobs:
       - name: Generate tags
         id: tags
         run: |
-          IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.name }}"
+          # GHCR rejects uppercase in a path; a fork under a mixed-case owner
+          # would otherwise fail the push with an obscure error.
+          PREFIX=$(echo "${{ env.IMAGE_PREFIX }}" | tr '[:upper:]' '[:lower:]')
+          IMAGE="${{ env.REGISTRY }}/${PREFIX}/${{ matrix.name }}"
           SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
 
           # The sha tag is always published and never moves.

@@ -41,7 +41,10 @@ has since landed on `main`.
 ### Image tags
 
 Every service in `service-map.yaml` is built and pushed to
-`ghcr.io/<owner>/<service>` on each release build.
+`ghcr.io/<owner>/<repo>/<service>` on each release build — each project owns
+its own registry namespace, so two repositories shipping a service of the same
+name never collide, and each project's workflow owns (and can therefore create)
+its own packages.
 
 | Tag | Published on | Meaning | Moves? |
 | --- | --- | --- | --- |
