@@ -1,0 +1,233 @@
+name: Release Build
+
+# Publishes container images for every service in service-map.yaml.
+#
+#   push to release/X.Y   -> :<short-sha>
+#   push of tag vX.Y.Z    -> :<short-sha>, :vX.Y.Z, :vX.Y
+#   workflow_dispatch     -> :<short-sha>, optionally a subset of services
+#
+# A published vX.Y.Z tag is never re-pointed; a bad release is superseded by
+# the next patch. See docs/tech-docs/release-management.md.
+#
+# Deployment is deliberately out of scope: this repository publishes images and
+# manifests, and a private per-installation repository decides what runs where.
+
+on:
+  push:
+    branches:
+      - 'release/**'
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      services:
+        description: 'Comma-separated services to build (default: all)'
+        required: false
+        default: ''
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository_owner }}
+
+jobs:
+  plan:
+    name: Plan Build
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      services: ${{ steps.plan.outputs.services }}
+      version: ${{ steps.version.outputs.version }}
+      is-release: ${{ steps.version.outputs.is-release }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install yq
+        run: |
+          sudo wget -qO /usr/bin/yq \
+            https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/bin/yq
+
+      - name: Resolve version
+        id: version
+        run: |
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            TAG="${{ github.ref_name }}"
+            if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "::error::Tag '$TAG' is not a vX.Y.Z release tag"
+              exit 1
+            fi
+            echo "version=$TAG" >> $GITHUB_OUTPUT
+            echo "is-release=true" >> $GITHUB_OUTPUT
+          else
+            echo "version=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "is-release=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Select services
+        id: plan
+        run: |
+          # A release build is whole: every service, so a version tag names a
+          # coherent set of images. The subset input exists only to re-run a
+          # single service after an infrastructure failure.
+          REQUESTED="${{ github.event.inputs.services }}"
+
+          if [[ -n "$REQUESTED" ]]; then
+            SERVICES=$(echo "$REQUESTED" | tr ',' '\n' \
+              | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' \
+              | grep -v '^$' | jq -R . | jq -s -c .)
+
+            # Fail loudly on a typo rather than silently building nothing.
+            for service in $(echo "$SERVICES" | jq -r '.[]'); do
+              if [[ "$(yq eval ".services | has(\"$service\")" service-map.yaml)" != "true" ]]; then
+                echo "::error::Unknown service '$service' (not in service-map.yaml)"
+                exit 1
+              fi
+            done
+          else
+            SERVICES=$(yq eval '.services | keys' service-map.yaml -o json | jq -c .)
+          fi
+
+          MATRIX=$(yq eval -o json '.services' service-map.yaml \
+            | jq -c --argjson want "$SERVICES" '
+                to_entries
+                | map(select(.key as $k | $want | index($k)))
+                | map({name: .key, dockerfile: .value.build.dockerfile,
+                       context: (.value.build.context // ".")})
+                | {include: .}')
+
+          if [[ "$(echo "$MATRIX" | jq '.include | length')" == "0" ]]; then
+            echo "::error::No services resolved to build"
+            exit 1
+          fi
+
+          echo "services=$SERVICES" >> $GITHUB_OUTPUT
+          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+          echo "Building: $SERVICES"
+
+  build:
+    name: Build ${{ matrix.name }}
+    needs: plan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.plan.outputs.matrix) }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate tags
+        id: tags
+        run: |
+          IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.name }}"
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+
+          # The sha tag is always published and never moves.
+          TAGS="${IMAGE}:${SHORT_SHA}"
+
+          if [[ "${{ needs.plan.outputs.is-release }}" == "true" ]]; then
+            VERSION="${{ needs.plan.outputs.version }}"        # vX.Y.Z
+            LINE="${VERSION%.*}"                               # vX.Y
+            TAGS="${TAGS}"$'\n'"${IMAGE}:${VERSION}"
+            TAGS="${TAGS}"$'\n'"${IMAGE}:${LINE}"
+          fi
+
+          {
+            echo "tags<<EOF"
+            echo "$TAGS"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
+          # head_commit is absent on workflow_dispatch, so stamp the build here.
+          echo "date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+
+          echo "Tags:"
+          echo "$TAGS"
+
+      - name: Build and push service image
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILD_TAG=${{ github.sha }}
+            BUILD_DATE=${{ steps.tags.outputs.date }}
+            BUILD_COMMIT=${{ github.sha }}
+            VERSION=${{ needs.plan.outputs.version }}
+
+  # PARKED: attaching k8s/ + openapi/ to the GitHub release is one way for a
+  # deployment repository to obtain manifests at a known version, but that
+  # decision isn't made yet. Left here as the worked-out option; delete it if
+  # deployment repositories end up pinning this repo by tag instead.
+  #
+  # release-artifacts:
+  #   name: Publish Release Artifacts
+  #   needs: [plan, build]
+  #   if: needs.plan.outputs.is-release == 'true'
+  #   runs-on: ubuntu-latest
+  #   permissions:
+  #     contents: write
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+  #
+  #     - name: Package manifests and specs
+  #       env:
+  #         VERSION: ${{ needs.plan.outputs.version }}
+  #       run: |
+  #         tar czf "odo-manifests-${VERSION}.tar.gz" k8s openapi
+  #
+  #     - name: Create or update the GitHub release
+  #       env:
+  #         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #         VERSION: ${{ needs.plan.outputs.version }}
+  #       run: |
+  #         if ! gh release view "$VERSION" >/dev/null 2>&1; then
+  #           gh release create "$VERSION" --verify-tag --generate-notes \
+  #             --title "$VERSION"
+  #         fi
+  #         gh release upload "$VERSION" "odo-manifests-${VERSION}.tar.gz" --clobber
+
+  summary:
+    name: Build Summary
+    needs: [plan, build]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate summary
+        run: |
+          {
+            echo "## 📦 Release Build"
+            echo
+            echo "| | |"
+            echo "| --- | --- |"
+            echo "| Ref | \`${{ github.ref_name }}\` |"
+            echo "| Version | \`${{ needs.plan.outputs.version }}\` |"
+            echo "| Release tag | ${{ needs.plan.outputs.is-release }} |"
+            echo "| Commit | \`${{ github.sha }}\` |"
+            echo "| Result | ${{ needs.build.result }} |"
+            echo
+            echo "**Services**"
+            echo '```json'
+            # Empty when the plan job itself failed; don't fail the summary.
+            echo '${{ needs.plan.outputs.services }}' | jq . 2>/dev/null \
+              || echo '(planning failed)'
+            echo '```'
+          } >> $GITHUB_STEP_SUMMARY

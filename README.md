@@ -65,5 +65,6 @@ with `e2e.odo.admin` and defualt password `test123!`.
 
 ## Addtional Documentation
 
+* [Release Management](docs/tech-docs/release-management.md)
 * [Advanced PostgreSQL Setup](docs/tech-docs/postgres-setup.md)
 * [Mac Setup (Docker Desktop)](docs/tech-docs/mac-setup.md)
