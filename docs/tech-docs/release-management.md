@@ -1,7 +1,9 @@
 # Release Management
 
-Status: **in progress**. Phase 1 (this repo's release build) is being
-implemented; phases 2–4 are the agreed plan, not yet built.
+Status: phases 1 and 2 are **implemented** — both public repositories build
+releases and gate on CI. Phase 3 (the private deployment repository) and
+phase 4 (running a real release through the runbook below) are the agreed
+plan, not yet built.
 
 Odo and its applications are separate open-source projects with separate
 release cycles — this repo, and `kcls/current` (the reference application).
@@ -52,6 +54,12 @@ its own packages.
 | `vX.Y.Z` | tag push only | this release | never |
 | `vX.Y` | tag push only | newest patch on the release line | yes |
 
+> [!NOTE]
+> The flat `ghcr.io/kcls/<service>` packages predate the split — sjora created
+> and owns them, and production still pulls from them. They are frozen, not
+> deleted: deleting one breaks any pod that reschedules and has to re-pull.
+> Re-pointing deployments at the new namespace is part of phase 3.
+
 Pushing a release branch publishes the sha tag only. The line tag moves only
 when a release is actually tagged, so `vX.Y` never points at an untagged
 commit.
@@ -71,9 +79,10 @@ coherent set of images. The `[build: …]` commit-message parsing that the old
 workflow used survives only as a `workflow_dispatch` input, for re-running a
 single service after an infrastructure failure.
 
-### This repository's release workflow
+### The release workflow
 
-`.github/workflows/release-build.yml`:
+`.github/workflows/release-build.yml`, the same file in both repositories
+(service-map-driven, so each one picks up its own services):
 
 | Trigger | Effect |
 | --- | --- |
@@ -88,7 +97,7 @@ silently building nothing.
 There is deliberately no deployment step and no credential for any other
 repository.
 
-The workflow carries a **commented-out `release-artifacts` job** that would
+Both copies carry a **commented-out `release-artifacts` job** that would
 attach `k8s/` + `openapi/` to the GitHub release as a tarball. It is parked
 pending the decision below — it is one worked-out answer to "how does a
 deployment repository obtain manifests at a known version", not the chosen
@@ -101,10 +110,12 @@ its `Cargo.lock`, and installs its platform data through odo's
 `load-data-manifest.sh`. A Current release is therefore only meaningful
 against some range of odo versions.
 
-Two obligations follow:
+Two obligations follow, neither yet met:
 
-* Current pins its git dependency to a **released odo tag**, not to whatever
-  is on `main`.
+* Current should pin its git dependency to a **released odo tag** rather than
+  to `main`. Today `Cargo.toml` says `branch = "main"` with `Cargo.lock`
+  pinning a rev — which is reproducible but says nothing about which odo
+  release it corresponds to. This changes once odo has its first tag.
 * Each Current release states its odo compatibility range in the release
   notes ("requires odo >= 1.2, < 2.0"). Nothing enforces this at build time,
   so it has to be written down.
@@ -222,6 +233,10 @@ libxml2 and clang installed.
   commented out in the workflow), a kustomize remote base pinned to the release
   tag, a git submodule, or a vendoring script in the deployment repository.
   Undecided; nothing else in this document depends on which one wins.
+* Re-pointing production at `ghcr.io/kcls/<repo>/<service>`; until then it
+  runs images from the frozen sjora-owned namespace.
+* Current's `odo-client`/`odo-service` pin moving from `main` to an odo
+  release tag (blocked on odo having one).
 * Org-unit support in the registration manifest surface (see above).
 * Secrets in the deployment repository: verify whether any committed secret
   carries a live credential, and move to SOPS or sealed-secrets before the
