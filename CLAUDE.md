@@ -62,7 +62,8 @@ templates, or fixtures.
   the admin UI's generated TS types; `--check` is the drift gate. Commit
   the results whenever handler signatures/schemas change.
 - Releases: `.github/workflows/release-build.yml` publishes images to
-  `ghcr.io/<owner>/<service>` from `release/**` pushes (`:<short-sha>`) and
+  `ghcr.io/<owner>/<repo>/<service>` from `release/**` pushes (`:<short-sha>`)
+  and
   `vX.Y.Z` tags (`:<short-sha>`, `:vX.Y.Z`, `:vX.Y`). This repo publishes only
   — it holds no credential for, and never writes to, any deployment
   repository. How deployment repos get `k8s/`+`openapi/` is still open (a
