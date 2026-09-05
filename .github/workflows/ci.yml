@@ -1,0 +1,137 @@
+name: CI
+
+# Lint and unit tests. Everything here runs without a cluster or a database;
+# the integration, e2e, pgTAP and load suites in scripts/run-tests.sh need live
+# services and stay a manual/runbook step.
+
+on:
+  push:
+    branches:
+      - 'main'
+      - 'release/**'
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  rust:
+    name: Rust lint and unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      # odo-auth's saml feature builds samael, which links xmlsec1/libxml2 and
+      # needs clang for bindgen. Same package set as the odo-auth Dockerfile.
+      - name: Install SAML build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            pkg-config \
+            libssl-dev \
+            libxml2-dev \
+            libxmlsec1-dev \
+            libxmlsec1-openssl \
+            libclang-dev \
+            clang
+
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            src/rust/odo-client
+            src/rust/odo-service
+            src/rust/odo-entity
+            src/rust/odo-auth
+            src/rust/odo-org
+            src/rust/odo-notify
+            src/rust/odo-asset
+            src/rust/odo-register
+
+      # One crate per directory, no workspace root, so this walks them. Every
+      # crate is checked before the job fails rather than stopping at the first
+      # one, so a red run reports everything that needs fixing.
+      - name: Clippy and unit tests
+        run: |
+          failed=()
+          run() {  # run <label> <dir> <cargo args...>
+            local label="$1" dir="$2"; shift 2
+            echo "::group::$label"
+            if ( cd "$dir" && cargo "$@" ); then
+              echo "::endgroup::"
+            else
+              echo "::endgroup::"
+              echo "::error::$label failed"
+              failed+=("$label")
+            fi
+          }
+
+          for crate in odo-client odo-service odo-entity \
+                       odo-auth odo-org odo-notify odo-asset odo-register; do
+            run "clippy $crate" "src/rust/$crate" clippy --all-targets -- -D warnings
+            run "test $crate"   "src/rust/$crate" test
+          done
+
+          # SAML is feature-gated and otherwise never compiled.
+          run "clippy odo-auth --features saml" src/rust/odo-auth \
+            clippy --all-targets --features saml -- -D warnings
+          run "test odo-auth --features saml" src/rust/odo-auth \
+            test --features saml
+
+          if [ ${#failed[@]} -gt 0 ]; then
+            printf 'FAILED: %s\n' "${failed[@]}" >&2
+            exit 1
+          fi
+          echo "All crates clean."
+
+  ui:
+    name: UI typecheck, lint, tests and build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            src/ui/core/package-lock.json
+            src/ui/odo-admin/package-lock.json
+
+      - name: Install core dependencies
+        working-directory: src/ui/core
+        run: npm ci
+
+      - name: Typecheck core
+        working-directory: src/ui/core
+        run: npm run type-check
+
+      - name: Lint core
+        working-directory: src/ui/core
+        run: npm run lint
+
+      # @odo/core resolves to ./dist/index.js, so the admin build cannot see it
+      # until core is compiled. This ordering is the whole reason the two UIs
+      # share one job.
+      - name: Build core
+        working-directory: src/ui/core
+        run: npm run build
+
+      - name: Install admin dependencies
+        working-directory: src/ui/odo-admin
+        run: npm ci
+
+      - name: Admin unit tests
+        working-directory: src/ui/odo-admin
+        run: npx ng test --watch=false
+
+      # ng build is the admin UI's typecheck; there is no separate tsc script.
+      - name: Build admin
+        working-directory: src/ui/odo-admin
+        run: npx ng build

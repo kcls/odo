@@ -13,7 +13,7 @@ export function configureApiHostPort(hostport: string): void {
 export function getApiHostPort(): string {
     if (configuredHostPort) return configuredHostPort;
 
-    // @ts-ignore - Vite
+    // @ts-expect-error - Vite injects import.meta.env; not in this lib's tsconfig lib set
     const viteHost = typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_HOSTPORT;
     if (viteHost) return viteHost;
 
