@@ -1,5 +1,5 @@
 #!/bin/bash
-# Install a k3s cluster for Odo on Ubuntu.
+# Install a k3s cluster for Odo on Debian or Ubuntu.
 #
 # Installs k3s and Docker, deploys the cluster infrastructure (Envoy
 # Gateway, Fluent Bit, namespaces, secrets), and points the platform at an
@@ -34,6 +34,39 @@ case "$(uname -m)" in
         exit 1
         ;;
 esac
+
+# ---------------------------------------------------------------------------
+# Detect distribution
+# ---------------------------------------------------------------------------
+# Debian and Ubuntu differ here in exactly one place: which Docker apt
+# repository to pull from. Everything else is plain apt or a distro-agnostic
+# upstream installer. Read the fields in a subshell so /etc/os-release
+# cannot clobber a variable this script defines (it sets NAME, VERSION and
+# friends unconditionally).
+os_release() {
+    (. /etc/os-release 2>/dev/null && printf '%s' "${!1}")
+}
+
+# ID_LIKE is what catches the derivatives -- Linux Mint and Pop!_OS report
+# ID_LIKE=ubuntu, Raspberry Pi OS reports ID_LIKE=debian -- and Docker
+# publishes for the parent distribution, never the derivative. Ubuntu is
+# tested first because Pop!_OS lists both.
+case " $(os_release ID) $(os_release ID_LIKE) " in
+    *" ubuntu "*) DOCKER_DISTRO="ubuntu" ;;
+    *" debian "*) DOCKER_DISTRO="debian" ;;
+    *)
+        echo "Unsupported distribution: $(os_release PRETTY_NAME)"
+        echo "This installer expects Debian or Ubuntu, or a derivative of either."
+        exit 1
+        ;;
+esac
+
+# Same reason: an Ubuntu derivative puts its own codename in
+# VERSION_CODENAME (Mint 22 says 'wilma'), which Docker's repository does
+# not carry, and names the Ubuntu release it tracks in UBUNTU_CODENAME.
+# Debian has no such split, so VERSION_CODENAME is the codename there.
+DOCKER_SUITE="$(os_release UBUNTU_CODENAME)"
+DOCKER_SUITE="${DOCKER_SUITE:-$(os_release VERSION_CODENAME)}"
 
 # ---------------------------------------------------------------------------
 # Version / configuration variables
@@ -252,18 +285,30 @@ install_docker() {
         return
     fi
 
+    # Only reached when Docker is not installed, so a codename we cannot
+    # resolve is fatal here rather than at the top of the script: a host
+    # that already has Docker never needs it.
+    if [[ -z "$DOCKER_SUITE" ]]; then
+        echo "Could not read a release codename from /etc/os-release, so there"
+        echo "is no way to tell which Docker repository suite to use."
+        echo "Install Docker by hand, then re-run this script."
+        exit 1
+    fi
+
+    echo "Using Docker's $DOCKER_DISTRO repository, suite '$DOCKER_SUITE'"
+
     sudo apt-get update
     sudo apt-get install -y ca-certificates curl
 
     sudo install -m 0755 -d /etc/apt/keyrings
-    sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+    sudo curl -fsSL "https://download.docker.com/linux/${DOCKER_DISTRO}/gpg" \
         -o /etc/apt/keyrings/docker.asc
     sudo chmod a+r /etc/apt/keyrings/docker.asc
 
     sudo tee /etc/apt/sources.list.d/docker.sources > /dev/null <<EOF
 Types: deb
-URIs: https://download.docker.com/linux/ubuntu
-Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
+URIs: https://download.docker.com/linux/${DOCKER_DISTRO}
+Suites: ${DOCKER_SUITE}
 Components: stable
 Architectures: $(dpkg --print-architecture)
 Signed-By: /etc/apt/keyrings/docker.asc
@@ -501,9 +546,9 @@ main() {
 usage() {
     echo "Usage: $0 [--database-url <url>]"
     echo
-    echo "Installs k3s and Docker on this Ubuntu host and initializes the"
-    echo "Odo cluster infrastructure: Envoy Gateway, Fluent Bit, namespaces,"
-    echo "secrets, and the JWT keypair."
+    echo "Installs k3s and Docker on this Debian or Ubuntu host and"
+    echo "initializes the Odo cluster infrastructure: Envoy Gateway, Fluent"
+    echo "Bit, namespaces, secrets, and the JWT keypair."
     echo
     echo "PostgreSQL runs outside the cluster; the script asks for its"
     echo "address and stores a single DATABASE_URL in the"
