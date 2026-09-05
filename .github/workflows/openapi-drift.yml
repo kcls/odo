@@ -6,13 +6,11 @@ name: OpenAPI Spec Drift Check
 # without regenerating the specs (and the generated types).
 
 on:
-  # TEMPORARILY DISABLED: auto-triggers commented out; manual-run only.
-  # Restore by uncommenting push/pull_request below.
-  # push:
-  #   branches:
-  #     - 'main'
-  #     - 'release/**'
-  # pull_request:
+  push:
+    branches:
+      - 'main'
+      - 'release/**'
+  pull_request:
   workflow_dispatch:
 
 jobs:
@@ -28,6 +26,13 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+
+      # generate-openapi.sh also regenerates the admin UI's TypeScript types
+      # via `npx openapi-typescript`, so the job needs a pinned Node.
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
 
       - name: Cache cargo build
         uses: Swatinem/rust-cache@v2

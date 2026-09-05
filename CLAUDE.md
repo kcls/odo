@@ -61,6 +61,10 @@ templates, or fixtures.
 - OpenAPI: `./scripts/generate-openapi.sh` regenerates `openapi/*.json` +
   the admin UI's generated TS types; `--check` is the drift gate. Commit
   the results whenever handler signatures/schemas change.
+- CI (`.github/workflows/ci.yml`, on PRs and pushes to main/release):
+  clippy `-D warnings` + `cargo test` for all eight crates (odo-auth also
+  with `--features saml`), then core typecheck/lint/build and the admin UI's
+  tests and build. `openapi-drift.yml` is the spec gate and is enabled.
 - Releases: `.github/workflows/release-build.yml` publishes images to
   `ghcr.io/<owner>/<repo>/<service>` from `release/**` pushes (`:<short-sha>`)
   and
@@ -101,6 +105,13 @@ templates, or fixtures.
 
 ## Gotchas
 
+- `src/ui/core` must be BUILT before `src/ui/odo-admin` will build:
+  `@odo/core` resolves to `./dist/index.js`, so `ng build` fails with
+  "Cannot find module '@odo/core'" until `npm run build` has run in core.
+- `--features saml` builds samael, which links xmlsec1/libxml2 and needs
+  clang for bindgen: `pkg-config libssl-dev libxml2-dev libxmlsec1-dev
+  libxmlsec1-openssl libclang-dev clang` (the list the odo-auth Dockerfile
+  installs). Without them the build fails in samael's build script.
 - Docker/BuildKit can serve stale cargo caches (phantom old code in
   deployed binaries): `docker builder prune --force --filter
   type=exec.cachemount`, then rebuild.

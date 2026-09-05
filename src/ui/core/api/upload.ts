@@ -86,7 +86,7 @@ class UploadService {
         reject(new Error('Upload cancelled'));
       });
 
-      let url = this.getBasePath() + 'upload';
+      const url = this.getBasePath() + 'upload';
 
       xhr.open('POST', url);
       xhr.setRequestHeader('Authorization', `Bearer ${token}`);
@@ -127,7 +127,7 @@ class UploadService {
       throw new Error('No authentication token found');
     }
 
-    let url = this.getBasePath() + `files/${relativePath}`;
+    const url = this.getBasePath() + `files/${relativePath}`;
 
     const response = await fetch(url, {headers: {'Authorization': `Bearer ${token}`}});
 

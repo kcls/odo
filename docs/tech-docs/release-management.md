@@ -198,15 +198,22 @@ image alone should say so in their notes.
 ## Gating
 
 A release build should not be the first time anything is checked. Both
-projects run, on pull requests to `main` and on release branches:
+projects run `ci.yml` and `openapi-drift.yml` on pull requests and on pushes
+to `main` and `release/**`:
 
-* `cargo clippy` / `cargo test` per crate (odo-auth additionally with
-  `--features saml`)
-* `tsc --noEmit` and `vitest` for the UIs
-* the OpenAPI drift check
+| | odo | Current |
+| --- | --- | --- |
+| Rust | clippy `-D warnings` + `cargo test`, all eight crates, plus odo-auth with `--features saml` | same, one crate |
+| UI | core typecheck/lint/build, then admin tests + build | `tsc --noEmit`, `vitest` |
+| Specs | `generate-openapi.sh --check` | same |
 
-Integration and e2e suites need a live cluster and stay a runbook step rather
-than a CI job.
+Integration, e2e, pgTAP and load suites need a live cluster and stay a runbook
+step rather than a CI job.
+
+Two ordering constraints are baked into odo's job and are easy to trip over
+locally too: `src/ui/core` must be built before the admin UI will build
+(`@odo/core` resolves to `./dist`), and the `saml` feature needs xmlsec1,
+libxml2 and clang installed.
 
 ## Open items
 
