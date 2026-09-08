@@ -4,6 +4,7 @@ name: Release Build
 #
 #   push to release/X.Y   -> :<short-sha>
 #   push of tag vX.Y.Z    -> :<short-sha>, :vX.Y.Z, :vX.Y
+#   push of tag vX.Y.Z-rc1 -> :<short-sha>, :vX.Y.Z-rc1  (no line tag)
 #   workflow_dispatch     -> :<short-sha>, optionally a subset of services
 #
 # A published vX.Y.Z tag is never re-pointed; a bad release is superseded by
@@ -41,6 +42,7 @@ jobs:
       services: ${{ steps.plan.outputs.services }}
       version: ${{ steps.version.outputs.version }}
       is-release: ${{ steps.version.outputs.is-release }}
+      is-prerelease: ${{ steps.version.outputs.is-prerelease }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -54,17 +56,39 @@ jobs:
       - name: Resolve version
         id: version
         run: |
-          if [[ "${{ github.ref_type }}" == "tag" ]]; then
-            TAG="${{ github.ref_name }}"
-            if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-              echo "::error::Tag '$TAG' is not a vX.Y.Z release tag"
-              exit 1
-            fi
-            echo "version=$TAG" >> $GITHUB_OUTPUT
-            echo "is-release=true" >> $GITHUB_OUTPUT
-          else
+          if [[ "${{ github.ref_type }}" != "tag" ]]; then
             echo "version=${{ github.ref_name }}" >> $GITHUB_OUTPUT
             echo "is-release=false" >> $GITHUB_OUTPUT
+            echo "is-prerelease=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          TAG="${{ github.ref_name }}"
+
+          # Semver build metadata is a legal git tag but not a legal image
+          # tag, so catch it here rather than deep in an opaque push error.
+          if [[ "$TAG" == *+* ]]; then
+            echo "::error::Tag '$TAG' contains '+': semver build metadata is not a legal container image tag. Use a '-' prerelease suffix instead."
+            exit 1
+          fi
+
+          # vX.Y.Z, optionally with a prerelease suffix (v1.2.3-rc1).
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Tag '$TAG' is not a vX.Y.Z or vX.Y.Z-suffix release tag"
+            exit 1
+          fi
+
+          echo "version=$TAG" >> $GITHUB_OUTPUT
+          echo "is-release=true" >> $GITHUB_OUTPUT
+
+          # A suffixed tag is a prerelease: it publishes its own full tag but
+          # must never move the vX.Y line tag, which means "newest released
+          # patch on this line".
+          if [[ -n "${BASH_REMATCH[1]}" ]]; then
+            echo "is-prerelease=true" >> $GITHUB_OUTPUT
+            echo "Prerelease $TAG: no vX.Y line tag will be moved."
+          else
+            echo "is-prerelease=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Select services
@@ -145,10 +169,16 @@ jobs:
           TAGS="${IMAGE}:${SHORT_SHA}"
 
           if [[ "${{ needs.plan.outputs.is-release }}" == "true" ]]; then
-            VERSION="${{ needs.plan.outputs.version }}"        # vX.Y.Z
-            LINE="${VERSION%.*}"                               # vX.Y
+            VERSION="${{ needs.plan.outputs.version }}"        # vX.Y.Z[-suffix]
             TAGS="${TAGS}"$'\n'"${IMAGE}:${VERSION}"
-            TAGS="${TAGS}"$'\n'"${IMAGE}:${LINE}"
+
+            # Only a plain vX.Y.Z moves the line tag. ${VERSION%.*} would
+            # derive "v0.1" from "v0.1.0-rc1" and quietly point the stable
+            # line at a prerelease.
+            if [[ "${{ needs.plan.outputs.is-prerelease }}" != "true" ]]; then
+              LINE="${VERSION%.*}"                             # vX.Y
+              TAGS="${TAGS}"$'\n'"${IMAGE}:${LINE}"
+            fi
           fi
 
           {
