@@ -4,17 +4,26 @@
 //! notification templates, asset directories, SAML attribute->role maps)
 //! and dev/test fixtures (users, role assignments) by describing them in a
 //! JSON manifest and running this tool with the `odo-registration` machine
-//! account. Upsert-only semantics: rows that already exist (409 conflicts)
-//! count as OK; nothing is ever deleted. Re-running is always safe.
+//! account. Installations use the same mechanism for their own org
+//! structure. Upsert-only semantics: rows that already exist (409
+//! conflicts) count as OK; nothing is ever deleted. Re-running is always
+//! safe.
 //!
 //! Ordering within a manifest is fixed and dependency-correct:
-//! permissions -> roles -> grants -> templates -> directories -> SAML maps
-//! -> users -> user role assignments. (Directories reference permission
-//! codes; maps and assignments reference roles.)
+//! org unit types -> org units -> permissions -> roles -> grants ->
+//! templates -> directories -> SAML maps -> users -> user role
+//! assignments. (Directories reference permission codes; maps and
+//! assignments reference roles; assignments reference org units.)
 //!
 //! SAML maps apply to every active IdP that defines the manifest's
 //! `attr_key`; installs without SSO (or without the attribute) skip them
-//! with a notice. User role assignments resolve org units by tree code.
+//! with a notice.
+//!
+//! Org structure is addressed by natural key throughout -- units by
+//! `code`, unit types by `label` -- never by database id, so one manifest
+//! applies to any install (see docs/tech-docs/durable-references.md). This
+//! tool resolves those to ids against the live tree, so a manifest must
+//! list a parent before its children.
 //!
 //! Usage:
 //!   odo-register <manifest.json> [more-manifests...]
@@ -46,6 +55,10 @@ use std::process::ExitCode;
 #[derive(Deserialize)]
 struct Manifest {
     #[serde(default)]
+    org_unit_types: Vec<OrgUnitTypeSpec>,
+    #[serde(default)]
+    org_units: Vec<OrgUnitSpec>,
+    #[serde(default)]
     permissions: Vec<Value>,
     #[serde(default)]
     roles: Vec<Value>,
@@ -61,6 +74,34 @@ struct Manifest {
     users: Vec<Value>,
     #[serde(default)]
     user_role_assignments: Vec<Assignment>,
+}
+
+/// An org unit type, parented by label. Types form their own shallow tree
+/// (Root -> Region -> Branch -> ...) independent of the unit tree.
+#[derive(Deserialize)]
+struct OrgUnitTypeSpec {
+    label: String,
+    /// Parent type's label. Omit only for a root type.
+    #[serde(default)]
+    parent: Option<String>,
+    #[serde(default)]
+    can_have_staff: Option<bool>,
+    #[serde(default)]
+    can_have_patrons: Option<bool>,
+}
+
+/// An org unit, parented by code and typed by label.
+#[derive(Deserialize)]
+struct OrgUnitSpec {
+    code: String,
+    label: String,
+    /// Parent unit's code. Required: units always attach below an existing
+    /// unit, and the single root is seeded rather than registered.
+    parent: String,
+    /// Unit type's label.
+    unit_type: String,
+    #[serde(default)]
+    timezone: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -132,6 +173,15 @@ impl Client {
         }
     }
 
+    /// POST that requires a 200; for reads that happen to be POSTs.
+    async fn post_ok(&self, url: String, body: &Value) -> Result<Value, String> {
+        let display = url.clone();
+        match self.post(url, body).await? {
+            (200, body) => Ok(body),
+            (status, detail) => Err(format!("{display}: {status} {detail}")),
+        }
+    }
+
     async fn get(&self, url: String) -> Result<Value, String> {
         let resp = self
             .http
@@ -179,10 +229,27 @@ impl Tally {
     }
 }
 
-/// Walk the org tree into a code -> uuid map.
-fn walk_tree(node: &Value, map: &mut HashMap<String, String>) {
-    if let (Some(code), Some(uuid)) = (node["code"].as_str(), node["uuid"].as_str()) {
-        map.insert(code.to_string(), uuid.to_string());
+/// An org unit as the tree reports it: the uuid is what callers store, the
+/// id is what the create API wants for a parent.
+struct UnitRef {
+    id: i64,
+    uuid: String,
+}
+
+/// Walk the org tree into a code -> UnitRef map.
+fn walk_tree(node: &Value, map: &mut HashMap<String, UnitRef>) {
+    if let (Some(code), Some(uuid), Some(id)) = (
+        node["code"].as_str(),
+        node["uuid"].as_str(),
+        node["id"].as_i64(),
+    ) {
+        map.insert(
+            code.to_string(),
+            UnitRef {
+                id,
+                uuid: uuid.to_string(),
+            },
+        );
     }
     if let Some(children) = node["children"].as_array() {
         for child in children {
@@ -191,7 +258,167 @@ fn walk_tree(node: &Value, map: &mut HashMap<String, String>) {
     }
 }
 
+/// Fetch the whole org tree as code -> UnitRef.
+async fn load_units(client: &Client) -> Result<HashMap<String, UnitRef>, String> {
+    let tree = client
+        .get(format!("{}/api/v1/odo/org/tree", client.base))
+        .await?;
+    let mut units = HashMap::new();
+    // The tree endpoint returns either a bare root node or {tree: [...]}.
+    if let Some(roots) = tree["tree"].as_array() {
+        for root in roots {
+            walk_tree(root, &mut units);
+        }
+    } else {
+        walk_tree(&tree, &mut units);
+    }
+    Ok(units)
+}
+
+/// Create org unit types, resolving each parent label to the id of a type
+/// that already exists or was created earlier in this run.
+async fn apply_unit_types(client: &Client, specs: &[OrgUnitTypeSpec]) -> Result<(), String> {
+    // Existing types first: a label already present is "already registered",
+    // and its id may be needed as a parent below.
+    let page = client
+        .post_ok(
+            format!("{}/api/v1/odo/org/admin/unit-type/list", client.base),
+            &json!({"limit": 200}),
+        )
+        .await?;
+    let mut ids: HashMap<String, i64> = HashMap::new();
+    if let Some(rows) = page["rows"].as_array() {
+        for row in rows {
+            if let (Some(label), Some(id)) = (row["label"].as_str(), row["id"].as_i64()) {
+                ids.insert(label.to_string(), id);
+            }
+        }
+    }
+
+    let mut t = Tally::new();
+    for spec in specs {
+        if ids.contains_key(&spec.label) {
+            t.add(Outcome::Exists);
+            continue;
+        }
+
+        let mut body = json!({"label": spec.label});
+        if let Some(parent) = &spec.parent {
+            let parent_id = ids.get(parent).ok_or(format!(
+                "org unit type '{}': parent type '{parent}' does not exist yet. \
+                 List a parent type before the types beneath it.",
+                spec.label
+            ))?;
+            body["parent"] = json!(parent_id);
+        }
+        if let Some(v) = spec.can_have_staff {
+            body["can_have_staff"] = json!(v);
+        }
+        if let Some(v) = spec.can_have_patrons {
+            body["can_have_patrons"] = json!(v);
+        }
+
+        let label = format!("org unit type {}", spec.label);
+        let url = format!("{}/api/v1/odo/org/admin/unit-type/create", client.base);
+        match client.post(url, &body).await? {
+            (200, created) => {
+                let id = created["id"]
+                    .as_i64()
+                    .ok_or(format!("{label}: create response had no id"))?;
+                ids.insert(spec.label.clone(), id);
+                t.add(Outcome::Created);
+            }
+            (status, detail) => return Err(format!("{label}: {status} {detail}")),
+        }
+    }
+    t.report("org unit types");
+    Ok(())
+}
+
+/// Create org units, resolving parents by code and types by label. Units
+/// created here join the map, so a manifest can build a whole subtree in one
+/// pass as long as parents come first.
+async fn apply_units(client: &Client, specs: &[OrgUnitSpec]) -> Result<(), String> {
+    let mut units = load_units(client).await?;
+
+    let types = client
+        .post_ok(
+            format!("{}/api/v1/odo/org/admin/unit-type/list", client.base),
+            &json!({"limit": 200}),
+        )
+        .await?;
+    let mut type_ids: HashMap<String, i64> = HashMap::new();
+    if let Some(rows) = types["rows"].as_array() {
+        for row in rows {
+            if let (Some(label), Some(id)) = (row["label"].as_str(), row["id"].as_i64()) {
+                type_ids.insert(label.to_string(), id);
+            }
+        }
+    }
+
+    let mut t = Tally::new();
+    for spec in specs {
+        if units.contains_key(&spec.code) {
+            t.add(Outcome::Exists);
+            continue;
+        }
+
+        let parent = units.get(&spec.parent).ok_or(format!(
+            "org unit '{}': parent code '{}' is not in the tree. List a parent \
+             before its children; the root unit is seeded, not registered.",
+            spec.code, spec.parent
+        ))?;
+        let unit_type = type_ids.get(&spec.unit_type).ok_or(format!(
+            "org unit '{}': unknown unit type '{}'. Register it under \
+             org_unit_types first.",
+            spec.code, spec.unit_type
+        ))?;
+
+        let mut body = json!({
+            "label": spec.label,
+            "code": spec.code,
+            "parent": parent.id,
+            "unit_type": unit_type,
+        });
+        if let Some(tz) = &spec.timezone {
+            body["timezone"] = json!(tz);
+        }
+
+        let label = format!("org unit {}", spec.code);
+        let url = format!("{}/api/v1/odo/org/admin/unit/create", client.base);
+        match client.post(url, &body).await? {
+            (200, created) => {
+                let id = created["id"]
+                    .as_i64()
+                    .ok_or(format!("{label}: create response had no id"))?;
+                // The create response carries no uuid; nothing in this run
+                // needs one, and the next run reads it from the tree.
+                units.insert(
+                    spec.code.clone(),
+                    UnitRef {
+                        id,
+                        uuid: String::new(),
+                    },
+                );
+                t.add(Outcome::Created);
+            }
+            (status, detail) => return Err(format!("{label}: {status} {detail}")),
+        }
+    }
+    t.report("org units");
+    Ok(())
+}
+
 async fn apply(client: &Client, manifest: &Manifest) -> Result<(), String> {
+    // Org structure first: role assignments below resolve org units by code,
+    // and an app's fixtures may land in units this manifest creates.
+    if !manifest.org_unit_types.is_empty() {
+        apply_unit_types(client, &manifest.org_unit_types).await?;
+    }
+    if !manifest.org_units.is_empty() {
+        apply_units(client, &manifest.org_units).await?;
+    }
+
     let mut t = Tally::new();
     for p in &manifest.permissions {
         let label = format!("permission {}", p["code"]);
@@ -349,25 +576,19 @@ async fn apply(client: &Client, manifest: &Manifest) -> Result<(), String> {
     t.report("users");
 
     if !manifest.user_role_assignments.is_empty() {
-        let tree = client
-            .get(format!("{}/api/v1/odo/org/tree", client.base))
-            .await?;
-        let mut units = HashMap::new();
-        // The tree endpoint returns either a bare root node or {tree: [...]}.
-        if let Some(roots) = tree["tree"].as_array() {
-            for root in roots {
-                walk_tree(root, &mut units);
-            }
-        } else {
-            walk_tree(&tree, &mut units);
-        }
+        // Re-read the tree rather than reusing anything from apply_units:
+        // this picks up units created above, with their generated uuids.
+        let units = load_units(client).await?;
 
         let mut t = Tally::new();
         for a in &manifest.user_role_assignments {
-            let org_unit_uuid = units.get(&a.org_unit_code).ok_or(format!(
-                "org unit code '{}' not in the tree",
-                a.org_unit_code
-            ))?;
+            let org_unit_uuid = &units
+                .get(&a.org_unit_code)
+                .ok_or(format!(
+                    "org unit code '{}' not in the tree",
+                    a.org_unit_code
+                ))?
+                .uuid;
             let label = format!("assignment {} @ {}", a.role, a.org_unit_code);
             t.add(
                 client

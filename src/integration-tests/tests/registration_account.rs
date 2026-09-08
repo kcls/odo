@@ -36,7 +36,10 @@ async fn registration_account_runs_a_registration_flow() {
     // (directories FK the permission codes).
     let perm = format!("itest.reg.{n}.read");
     let resp = c
-        .post(format!("{}/api/v1/odo/auth/authz/permission/create", auth_base()))
+        .post(format!(
+            "{}/api/v1/odo/auth/authz/permission/create",
+            auth_base()
+        ))
         .headers(auth_header(&token))
         .json(&json!({"code": perm, "description": "registration flow test perm"}))
         .send()
@@ -55,7 +58,10 @@ async fn registration_account_runs_a_registration_flow() {
     assert_eq!(resp.status(), 200, "role/create");
 
     let resp = c
-        .post(format!("{}/api/v1/odo/auth/authz/role-permission/create", auth_base()))
+        .post(format!(
+            "{}/api/v1/odo/auth/authz/role-permission/create",
+            auth_base()
+        ))
         .headers(auth_header(&token))
         .json(&json!({"role": role, "perm": perm, "min_depth": 0}))
         .send()
@@ -84,7 +90,10 @@ async fn registration_account_runs_a_registration_flow() {
 
     let root = root_org_id(&c, &token).await;
     let resp = c
-        .post(format!("{}/api/v1/odo/auth/authz/user-role/create", auth_base()))
+        .post(format!(
+            "{}/api/v1/odo/auth/authz/user-role/create",
+            auth_base()
+        ))
         .headers(auth_header(&token))
         .json(&json!({"usr": user_id, "role": role, "org_unit": root}))
         .send()
@@ -95,7 +104,10 @@ async fn registration_account_runs_a_registration_flow() {
     // Register an asset directory referencing the new permission.
     let dir = format!("itest-reg-{n}");
     let resp = c
-        .post(format!("{}/api/v1/odo/asset/directory/create", asset_base()))
+        .post(format!(
+            "{}/api/v1/odo/asset/directory/create",
+            asset_base()
+        ))
         .headers(auth_header(&token))
         .json(&json!({"path": dir, "read_perm": perm, "write_perm": perm}))
         .send()
@@ -105,7 +117,10 @@ async fn registration_account_runs_a_registration_flow() {
 
     // Cleanup: directory, then the authz rows via admin deletes.
     let resp = c
-        .post(format!("{}/api/v1/odo/asset/directory/delete", asset_base()))
+        .post(format!(
+            "{}/api/v1/odo/asset/directory/delete",
+            asset_base()
+        ))
         .headers(auth_header(&token))
         .json(&json!({"path": dir}))
         .send()
@@ -129,13 +144,87 @@ async fn registration_account_lacks_admin_reach() {
         .unwrap();
     assert_eq!(resp.status(), 403, "user detail denied");
 
-    // No odo.org.unit.write: org structure is the platform's.
+    // No odo.auth.user_role.read: it can grant a role but not enumerate who
+    // holds one.
     let resp = c
-        .post(format!("{}/api/v1/odo/org/admin/unit/create", org_base()))
+        .post(format!(
+            "{}/api/v1/odo/auth/authz/user-role/list",
+            auth_base()
+        ))
         .headers(auth_header(&token))
-        .json(&json!({"label": "nope", "code": "NOPE", "parent": 1, "unit_type": 3}))
+        .json(&json!({}))
         .send()
         .await
         .unwrap();
-    assert_eq!(resp.status(), 403, "org unit create denied");
+    assert_eq!(resp.status(), 403, "user-role list denied");
+}
+
+/// Org structure used to be off limits to this account ("org structure is
+/// the platform's"). It is not any more: an installation's own org tree is
+/// site data, and 005_registration_org_units grants the read/write it needs
+/// so that tree arrives as an upsert-only manifest instead of hand-written
+/// SQL against the odo database.
+#[tokio::test]
+async fn registration_account_can_build_org_structure() {
+    let c = client();
+    let token = registration_token(&c).await;
+    let n = suffix();
+
+    // Unit types are needed to type a unit, so the account can list them.
+    let resp = c
+        .post(format!(
+            "{}/api/v1/odo/org/admin/unit-type/list",
+            org_base()
+        ))
+        .headers(auth_header(&token))
+        .json(&json!({"limit": 200}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200, "unit-type/list");
+    let types: serde_json::Value = resp.json().await.unwrap();
+    let branch = types["rows"]
+        .as_array()
+        .expect("rows")
+        .iter()
+        .find(|r| r["label"] == "Branch")
+        .expect("seeded Branch unit type");
+
+    // The seeded root is the parent: units always attach below an existing
+    // unit, which is why a manifest never creates a root.
+    let resp = c
+        .get(format!("{}/api/v1/odo/org/root", org_base()))
+        .headers(auth_header(&token))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200, "org/root");
+    let root: serde_json::Value = resp.json().await.unwrap();
+
+    let code = format!("ITREG{n}");
+    let resp = c
+        .post(format!("{}/api/v1/odo/org/admin/unit/create", org_base()))
+        .headers(auth_header(&token))
+        .json(&json!({
+            "label": format!("Registration Test Branch {n}"),
+            "code": code,
+            "parent": root["id"],
+            "unit_type": branch["id"],
+        }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200, "org unit create allowed");
+
+    // And it shows up in the tree by code, which is how odo-register
+    // resolves parents and how role assignments find their org unit.
+    let resp = c
+        .get(format!("{}/api/v1/odo/org/tree", org_base()))
+        .headers(auth_header(&token))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200, "org/tree");
+    let body = resp.text().await.unwrap();
+    assert!(body.contains(&code), "new unit appears in the tree");
 }

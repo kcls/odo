@@ -90,6 +90,17 @@ templates, or fixtures.
   own repo; run `./scripts/load-data-manifest.sh <manifest.json>` from here —
   it activates the account, applies the manifests and disables it again,
   so hosted apps never hold registration credentials.
+- **Org structure via manifest**: `org_unit_types` (by `label`) and
+  `org_units` (by `code`, with `parent` code and `unit_type` label) are
+  manifest keys too, applied before everything else so later
+  `user_role_assignments` resolve. Natural keys only — odo-register maps
+  them to ids against the live tree, so **a parent must be listed before
+  its children**, and the single root is seeded, never registered.
+  `005_registration_org_units` grants the account
+  `odo.org.unit.read/write` for this; it is the one grant that exists for
+  an installation's own site data rather than for app registration, so
+  split it into a separate account if app manifests ever become less
+  trusted.
 - Machine accounts: `odo-registration` ships disabled with an unknowable
   password (the seed plus `004_registration_account_lockdown`); only
   `load-data-manifest.sh` enables it, and `src/test-data/` restores a known
