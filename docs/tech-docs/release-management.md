@@ -52,10 +52,20 @@ its own packages.
 
 | Tag | Published on | Meaning | Moves? |
 | --- | --- | --- | --- |
-| `<short-sha>` | every build | exactly this commit | never |
-| `vX.Y.Z` | tag push only | this release | never |
-| `vX.Y.Z-suffix` | tag push only | this prerelease | never |
+| `<short-sha>` | every build | the newest build **of** this commit | on a rebuild |
+| `vX.Y.Z` | tag push only | this release | never, by policy |
+| `vX.Y.Z-suffix` | tag push only | this prerelease | never, by policy |
 | `vX.Y` | plain `vX.Y.Z` only | newest **released** patch on the line | yes |
+
+> [!IMPORTANT]
+> The sha tag identifies a commit, not an image. Builds are not reproducible —
+> `BUILD_DATE` alone differs every run — so building one commit twice produces
+> two digests and the second push moves the sha tag to the newer one. It
+> happened on the very first releases: `v0.1.0` and `v0.1.0-t1` were tagged at
+> the same commit and left `4faf62f` pointing at whichever built last.
+>
+> Only `vX.Y.Z` is immutable, and only because nothing re-points it. If you
+> need certainty that a deployment cannot change underneath you, pin a digest.
 
 > [!NOTE]
 > The flat `ghcr.io/kcls/<service>` packages predate the split — sjora created
@@ -67,8 +77,9 @@ Pushing a release branch publishes the sha tag only. The line tag moves only
 when a release is actually tagged, so `vX.Y` never points at an untagged
 commit.
 
-Deployments pin `vX.Y.Z` or a digest. `vX.Y` is a convenience for development
-targets that should track a line.
+Deployments pin `vX.Y.Z` or a digest — the sha tag is for tracing a build back
+to its source, not for pinning. `vX.Y` is a convenience for development targets
+that should track a line.
 
 ### Prereleases
 

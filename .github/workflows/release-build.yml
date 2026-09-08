@@ -165,7 +165,8 @@ jobs:
           IMAGE="${{ env.REGISTRY }}/${PREFIX}/${{ matrix.name }}"
           SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
 
-          # The sha tag is always published and never moves.
+          # Always published. It names the commit, not a fixed image: a rebuild
+          # of the same commit produces a new digest and moves this tag.
           TAGS="${IMAGE}:${SHORT_SHA}"
 
           if [[ "${{ needs.plan.outputs.is-release }}" == "true" ]]; then
