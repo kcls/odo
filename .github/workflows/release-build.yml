@@ -178,38 +178,9 @@ jobs:
             BUILD_COMMIT=${{ github.sha }}
             VERSION=${{ needs.plan.outputs.version }}
 
-  # PARKED: attaching k8s/ + openapi/ to the GitHub release is one way for a
-  # deployment repository to obtain manifests at a known version, but that
-  # decision isn't made yet. Left here as the worked-out option; delete it if
-  # deployment repositories end up pinning this repo by tag instead.
-  #
-  # release-artifacts:
-  #   name: Publish Release Artifacts
-  #   needs: [plan, build]
-  #   if: needs.plan.outputs.is-release == 'true'
-  #   runs-on: ubuntu-latest
-  #   permissions:
-  #     contents: write
-  #   steps:
-  #     - name: Checkout code
-  #       uses: actions/checkout@v4
-  #
-  #     - name: Package manifests and specs
-  #       env:
-  #         VERSION: ${{ needs.plan.outputs.version }}
-  #       run: |
-  #         tar czf "odo-manifests-${VERSION}.tar.gz" k8s openapi
-  #
-  #     - name: Create or update the GitHub release
-  #       env:
-  #         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  #         VERSION: ${{ needs.plan.outputs.version }}
-  #       run: |
-  #         if ! gh release view "$VERSION" >/dev/null 2>&1; then
-  #           gh release create "$VERSION" --verify-tag --generate-notes \
-  #             --title "$VERSION"
-  #         fi
-  #         gh release upload "$VERSION" "odo-manifests-${VERSION}.tar.gz" --clobber
+  # No release-artifacts job: deployment repositories read k8s/ and openapi/
+  # as a kustomize remote base pinned to the release tag, so there is nothing
+  # to package here.
 
   summary:
     name: Build Summary

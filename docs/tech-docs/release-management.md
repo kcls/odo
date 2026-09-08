@@ -1,9 +1,10 @@
 # Release Management
 
-Status: phases 1 and 2 are **implemented** — both public repositories build
-releases and gate on CI. Phase 3 (the private deployment repository) and
-phase 4 (running a real release through the runbook below) are the agreed
-plan, not yet built.
+Status: phases 1 and 2 are **implemented and proven** — both public
+repositories build releases and gate on CI, and images publish to the new
+namespace (`ghcr.io/kcls/odo/odo-org:b0e51cf` and friends). Phase 3 (the
+private deployment repository, `kcls/odo-deploy`, created but still empty) and
+phase 4 (running a real release through the runbook below) remain.
 
 Odo and its applications are separate open-source projects with separate
 release cycles — this repo, and `kcls/current` (the reference application).
@@ -97,11 +98,9 @@ silently building nothing.
 There is deliberately no deployment step and no credential for any other
 repository.
 
-Both copies carry a **commented-out `release-artifacts` job** that would
-attach `k8s/` + `openapi/` to the GitHub release as a tarball. It is parked
-pending the decision below — it is one worked-out answer to "how does a
-deployment repository obtain manifests at a known version", not the chosen
-one.
+Neither copy publishes release artifacts. Deployment repositories read `k8s/`
+and `openapi/` straight out of the tagged source (see below), so there is
+nothing to package.
 
 ## Cross-project version coupling
 
@@ -127,8 +126,7 @@ and the site-specific data. Layout:
 
 ```
 <org>/odo-deploy (private)
-  clusters/<env>/          kustomize overlay per target
-  services/<svc>/          per-service manifests at a known version
+  clusters/<env>/          kustomize overlay per target, pinning the release
   infrastructure/          gateway, envoy (composed), logging, argocd
   site-data/<env>/
     manifests/*.json       odo-register manifests (org units, users, SAML maps)
@@ -140,7 +138,26 @@ and the site-specific data. Layout:
 
 `versions.yaml` is the single readable answer to "what is deployed here";
 `bump-images.sh` (formerly this repo's `scripts/update-image-tags.sh`) writes
-those versions into the deployment manifests.
+those versions into the overlays.
+
+### Manifests come from the tag, not from a copy
+
+An environment's overlay names each project's `k8s/` tree as a **kustomize
+remote base pinned to the release tag**:
+
+```yaml
+resources:
+  - github.com/kcls/odo//k8s/services/odo-auth?ref=v1.2.3
+  - github.com/kcls/current//k8s/services/current?ref=v0.9.1
+```
+
+ArgoCD resolves those natively, there is nothing to vendor or keep in sync,
+and the version in effect is visible in the diff of any change. The overlay
+then patches what is installation-specific — image tags, replicas, hostnames,
+secret references — leaving the upstream manifests untouched.
+
+This is why neither public repository publishes release artifacts: the tag
+*is* the artifact.
 
 ### One repository, not two
 
@@ -160,8 +177,8 @@ already kustomize and ArgoCD supports a path per environment natively.
 
 Each project ships its own Envoy routes (this repo:
 `k8s/infrastructure/envoy/`; Current: `k8s/services/*/routes.yaml`). The
-deployment repository **composes** them via kustomize, rather than maintaining
-a merged copy by hand — however it ends up obtaining them.
+deployment repository **composes** them via kustomize from each project's
+pinned remote base, rather than maintaining a merged copy by hand.
 
 ### Site data: manifests over SQL
 
@@ -228,19 +245,16 @@ libxml2 and clang installed.
 
 ## Open items
 
-* **How a deployment repository obtains `k8s/` and `openapi/` at a known
-  version.** Candidates: tarballs attached to the GitHub release (written and
-  commented out in the workflow), a kustomize remote base pinned to the release
-  tag, a git submodule, or a vendoring script in the deployment repository.
-  Undecided; nothing else in this document depends on which one wins.
 * Re-pointing production at `ghcr.io/kcls/<repo>/<service>`; until then it
   runs images from the frozen sjora-owned namespace.
 * Current's `odo-client`/`odo-service` pin moving from `main` to an odo
   release tag (blocked on odo having one).
 * Org-unit support in the registration manifest surface (see above).
-* Secrets in the deployment repository: verify whether any committed secret
-  carries a live credential, and move to SOPS or sealed-secrets before the
-  repository's access boundary changes.
+* Secrets in the deployment repository: the predecessor's committed secrets
+  are stubs (empty JWT/SMTP/API values, `demo123` against an in-cluster
+  PostgreSQL that no longer exists), so real values are injected out of band.
+  Whatever replaces that — SOPS, sealed-secrets, or staying out of band —
+  should be a stated decision rather than the status quo by default.
 * Branch protection on `main` and `release/**` in both public repositories.
 * A CHANGELOG and GitHub Releases per project — adopters now need to know what
   changed between tags.
