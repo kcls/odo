@@ -88,8 +88,10 @@ templates, or fixtures.
   registered; never deletes. New registration surface belongs behind
   perms held by that account (see the seed). Manifests live in the app's
   own repo; run `./scripts/load-data-manifest.sh <manifest.json>` from here —
-  it activates the account, applies the manifests and disables it again,
-  so hosted apps never hold registration credentials.
+  it summarizes what each manifest installs and against which target, waits
+  for confirmation (`--force` skips it; a non-TTY without `--force` refuses
+  rather than hangs), then activates the account, applies the manifests and
+  disables it again, so hosted apps never hold registration credentials.
 - **Org structure via manifest**: `org_unit_types` (by `label`) and
   `org_units` (by `code`, with `parent` code and `unit_type` label) are
   manifest keys too, applied before everything else so later
