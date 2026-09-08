@@ -2,9 +2,10 @@
 
 Status: phases 1 and 2 are **implemented and proven** — both public
 repositories build releases and gate on CI, and images publish to the new
-namespace (`ghcr.io/kcls/odo/odo-org:b0e51cf` and friends). Phase 3 (the
-private deployment repository, `kcls/odo-deploy`, created but still empty) and
-phase 4 (running a real release through the runbook below) remain.
+namespace (`ghcr.io/kcls/odo/odo-org:b0e51cf` and friends). Phase 3 is
+under way: `kcls/odo-deploy` exists, its `clusters/dev` runs on pinned remote
+bases, and `site-data/dev` is scaffolded but holds no data. Phase 4 — running
+a real release through the runbook below — remains.
 
 Odo and its applications are separate open-source projects with separate
 release cycles — this repo, and `kcls/current` (the reference application).
@@ -126,11 +127,15 @@ and the site-specific data. Layout:
 
 ```
 <org>/odo-deploy (private)
-  clusters/<env>/          kustomize overlay per target, pinning the release
-  infrastructure/          gateway, envoy (composed), logging, argocd
-  site-data/<env>/
-    manifests/*.json       odo-register manifests (org units, users, SAML maps)
-    sql/                   sqitch project for what has no API
+  clusters/<env>/          everything ArgoCD syncs for one target
+    components/            cross-cutting patches (pull secret, ClusterIP)
+    infrastructure/        gateway, envoy (composed), logging, argocd
+    services/<svc>/        a pinned remote base + this environment's patches
+  site-data/<env>/         applied deliberately; ArgoCD never syncs it
+    requires.yaml          schema changes this data assumes
+    apply.sh               preflight, then manifests, then SQL
+    manifests/*.json       odo-register manifests, numbered, applied in order
+    sql/<database>/        sqitch project per target database
   versions.yaml            odo: 1.2.3, current: 0.9.1 — per environment
   scripts/bump-images.sh
   runbook.md
@@ -188,12 +193,54 @@ same rule: upsert-only semantics, permission checks, and durable uuids, for
 free.
 
 Users, roles, grants, SAML maps, notification templates and asset directories
-already have manifest support. **Org units do not** — extending odo's
-registration surface to cover them is the prerequisite for keeping a site's
-local branch structure out of raw SQL.
+already have manifest support. **Org units do not**, and that gap is sharper
+than it first looks: a manifest's `user_role_assignments` entries reference an
+org unit by `org_unit_code`, so org units are a prerequisite for a surface
+that already exists, and every installation's bootstrap is "raw SQL first,
+then manifests". Extending odo's registration surface to cover org units is
+what lets the SQL tree shrink toward empty.
 
-The `sql/` tree is reserved for what genuinely has no API, and is a sqitch
-project so it is versioned and repeatable rather than ad-hoc `psql`.
+> [!IMPORTANT]
+> The manifest schema accepts `users[].password` in cleartext — odo's and
+> Current's e2e fixtures use it, which is fine for throwaway accounts in a
+> public repo. Site data must not: create the account with no usable password
+> and set it out of band, exactly as the deployment repository's secrets work.
+
+### Site data is per database set, not per cluster
+
+`site-data/<env>/` corresponds to a set of databases — odo's and each
+application's — rather than to a Kubernetes cluster. Two clusters pointed at
+one production database share one tree.
+
+Environments differ in **content**, not merely in version: dev's org tree is a
+handful of fakes and production's is the real branch list. That is why there
+is no `common/` tree — in a single-branch repository shared content is always
+at HEAD for every environment, reintroducing exactly the skew the split
+avoids. Promotion is a copy reviewed as a diff (`diff -r site-data/dev
+site-data/prod` is the backlog).
+
+Version skew does **not** require a sqitch project per cluster. Sqitch keeps
+its registry in the target database, and the environments are separate
+databases, so one plan deploys to each target independently and production
+sitting several changes behind dev is ordinary operation. Each environment
+still gets its own project because the *data* differs, and each carries a
+distinct `%project` name (`kcls-site-odo-dev`, not `kcls-site`): registries
+are already isolated per database, so unique names buy no structure — what
+they buy is that pointing dev's plan at production's database fails loudly
+instead of quietly deploying dev's org units into production.
+
+### The version gate
+
+Each environment declares, in `requires.yaml`, the schema changes its data
+assumes are already deployed; `apply.sh` checks them against each target
+database's sqitch registry and refuses to run if any is missing. So a
+lagging cluster fails with a clear message instead of a 4xx from the API
+halfway through a manifest.
+
+The gate keys on **sqitch change names rather than release versions** because
+the services expose no version endpoint — `/health` returns status only — and
+because the schema change is what the data actually depends on. If a version
+endpoint is ever added, the gate can check both; it does not need to.
 
 ## Deploying a release
 
