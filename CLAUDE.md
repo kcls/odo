@@ -109,6 +109,13 @@ templates, or fixtures.
 - Paginated admin lists use `odo_service::page_type!` (a generic
   Paginated<T> produces untyped rows in the generated TS).
 - Soft deletes only (`deleted_at`); a DB trigger blocks hard deletes.
+- A sqitch **verify** script must only assert what holds on every install.
+  `src/test-data/` deliberately reverses some schema effects for dev/CI (it
+  reactivates `odo-registration` and restores its published password), so a
+  verify that asserts account status or a password hash fails permanently on
+  any box that has run `deploy-test` — which silently costs you `verify` as a
+  gate everywhere. Assert structure; leave environment-dependent state to the
+  deploy script.
 - New HTTP endpoints must be routed in `k8s/infrastructure/envoy/` (and
   applied) or requests fall through with misleading errors; record new
   path prefixes in the README routing registry.
