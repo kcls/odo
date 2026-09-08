@@ -54,7 +54,8 @@ its own packages.
 | --- | --- | --- | --- |
 | `<short-sha>` | every build | exactly this commit | never |
 | `vX.Y.Z` | tag push only | this release | never |
-| `vX.Y` | tag push only | newest patch on the release line | yes |
+| `vX.Y.Z-suffix` | tag push only | this prerelease | never |
+| `vX.Y` | plain `vX.Y.Z` only | newest **released** patch on the line | yes |
 
 > [!NOTE]
 > The flat `ghcr.io/kcls/<service>` packages predate the split — sjora created
@@ -68,6 +69,18 @@ commit.
 
 Deployments pin `vX.Y.Z` or a digest. `vX.Y` is a convenience for development
 targets that should track a line.
+
+### Prereleases
+
+A tag may carry a suffix — `v1.2.0-rc1`, `v1.2.0-kcls2` — and publishes its own
+full tag plus the sha. **A suffixed tag never moves `vX.Y`**, which is the
+whole reason the workflow tells them apart: deriving the line tag by trimming
+the last dotted segment turns `v0.1.0-rc1` into `v0.1`, quietly pointing the
+stable line at a prerelease.
+
+Semver build metadata (`v1.0.0+build7`) is rejected outright. `+` is legal in
+a git tag and in semver but not in a container image tag, so it fails fast
+with an explanation instead of deep inside a registry push.
 
 > [!IMPORTANT]
 > A published `vX.Y.Z` tag is never re-pointed at a different image. A bad
@@ -89,10 +102,11 @@ single service after an infrastructure failure.
 | Trigger | Effect |
 | --- | --- |
 | push to `release/**` | build all services, publish `:<short-sha>` |
-| push of tag `v*` | build all services, publish all three tags |
+| push of tag `vX.Y.Z` | build all services, publish sha + version + line tag |
+| push of tag `vX.Y.Z-suffix` | build all services, publish sha + version, no line tag |
 | `workflow_dispatch` | build all services (or a comma-separated subset), publish `:<short-sha>` |
 
-A tag that is not `vX.Y.Z` fails the build rather than publishing something
+A tag that is not `vX.Y.Z[-suffix]` fails the build rather than publishing something
 ambiguous, and an unknown service name in the dispatch input fails rather than
 silently building nothing.
 
