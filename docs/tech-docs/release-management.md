@@ -138,15 +138,49 @@ its `Cargo.lock`, and installs its platform data through odo's
 `load-data-manifest.sh`. A Current release is therefore only meaningful
 against some range of odo versions.
 
-Two obligations follow, neither yet met:
+Two obligations follow:
 
-* Current should pin its git dependency to a **released odo tag** rather than
-  to `main`. Today `Cargo.toml` says `branch = "main"` with `Cargo.lock`
-  pinning a rev — which is reproducible but says nothing about which odo
-  release it corresponds to. This changes once odo has its first tag.
+* Current pins its git dependency to a **released odo tag**, not to a branch.
+  `Cargo.toml` says `tag = "v0.2.1"`, so the lock records which odo release is
+  in the binary. This is not cosmetic: it used to say `branch = "main"`, and
+  because a branch spec lets cargo take the branch head whenever it
+  re-resolves, `current v0.1.0` shipped against an odo from months earlier —
+  linking a sea-orm release candidate the platform had already left behind.
+  Moving the pin is now an edit to `Cargo.toml`, which also means a newer odo
+  must be **released** before Current can adopt it.
 * Each Current release states its odo compatibility range in the release
   notes ("requires odo >= 1.2, < 2.0"). Nothing enforces this at build time,
   so it has to be written down.
+
+### Tracking a release series instead of a tag
+
+Cargo has no version ranges for git dependencies — the only selectors are
+`branch`, `tag` and `rev`, all exact refs, and a `version` field beside a git
+dep is a compatibility assertion rather than a selector. So there is no way to
+ask for "newest 0.2.x".
+
+What works is a **branch** pointing at the line:
+
+```toml
+odo-client = { git = "https://github.com/kcls/odo", branch = "release/0.2" }
+```
+
+That narrows what a future `cargo update` may land on to commits on that
+release line, instead of everything that has reached `main`. It needs the
+`release/X.Y` branch to actually exist, which today it does not — both tags so
+far were cut straight from `main`.
+
+Note what a series pin does **not** buy: `Cargo.lock` still records one exact
+rev, so nothing resolves at build time. The choice only changes what an
+explicit update is allowed to move to.
+
+> [!TIP]
+> The image tag `vX.Y` is a *registry* tag, not a git ref, so
+> `tag = "v0.2"` cannot resolve. Don't create a moving `v0.2` git tag to
+> mirror it: cargo would not follow it without an update anyway, and it breaks
+> the tag immutability that the deployment repository's `?ref=` pinning relies
+> on. In kustomize the same idea does work live — `?ref=release/0.2` is
+> re-resolved by ArgoCD on every sync.
 
 ## The private deployment repository
 
@@ -334,10 +368,17 @@ libxml2 and clang installed.
 
 ## Open items
 
+* **A supported way to run the published release.** The images are public, but
+  nothing in either repository knows how to deploy them: `k8s/services/*`
+  hardcodes `image: localhost:32000/<service>:latest`, and
+  `build-service.sh`/`deploy-service.sh` only build locally. So getting a
+  platform running still means compiling every service from source — for a
+  Current developer who only wants odo to exist, and for any outside adopter.
+  The fix is small: a `k8s/overlays/published/` kustomization pinned to a
+  release tag, or an image override on `deploy-service.sh`, plus the README
+  lines that point at it.
 * Re-pointing production at `ghcr.io/kcls/<repo>/<service>`; until then it
   runs images from the frozen sjora-owned namespace.
-* Current's `odo-client`/`odo-service` pin moving from `main` to an odo
-  release tag (blocked on odo having one).
 * Secrets in the deployment repository: the predecessor's committed secrets
   are stubs (empty JWT/SMTP/API values, `demo123` against an in-cluster
   PostgreSQL that no longer exists), so real values are injected out of band.
