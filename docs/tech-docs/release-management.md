@@ -262,7 +262,9 @@ manifest changes — including before anyone has migrated the database.
 1. Apply schema migrations from a checkout of the release tag
    (`manage-database.sh deploy`).
 2. Apply registration manifests — the platform's own, then each application's
-   (`load-data-manifest.sh`). Upsert-only; re-running is safe.
+   (`load-data-manifest.sh`). Upsert-only; re-running is safe. The script
+   summarizes each manifest and the target it is pointed at, and waits for
+   confirmation; `--force` skips the prompt for scripted runs.
 3. Apply site data for the environment.
 4. Bump `versions.yaml` and run `bump-images.sh`; commit. ArgoCD rolls out.
 

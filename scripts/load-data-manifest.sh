@@ -15,7 +15,10 @@
 # raw equivalent, since the blob URL serves an HTML page rather than the
 # file.
 #
-# Usage: ./load-data-manifest.sh <manifest.json|url> [more...]
+# Usage: ./load-data-manifest.sh [--force] <manifest.json|url> [more...]
+#
+# Summarizes what each manifest would install and waits for confirmation
+# before touching anything. --force skips the prompt for unattended runs.
 #
 # Environment variables:
 #   ODO_URL=url               Gateway base URL (default: http://localhost:30080)
@@ -52,11 +55,17 @@ source "$SCRIPT_DIR/common.sh"
 REGISTRATION_USER="odo-registration"
 
 usage() {
-    echo -e "${BLUE}Usage: $0 <manifest.json> [more-manifests...]${NC}"
+    echo -e "${BLUE}Usage: $0 [--force] <manifest.json> [more-manifests...]${NC}"
     echo
     echo "Applies app registration manifests using the odo-registration machine"
     echo "account, which is activated for the duration of the run and disabled"
     echo "again afterwards."
+    echo
+    echo "Prints what each manifest would install, against which target, and"
+    echo "waits for confirmation."
+    echo
+    echo "Options:"
+    echo "  -f, --force               Skip the confirmation prompt"
     echo
     echo "Environment variables:"
     echo "  ODO_URL=url               Gateway base URL (default: http://localhost:30080)"
@@ -70,6 +79,19 @@ usage() {
     echo "  $0 https://github.com/kcls/current/blob/main/src/registration/current-manifest.json"
     exit 1
 }
+
+FORCE=0
+ARGS=()
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -f|--force|--yes|-y) FORCE=1; shift ;;
+        -h|--help)           usage ;;
+        --)                  shift; ARGS+=("$@"); break ;;
+        -*)                  echo -e "${RED}Unknown option: $1${NC}" >&2; usage ;;
+        *)                   ARGS+=("$1"); shift ;;
+    esac
+done
+set -- "${ARGS[@]+"${ARGS[@]}"}"
 
 [ $# -ge 1 ] || usage
 
@@ -238,6 +260,77 @@ for arg in "$@"; do
             ;;
     esac
 done
+
+# --- what is about to happen -------------------------------------------------
+# Everything below is upsert-only, but "upsert-only" is not "harmless": these
+# manifests create org structure, accounts and role grants on whichever
+# install this happens to be pointed at. Show the target and the contents
+# before the account is switched on.
+
+# Top-level keys odo-register understands. Anything else in a manifest is
+# silently ignored by the deserializer, so a typo'd key is a section that
+# quietly does nothing -- worth catching here rather than after the fact.
+KNOWN_KEYS='["org_unit_types","org_units","permissions","roles","role_permissions","notification_templates","asset_directories","saml_attr_role_maps","users","user_role_assignments"]'
+# Keys manifests carry for humans. Not warned about, so the typo warning
+# above stays worth reading.
+META_KEYS='["app","description","comment","version","$schema"]'
+
+summarize() {
+    jq -r --argjson known "$KNOWN_KEYS" --argjson meta "$META_KEYS" '
+        def cnt($m; $k):
+            if $k == "saml_attr_role_maps"
+            then ($m[$k].maps // []) | length
+            else ($m[$k] // []) | length
+            end;
+
+        . as $m
+        | [ $known[] | . as $k | select(cnt($m; $k) > 0) | "    \($k)|\(cnt($m; $k))" ] as $rows
+        | ( if ($rows | length) == 0
+            then ["    (nothing this tool installs)"]
+            else $rows end )[],
+
+          ( [ ($m.users // [])[] | select(.password) ] | length ) as $pw
+        | ( if $pw > 0 then "    ! \($pw) user(s) carry a cleartext password" else empty end ),
+
+          ( if ((($m.org_units // []) | length) + (($m.org_unit_types // []) | length)) > 0
+            then "    ! creates or extends org structure" else empty end ),
+
+          ( $m | keys_unsorted[]
+            | select(. as $k | ($known + $meta) | index($k) | not)
+            | "    ? unknown key \"\(.)\" - odo-register will ignore it" )
+    ' "$1" | column -t -s'|'
+}
+
+echo
+echo -e "${BLUE}=== About to apply ===${NC}"
+echo -e "  Gateway:  ${YELLOW}${ODO_URL:-http://localhost:30080}${NC}"
+echo -e "  Database: ${YELLOW}${PGDATABASE}${NC} on ${YELLOW}${PGHOST}:${PGPORT}${NC}"
+echo -e "  Account:  ${REGISTRATION_USER} (enabled for this run, disabled afterwards)"
+echo
+# Show what the operator typed, not the temp file a URL landed in.
+ORIGINALS=("$@")
+for i in "${!MANIFESTS[@]}"; do
+    echo -e "  ${BLUE}$(( i + 1 )). ${ORIGINALS[$i]}${NC}"
+    if ! summarize "${MANIFESTS[$i]}"; then
+        echo -e "${RED}Could not parse ${MANIFESTS[$i]} as JSON.${NC}" >&2
+        exit 1
+    fi
+    echo
+done
+
+if [ "$FORCE" -eq 1 ]; then
+    echo -e "${YELLOW}--force: applying without confirmation${NC}"
+elif [ ! -t 0 ]; then
+    echo -e "${RED}Not running on a terminal, so there is nobody to confirm.${NC}" >&2
+    echo "Re-run with --force if this is meant to be unattended." >&2
+    exit 1
+else
+    read -r -p "Apply to ${PGDATABASE} on ${PGHOST}? [y/N] " reply
+    case "$reply" in
+        y|Y|yes|YES) ;;
+        *) echo "Aborted; nothing was changed."; exit 1 ;;
+    esac
+fi
 
 echo -e "${YELLOW}Activating $REGISTRATION_USER${NC}"
 ACCOUNT_ACTIVATED=1
