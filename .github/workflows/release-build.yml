@@ -208,9 +208,39 @@ jobs:
             BUILD_COMMIT=${{ github.sha }}
             VERSION=${{ needs.plan.outputs.version }}
 
-  # No release-artifacts job: deployment repositories read k8s/ and openapi/
-  # as a kustomize remote base pinned to the release tag, so there is nothing
-  # to package here.
+  github-release:
+    name: Publish GitHub Release
+    needs: [plan, build]
+    # Only after the images exist: a release entry announcing a version whose
+    # build failed is worse than no entry.
+    if: needs.plan.outputs.is-release == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      # No checkout: gh works from GH_REPO, and there is nothing to upload.
+      # Deployment repositories read k8s/ and openapi/ as a kustomize remote
+      # base pinned to this tag, so the release carries no artifacts.
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.plan.outputs.version }}
+          PRERELEASE: ${{ needs.plan.outputs.is-prerelease }}
+        run: |
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            echo "Release $VERSION already exists; leaving it alone."
+            exit 0
+          fi
+
+          # --prerelease keeps a suffixed tag from being presented as the
+          # latest release, matching the rule that it never moves vX.Y.
+          args=(--verify-tag --generate-notes --title "$VERSION")
+          if [ "$PRERELEASE" = "true" ]; then
+            args+=(--prerelease)
+          fi
+
+          gh release create "$VERSION" "${args[@]}"
 
   summary:
     name: Build Summary
