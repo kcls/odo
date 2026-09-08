@@ -192,13 +192,25 @@ register what they need through `odo-register` manifests. Site data earns the
 same rule: upsert-only semantics, permission checks, and durable uuids, for
 free.
 
-Users, roles, grants, SAML maps, notification templates and asset directories
-already have manifest support. **Org units do not**, and that gap is sharper
-than it first looks: a manifest's `user_role_assignments` entries reference an
-org unit by `org_unit_code`, so org units are a prerequisite for a surface
-that already exists, and every installation's bootstrap is "raw SQL first,
-then manifests". Extending odo's registration surface to cover org units is
-what lets the SQL tree shrink toward empty.
+Users, roles, grants, SAML maps, notification templates, asset directories
+**and org structure** all have manifest support. Org units were the last gap,
+and a sharp one: `user_role_assignments` references a unit by
+`org_unit_code`, so units were a prerequisite for a surface that already
+existed, and every installation's bootstrap began with raw SQL. Since
+`005_registration_org_units` a manifest can carry `org_unit_types` (keyed by
+label) and `org_units` (keyed by code, with the parent's code and the type's
+label), which leaves the `sql/` tree with nothing it must hold.
+
+Two constraints come with it. Parents are resolved against the live tree, so
+**a manifest must list a parent before its children**. And the single root is
+seeded rather than registered — `unit/create` requires a parent — so a
+manifest extends the tree and never establishes it.
+
+Granting `odo.org.unit.write` widened the `odo-registration` account, which
+002's seed had deliberately kept clear of org structure. That is the one
+permission it holds for an installation's own site data rather than for app
+registration; if app-supplied manifests ever become less trusted, splitting
+site data onto its own account is the way back.
 
 > [!IMPORTANT]
 > The manifest schema accepts `users[].password` in cleartext — odo's and
@@ -296,7 +308,6 @@ libxml2 and clang installed.
   runs images from the frozen sjora-owned namespace.
 * Current's `odo-client`/`odo-service` pin moving from `main` to an odo
   release tag (blocked on odo having one).
-* Org-unit support in the registration manifest surface (see above).
 * Secrets in the deployment repository: the predecessor's committed secrets
   are stubs (empty JWT/SMTP/API values, `demo123` against an in-cluster
   PostgreSQL that no longer exists), so real values are injected out of band.
