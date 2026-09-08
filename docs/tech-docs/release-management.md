@@ -102,8 +102,8 @@ single service after an infrastructure failure.
 | Trigger | Effect |
 | --- | --- |
 | push to `release/**` | build all services, publish `:<short-sha>` |
-| push of tag `vX.Y.Z` | build all services, publish sha + version + line tag |
-| push of tag `vX.Y.Z-suffix` | build all services, publish sha + version, no line tag |
+| push of tag `vX.Y.Z` | build all, publish sha + version + line tag, create the release |
+| push of tag `vX.Y.Z-suffix` | build all, publish sha + version, no line tag, create a prerelease |
 | `workflow_dispatch` | build all services (or a comma-separated subset), publish `:<short-sha>` |
 
 A tag that is not `vX.Y.Z[-suffix]` fails the build rather than publishing something
@@ -113,9 +113,12 @@ silently building nothing.
 There is deliberately no deployment step and no credential for any other
 repository.
 
-Neither copy publishes release artifacts. Deployment repositories read `k8s/`
-and `openapi/` straight out of the tagged source (see below), so there is
-nothing to package.
+A tag push also creates the **GitHub Release**, with generated notes; a
+suffixed tag is marked as a prerelease so it is not presented as the latest.
+The release carries no artifacts — deployment repositories read `k8s/` and
+`openapi/` straight out of the tagged source (see below), so there is nothing
+to package. The job is skipped if the release already exists, so re-running a
+build never overwrites notes someone has edited.
 
 ## Cross-project version coupling
 
@@ -330,5 +333,10 @@ libxml2 and clang installed.
   Whatever replaces that — SOPS, sealed-secrets, or staying out of band —
   should be a stated decision rather than the status quo by default.
 * Branch protection on `main` and `release/**` in both public repositories.
-* A CHANGELOG and GitHub Releases per project — adopters now need to know what
-  changed between tags.
+* A CHANGELOG per project. GitHub Releases are created automatically with
+  generated notes; a hand-written summary of what changed between tags is
+  still worth adding for adopters.
+* Current's release notes are where its odo compatibility range is recorded,
+  and nothing puts it there — the workflow could append the odo ref its
+  `Cargo.lock` pins, which would have caught `v0.1.0` shipping against a
+  months-old odo.
