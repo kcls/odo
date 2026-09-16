@@ -714,6 +714,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/odo/auth/user/name-batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Batch lookup of user `display_name`.
+         * @description Mirrors org's `unit/label-batch`. Built for callers holding a set of
+         *     `*_by` references that need only display names -- decorating a page of
+         *     list rows, say. Doing that with `user/get` is an N+1 against this
+         *     service, which matters on endpoints a UI polls.
+         *
+         *     Returns only identity and display name, never contact details or
+         *     account metadata, so it needs no more privilege than reading a name
+         *     off a row the caller can already see. Unknown ids and uuids, and
+         *     unparseable uuids, are silently dropped rather than failing the batch.
+         */
+        post: operations["user_name_batch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/odo/auth/user/search": {
         parameters: {
             query?: never;
@@ -1058,6 +1086,23 @@ export interface components {
         LogoutResponse: {
             message: string;
             success: boolean;
+        };
+        NameBatchRequest: {
+            /** @description Lookup by database id. */
+            ids?: number[];
+            /**
+             * @description Include soft-deleted users (flagged with deleted_at) so historical
+             *     `*_by` references still render. Default keeps this active-only.
+             */
+            include_deleted?: boolean;
+            /**
+             * @description Lookup by stable uuid (durable references). May be mixed with `ids`;
+             *     entries are deduplicated in the response.
+             */
+            uuids?: string[];
+        };
+        NameBatchResponse: {
+            names: components["schemas"]["UserNameEntry"][];
         };
         /**
          * @description Standard pagination inputs for admin list endpoints. Flatten this into a
@@ -1440,6 +1485,15 @@ export interface components {
             /** Format: int32 */
             id: number;
             username: string;
+        };
+        UserNameEntry: {
+            /** @description RFC3339 soft-delete timestamp; null for active users. */
+            deleted_at?: string | null;
+            display_name: string;
+            /** Format: int32 */
+            id: number;
+            /** @description Stable uuid (durable references). */
+            uuid: string;
         };
         UserPermScopesResponse: {
             perms: components["schemas"]["PermScopeRow"][];
@@ -2568,6 +2622,30 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserResponse"];
+                };
+            };
+        };
+    };
+    user_name_batch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NameBatchRequest"];
+            };
+        };
+        responses: {
+            /** @description Display names for the requested users */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NameBatchResponse"];
                 };
             };
         };
