@@ -30,6 +30,7 @@ use utoipa::OpenApi;
         handler::user_roles,
         handler::users_with_role,
         user::get_user,
+        user::user_name_batch,
         user::user_search,
         authz_admin::list_permissions,
         authz_admin::create_permission,
@@ -91,6 +92,9 @@ use utoipa::OpenApi;
         user::GetUserRequest,
         user::UserSearchRequest,
         user::UserResponse,
+        user::NameBatchRequest,
+        user::NameBatchResponse,
+        user::UserNameEntry,
         authz_admin::PermissionRow,
         authz_admin::RoleRow,
         authz_admin::GrantRow,
@@ -377,6 +381,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let user_routes = Router::new()
         .route("/api/v1/odo/auth/user/get", post(user::get_user))
         .route("/api/v1/odo/auth/user/search", post(user::user_search))
+        .route(
+            "/api/v1/odo/auth/user/name-batch",
+            post(user::user_name_batch),
+        )
         .route(
             "/api/v1/odo/auth/user/detail",
             post(user_admin::user_detail),

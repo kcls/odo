@@ -360,6 +360,45 @@ impl AuthServiceClient {
 
     /// Retrieve a user by stable uuid; `with_deleted` resolves soft-deleted
     /// users too (flagged), for rendering historical references.
+    /// Batch lookup of `(uuid -> display_name)` for a set of user uuids.
+    ///
+    /// One round trip for a page of rows whose `*_by` columns hold uuids,
+    /// instead of an N+1 of [`get_user_by_uuid`]. Unknown uuids are
+    /// silently dropped; empty input short-circuits without an HTTP call.
+    pub async fn fetch_display_names_by_uuid(
+        &self,
+        uuids: &[uuid::Uuid],
+        include_deleted: bool,
+    ) -> LocalResult<std::collections::HashMap<uuid::Uuid, String>> {
+        if uuids.is_empty() {
+            return Ok(std::collections::HashMap::new());
+        }
+        #[derive(serde::Deserialize)]
+        struct Entry {
+            uuid: uuid::Uuid,
+            display_name: String,
+        }
+        #[derive(serde::Deserialize)]
+        struct Resp {
+            names: Vec<Entry>,
+        }
+        let resp: Resp = self
+            .client
+            .post(
+                "/api/v1/odo/auth/user/name-batch",
+                &serde_json::json!({
+                    "uuids": uuids.iter().map(|u| u.to_string()).collect::<Vec<_>>(),
+                    "include_deleted": include_deleted,
+                }),
+            )
+            .await?;
+        Ok(resp
+            .names
+            .into_iter()
+            .map(|e| (e.uuid, e.display_name))
+            .collect())
+    }
+
     pub async fn get_user_by_uuid(
         &self,
         user_uuid: &uuid::Uuid,

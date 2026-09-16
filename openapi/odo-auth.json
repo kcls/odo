@@ -1492,6 +1492,43 @@
         ]
       }
     },
+    "/api/v1/odo/auth/user/name-batch": {
+      "post": {
+        "tags": [
+          "user"
+        ],
+        "summary": "Batch lookup of user `display_name`.",
+        "description": "Mirrors org's `unit/label-batch`. Built for callers holding a set of\n`*_by` references that need only display names -- decorating a page of\nlist rows, say. Doing that with `user/get` is an N+1 against this\nservice, which matters on endpoints a UI polls.\n\nReturns only identity and display name, never contact details or\naccount metadata, so it needs no more privilege than reading a name\noff a row the caller can already see. Unknown ids and uuids, and\nunparseable uuids, are silently dropped rather than failing the batch.",
+        "operationId": "user_name_batch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NameBatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Display names for the requested users",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NameBatchResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/odo/auth/user/search": {
       "post": {
         "tags": [
@@ -2602,6 +2639,44 @@
           },
           "success": {
             "type": "boolean"
+          }
+        }
+      },
+      "NameBatchRequest": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "description": "Lookup by database id."
+          },
+          "include_deleted": {
+            "type": "boolean",
+            "description": "Include soft-deleted users (flagged with deleted_at) so historical\n`*_by` references still render. Default keeps this active-only."
+          },
+          "uuids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Lookup by stable uuid (durable references). May be mixed with `ids`;\nentries are deduplicated in the response."
+          }
+        }
+      },
+      "NameBatchResponse": {
+        "type": "object",
+        "required": [
+          "names"
+        ],
+        "properties": {
+          "names": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserNameEntry"
+            }
           }
         }
       },
@@ -3784,6 +3859,34 @@
           },
           "username": {
             "type": "string"
+          }
+        }
+      },
+      "UserNameEntry": {
+        "type": "object",
+        "required": [
+          "id",
+          "uuid",
+          "display_name"
+        ],
+        "properties": {
+          "deleted_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "RFC3339 soft-delete timestamp; null for active users."
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "uuid": {
+            "type": "string",
+            "description": "Stable uuid (durable references)."
           }
         }
       },

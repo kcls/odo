@@ -96,6 +96,108 @@ pub struct UserSearchRequest {
     options: Option<GetUserOptions>,
 }
 
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct NameBatchRequest {
+    /// Lookup by database id.
+    #[serde(default)]
+    pub ids: Vec<i32>,
+    /// Lookup by stable uuid (durable references). May be mixed with `ids`;
+    /// entries are deduplicated in the response.
+    #[serde(default)]
+    pub uuids: Vec<String>,
+    /// Include soft-deleted users (flagged with deleted_at) so historical
+    /// `*_by` references still render. Default keeps this active-only.
+    #[serde(default)]
+    pub include_deleted: bool,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct UserNameEntry {
+    pub id: i32,
+    /// Stable uuid (durable references).
+    pub uuid: String,
+    pub display_name: String,
+    /// RFC3339 soft-delete timestamp; null for active users.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deleted_at: Option<String>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct NameBatchResponse {
+    pub names: Vec<UserNameEntry>,
+}
+
+/// Batch lookup of user `display_name`.
+///
+/// Mirrors org's `unit/label-batch`. Built for callers holding a set of
+/// `*_by` references that need only display names -- decorating a page of
+/// list rows, say. Doing that with `user/get` is an N+1 against this
+/// service, which matters on endpoints a UI polls.
+///
+/// Returns only identity and display name, never contact details or
+/// account metadata, so it needs no more privilege than reading a name
+/// off a row the caller can already see. Unknown ids and uuids, and
+/// unparseable uuids, are silently dropped rather than failing the batch.
+#[utoipa::path(
+    post,
+    path = "/api/v1/odo/auth/user/name-batch",
+    request_body = NameBatchRequest,
+    responses((status = 200, body = NameBatchResponse, description = "Display names for the requested users")),
+    security(("bearer" = [])),
+    tag = "user"
+)]
+pub async fn user_name_batch(
+    State(state): State<Arc<AppState>>,
+    Json(params): Json<NameBatchRequest>,
+) -> ApiResult<Json<NameBatchResponse>> {
+    odo_client::context::RequestContext::user_id().ok_or(LocalError::unauthenticated())?;
+
+    if params.ids.is_empty() && params.uuids.is_empty() {
+        return Ok(Json(NameBatchResponse { names: vec![] }));
+    }
+
+    let mut ids = params.ids;
+    ids.sort_unstable();
+    ids.dedup();
+    ids.truncate(MAX_QUERY_RESULTS as usize);
+
+    let mut uuids: Vec<Uuid> = params
+        .uuids
+        .iter()
+        .filter_map(|u| u.parse::<Uuid>().ok())
+        .collect();
+    uuids.sort_unstable();
+    uuids.dedup();
+    uuids.truncate(MAX_QUERY_RESULTS as usize);
+
+    let mut cond = sea_orm::Condition::any();
+    if !ids.is_empty() {
+        cond = cond.add(usr::Column::Id.is_in(ids));
+    }
+    if !uuids.is_empty() {
+        cond = cond.add(usr::Column::Uuid.is_in(uuids));
+    }
+
+    let mut query = usr::Entity::find().filter(cond);
+    if !params.include_deleted {
+        query = query.filter(usr::Column::DeletedAt.is_null());
+    }
+
+    let names = query
+        .all(&state.db)
+        .await?
+        .into_iter()
+        .map(|u| UserNameEntry {
+            id: u.id,
+            uuid: u.uuid.to_string(),
+            display_name: u.display_name,
+            deleted_at: u.deleted_at.map(|d| d.to_rfc3339()),
+        })
+        .collect();
+
+    Ok(Json(NameBatchResponse { names }))
+}
+
 #[utoipa::path(
     post,
     path = "/api/v1/odo/auth/user/get",
