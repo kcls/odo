@@ -100,10 +100,16 @@ INSERT INTO authz.role_permission (role, perm, min_depth) VALUES
 
 -- Root -> Region -> Branch -> Locker. Parents resolved by label; no
 -- hard-coded ids.
+--
+-- Root and Region are organizational groupings, not places anyone works,
+-- so neither can hold staff: an application asking "can staff be here?"
+-- (Current's Communication Log does, before accepting an entry) must get
+-- the same answer from a demo install as from a real one. A Branch is
+-- the physical location; a Locker is unstaffed self-service.
 INSERT INTO org.unit_type (label, parent, can_have_staff, can_have_patrons, uuid) VALUES
-    ('Root', NULL, true, false, '5eed0000-0000-4000-a000-000000000101');
+    ('Root', NULL, false, false, '5eed0000-0000-4000-a000-000000000101');
 INSERT INTO org.unit_type (label, parent, can_have_staff, can_have_patrons, uuid) VALUES
-    ('Region', (SELECT id FROM org.unit_type WHERE label = 'Root'), true, false,
+    ('Region', (SELECT id FROM org.unit_type WHERE label = 'Root'), false, false,
      '5eed0000-0000-4000-a000-000000000102');
 INSERT INTO org.unit_type (label, parent, can_have_staff, can_have_patrons, uuid) VALUES
     ('Branch', (SELECT id FROM org.unit_type WHERE label = 'Region'), true, true,
