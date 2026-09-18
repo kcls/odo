@@ -19,8 +19,8 @@
 -- Platform seed for a fresh odo install: the odo.* permissions, the
 -- platform roles (odo-admin, odo-notify-service, odo-registration) and
 -- their grants, the org unit types, the root org unit (parameterized --
--- see below), and the machine accounts (dev-default passwords -- change
--- in production).
+-- see below), and the machine accounts (both ship with unknowable
+-- passwords; dev and CI get known ones from src/test-data/).
 --
 -- The demo org tree below the root is NOT here: it lives in the separate
 -- `demo` sqitch project (src/sqitch/demo), so an installation deploying
@@ -169,16 +169,30 @@ INSERT INTO org.unit (label, code, parent, unit_type, timezone, uuid) VALUES
 
 -- odo-notify-service: shared low-privilege machine account used by
 -- application background jobs to authenticate and enqueue notifications.
--- Dev-default password; change in production.
+--
+-- Ships with an unknowable password, like odo-registration: not a
+-- placeholder anyone could guess, and not the same value in every
+-- install. An operator sets a real one (manage-secrets.sh
+-- update-notify-service writes the Kubernetes secret and prints the
+-- UPDATE that sets the matching hash); dev and CI get a known password
+-- from src/test-data/ instead.
+--
+-- Unlike odo-registration this account stays 'active'. It is not a
+-- bootstrap account activated for the length of one run -- application
+-- background jobs log into it continuously, so disabling it would just
+-- break the draft reminder until someone re-enabled it. The password is
+-- the control here, not the status flag.
+--
+-- A random hash rather than NULL on purpose: a null password_hash would
+-- leave verify_password() comparing against SQL NULL, and a real hash
+-- for an unknown secret is the safer failure mode.
 INSERT INTO auth.usr (username, email, auth_method, status, display_name, uuid)
 VALUES ('odo-notify-service', 'odo-notify-service@odo.example.org', 'local', 'active', '',
         '5eed0000-0000-4000-a000-000000000001');
 
--- TODO would it make more sense to apply this password only
--- via the test data scripts?
 INSERT INTO auth.local_account (usr, password_hash)
 VALUES ((SELECT id FROM auth.usr WHERE username = 'odo-notify-service'),
-        crypt('odo-notify-service-dev-only', gen_salt('bf', 10)));
+        crypt(gen_random_uuid()::text || gen_random_uuid()::text, gen_salt('bf', 10)));
 
 INSERT INTO authz.usr_role_org_map (usr, role, org_unit)
 VALUES ((SELECT id FROM auth.usr WHERE username = 'odo-notify-service'),
