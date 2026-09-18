@@ -18,7 +18,7 @@
 -- the matching Kubernetes secret.
 --
 -- Keep in sync with NOTIFY_SERVICE_PASSWORD in
--- src/integration-tests/src/lib.rs.
+-- tests/integration/src/lib.rs.
 --
 -- Idempotent: safe to re-run.
 

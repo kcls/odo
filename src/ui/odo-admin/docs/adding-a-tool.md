@@ -48,9 +48,9 @@ admin modules:
   TypeScript. Reuse the *same* expressions the enforcement path uses so the
   display can't drift from what's actually enforced — see
   `authz.usr_perm_scopes` (migration 092), which mirrors `authz.usr_has_perm_at`,
-  and its pgTAP coverage in `src/db-tests/usr_perm_scopes_tests.sql`. Add pgTAP
+  and its pgTAP coverage in `tests/db/usr_perm_scopes_tests.sql`. Add pgTAP
   tests for any non-trivial SQL function; run them with
-  `PGPASSWORD=… PGHOST=localhost PGPORT=5432 ./run-tests.sh` from `src/db-tests`.
+  `PGPASSWORD=… PGHOST=localhost PGPORT=5432 ./run-tests.sh` from `tests/db`.
 
 Then regenerate the committed specs + TypeScript types:
 
@@ -227,11 +227,11 @@ Check your feature dir has **no** `mat-table`/`MatTableModule` and **no**
 ## 5. E2E
 
 Add the tool to the smoke list in
-`src/e2e/apps/odo-admin/tests/smoke.spec.ts` (its nav label + a heading its
+`tests/e2e/apps/odo-admin/tests/smoke.spec.ts` (its nav label + a heading its
 list page renders). Run against a deployed cluster:
 
 ```bash
-# from src/e2e
+# from tests/e2e
 BASE_URL=http://localhost:30080 npm run test:odo-admin
 ```
 

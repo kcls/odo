@@ -253,7 +253,7 @@ install_system_packages() {
 
     install_sqitch
 
-    # pgTAP is not here: it is only needed to run src/db-tests, so
+    # pgTAP is not here: it is only needed to run tests/db, so
     # install_pgtap handles it under --with-test-deps (cpanminus above is
     # what it uses for pg_prove).
 
@@ -507,7 +507,7 @@ install_pgtap() {
 
     print_section "Installing pgTAP"
 
-    # pg_prove, the client-side runner src/db-tests is executed with
+    # pg_prove, the client-side runner tests/db is executed with
     # (cpanminus comes with the system packages above).
     sudo cpanm --notest TAP::Parser::SourceHandler::pgTAP
 
@@ -537,7 +537,7 @@ install_e2e_packages() {
     # node/npm are on PATH from install_node above. Subshell so the cd
     # does not leak into the steps that follow, which use relative paths.
     (
-        cd ./src/e2e
+        cd ./tests/e2e
         npm install
         npx playwright install
     )
