@@ -328,6 +328,7 @@ reset_demo_data() {
 purge_all_schemas() {
     echo -e "\n${RED}WARNING: This will DROP AND RECREATE database '${PGDATABASE}'.${NC}"
     echo -e "${RED}Everything in it is lost, including both sqitch registries.${NC}"
+    echo -e "${RED}Connected services will be disconnected and will need restarting.${NC}"
     read -r -p "Type 'purge' to confirm: " confirmation
 
     if [[ "$confirmation" != "purge" ]]; then
@@ -344,6 +345,11 @@ purge_all_schemas() {
     # Terminate other sessions first: DROP DATABASE fails while any
     # connection remains, and a running service reconnects faster than
     # the drop can land.
+    #
+    # This takes the odo services down with it -- a pod whose connection is
+    # killed mid-flight generally exits rather than reconnecting. Expect
+    # to restart them afterwards; on a cluster ArgoCD or the kubelet will
+    # do it, locally you restart them yourself.
     echo -e "${YELLOW}Disconnecting other sessions from '${PGDATABASE}'${NC}"
     execute_psql "SELECT pg_terminate_backend(pid)
                     FROM pg_stat_activity
