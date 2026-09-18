@@ -326,9 +326,28 @@ reset_demo_data() {
 }
 
 purge_all_schemas() {
-    echo -e "\n${RED}WARNING: This will DROP AND RECREATE database '${PGDATABASE}'.${NC}"
-    echo -e "${RED}Everything in it is lost, including both sqitch registries.${NC}"
+    echo -e "\n${RED}WARNING: This will drop all application schemas in database '${PGDATABASE}'.${NC}"
+    echo -e "${RED}Everything in them is lost, including both sqitch registries.${NC}"
     echo -e "${RED}Connected services will be disconnected and will need restarting.${NC}"
+
+    # Schema-level drops rather than DROP DATABASE: the pooled service
+    # credentials cannot create a database, and pgbouncer does not pool
+    # the maintenance database at all, so there is no connection from
+    # here that could recreate one.
+    #
+    # Dropping still needs ownership. The schemas are owned by the
+    # database owner, not by the service role the secret carries, so
+    # this generally wants PGUSER/PGPASSWORD overridden with an
+    # administrative account:
+    #
+    #   PGUSER=postgres PGPASSWORD=... PGHOST=<server> PGPORT=5432 \
+    #       ./scripts/manage-database.sh purge-all
+    #
+    # Note the direct port: pgbouncer fronts the pooled databases, and
+    # an admin role is usually not among its configured users.
+    local schemas=(notification asset auth audit authz org sqitch)
+
+    echo -e "${RED}Schemas that will be dropped: ${schemas[*]}${NC}"
     read -r -p "Type 'purge' to confirm: " confirmation
 
     if [[ "$confirmation" != "purge" ]]; then
@@ -336,33 +355,32 @@ purge_all_schemas() {
         return
     fi
 
-    # Drop and recreate rather than dropping schemas one at a time: the
-    # old list had to be kept in step with every new schema, and it left
-    # behind anything outside it (extensions, types, ownership). A fresh
-    # database is the same thing every CI run and every new checkout
-    # starts from.
-    #
-    # Terminate other sessions first: DROP DATABASE fails while any
-    # connection remains, and a running service reconnects faster than
-    # the drop can land.
-    #
-    # This takes the odo services down with it -- a pod whose connection is
-    # killed mid-flight generally exits rather than reconnecting. Expect
-    # to restart them afterwards; on a cluster ArgoCD or the kubelet will
-    # do it, locally you restart them yourself.
-    echo -e "${YELLOW}Disconnecting other sessions from '${PGDATABASE}'${NC}"
-    execute_psql "SELECT pg_terminate_backend(pid)
-                    FROM pg_stat_activity
-                   WHERE datname = '$PGDATABASE'
-                     AND pid <> pg_backend_pid();"
+    # Check ownership before dropping anything: a partial purge leaves a
+    # database that neither deploys nor reverts, and the bare
+    # "must be owner of schema" error does not say what to do about it.
+    local not_owned
+    not_owned=$(PGPASSWORD="$PGPASSWORD" psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" \
+        -d "$PGDATABASE" -tAc \
+        "SELECT string_agg(nspname, ', ' ORDER BY nspname)
+           FROM pg_namespace
+          WHERE nspname = ANY(ARRAY['notification','asset','auth','audit','authz','org','sqitch'])
+            AND pg_get_userbyid(nspowner) <> current_user
+            AND NOT pg_has_role(current_user, nspowner, 'MEMBER')" 2>/dev/null)
 
-    echo -e "${YELLOW}Dropping database '${PGDATABASE}'${NC}"
-    execute_psql "DROP DATABASE IF EXISTS $PGDATABASE;"
+    if [ -n "$not_owned" ]; then
+        echo -e "${RED}Cannot purge: '$PGUSER' does not own: $not_owned${NC}"
+        echo -e "${YELLOW}Re-run with an administrative account, e.g.${NC}"
+        echo "  PGUSER=postgres PGPASSWORD=... PGPORT=5432 $0 purge-all"
+        return 1
+    fi
 
-    echo -e "${GREEN}Recreating database '${PGDATABASE}'${NC}"
-    execute_psql "CREATE DATABASE $PGDATABASE OWNER $PGUSER;"
+    echo -e "${YELLOW}Dropping application schemas...${NC}"
+    for schema in "${schemas[@]}"; do
+        echo -e "${BLUE}Dropping schema '$schema'${NC}"
+        execute_psql "DROP SCHEMA IF EXISTS \"$schema\" CASCADE;" "$PGDATABASE"
+    done
 
-    echo -e "${GREEN}Database recreated. Run '$0 deploy' to rebuild the schema.${NC}"
+    echo -e "${GREEN}All application schemas dropped. Run '$0 deploy' to rebuild.${NC}"
 }
 
 # Function to setup database
