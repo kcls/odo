@@ -271,7 +271,7 @@ deploy_demo_data() {
 deploy_test_data() {
     print_section "Deploying e2e/dev test data"
 
-    # src/sqitch/test-data: flat idempotent fixtures -- the e2e.odo.*
+    # tests/fixtures: flat idempotent fixtures -- the e2e.odo.*
     # users, the login-only e2e-test-role, MockSAML config, soft-deleted
     # rows, and the dev passwords for the two machine accounts (which
     # ship unusable). Safe to re-run at any time.

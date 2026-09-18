@@ -31,8 +31,8 @@ templates, or fixtures.
   below the root (pinned `5eed0000-…` uuids), depending on
   `odo:002_odo_seed`. Separate so an installation with its own org
   structure can skip it. `manage-database.sh deploy-demo`.
-- `src/sqitch/test-data/` — flat idempotent SQL e2e fixtures (`e2e.*`
-  users with pinned `e2e00000-…` uuids), not a sqitch project; applied by
+- `tests/fixtures/` — flat idempotent SQL e2e fixtures (`e2e.*` users
+  with pinned `e2e00000-…` uuids), not a sqitch project; applied by
   `manage-database.sh deploy-test`.
 - `tests/integration/`, `tests/e2e/` (Playwright, odo-admin project),
   `tests/db/` (pgTAP), `tests/load/` (weighted API load harness).
@@ -111,7 +111,7 @@ templates, or fixtures.
   split it into a separate account if app manifests ever become less
   trusted.
 - Machine accounts: both ship with unknowable passwords, and
-  `src/sqitch/test-data/` restores known dev ones for dev/CI.
+  `tests/fixtures/` restores known dev ones for dev/CI.
   `odo-registration` additionally ships *disabled* (the seed plus
   `004_registration_account_lockdown`); only `load-data-manifest.sh`
   enables it, for the length of one run. `odo-notify-service` stays
@@ -121,7 +121,7 @@ templates, or fixtures.
   Paginated<T> produces untyped rows in the generated TS).
 - Soft deletes only (`deleted_at`); a DB trigger blocks hard deletes.
 - A sqitch **verify** script must only assert what holds on every install.
-  `src/sqitch/test-data/` deliberately reverses some schema effects for dev/CI (it
+  `tests/fixtures/` deliberately reverses some schema effects for dev/CI (it
   reactivates `odo-registration` and restores its published password), so a
   verify that asserts account status or a password hash fails permanently on
   any box that has run `deploy-test` — which silently costs you `verify` as a

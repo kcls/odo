@@ -30,7 +30,7 @@ pub fn asset_base() -> &'static str {
     })
 }
 
-// Test users are defined by src/sqitch/test-data (odo platform fixtures). Rows
+// Test users are defined by tests/fixtures (odo platform fixtures). Rows
 // carry pinned UUIDs; database ids are resolved at runtime (login JWT sub
 // for the caller, get_user-by-uuid for other users) - never hard-coded.
 pub struct TestUser {
