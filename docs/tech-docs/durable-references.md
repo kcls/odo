@@ -33,7 +33,7 @@ can't handle simply doesn't occur.
 
 ## How it's implemented
 
-All of the below is in the baseline schema (`src/sqitch/schema`).
+All of the below is in the baseline schema (`src/sqitch/core`).
 
 ### 1. No hard deletes
 

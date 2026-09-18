@@ -23,11 +23,17 @@ templates, or fixtures.
   middleware, `page_type!`), odo-entity (SeaORM entities, private to the
   services — apps must NOT depend on it); odo-register (CLI: applies app
   registration manifests to the APIs).
-- `src/sqitch/schema/` — sqitch project: 001 baseline (squashed schema) +
-  002 seed (permissions, platform roles, machine accounts, the "Odo
-  Library System" demo org tree with pinned `5eed0000-…` uuids).
-- `src/test-data/` — flat idempotent SQL e2e fixtures (`e2e.*` users with
-  pinned `e2e00000-…` uuids); applied by `manage-database.sh deploy-test`.
+- `src/sqitch/core/` — sqitch project `odo`: 001 baseline (squashed
+  schema) + 002 seed (permissions, platform roles, unit types, machine
+  accounts, and the root org unit — whose code/label/uuid are deploy-time
+  variables defaulting to the demo values).
+- `src/sqitch/demo-data/` — sqitch project `odo-demo`: the sample org tree
+  below the root (pinned `5eed0000-…` uuids), depending on
+  `odo:002_odo_seed`. Separate so an installation with its own org
+  structure can skip it. `manage-database.sh deploy-demo`.
+- `src/sqitch/test-data/` — flat idempotent SQL e2e fixtures (`e2e.*`
+  users with pinned `e2e00000-…` uuids), not a sqitch project; applied by
+  `manage-database.sh deploy-test`.
 - `src/integration-tests/`, `src/e2e/` (Playwright, odo-admin project),
   `src/db-tests/` (pgTAP), `src/load-tests/` (weighted API load harness).
 - `src/ui/odo-admin/` — Angular admin SPA (`/odo/admin`); `src/ui/core` —
@@ -104,16 +110,18 @@ templates, or fixtures.
   an installation's own site data rather than for app registration, so
   split it into a separate account if app manifests ever become less
   trusted.
-- Machine accounts: `odo-registration` ships disabled with an unknowable
-  password (the seed plus `004_registration_account_lockdown`); only
-  `load-data-manifest.sh` enables it, and `src/test-data/` restores a known
-  dev password for dev/CI. `odo-notify-service` still has a dev-only
-  seeded password that must be changed in prod.
+- Machine accounts: both ship with unknowable passwords, and
+  `src/sqitch/test-data/` restores known dev ones for dev/CI.
+  `odo-registration` additionally ships *disabled* (the seed plus
+  `004_registration_account_lockdown`); only `load-data-manifest.sh`
+  enables it, for the length of one run. `odo-notify-service` stays
+  active — application background jobs authenticate as it continuously,
+  so the password is the control there, not the status flag.
 - Paginated admin lists use `odo_service::page_type!` (a generic
   Paginated<T> produces untyped rows in the generated TS).
 - Soft deletes only (`deleted_at`); a DB trigger blocks hard deletes.
 - A sqitch **verify** script must only assert what holds on every install.
-  `src/test-data/` deliberately reverses some schema effects for dev/CI (it
+  `src/sqitch/test-data/` deliberately reverses some schema effects for dev/CI (it
   reactivates `odo-registration` and restores its published password), so a
   verify that asserts account status or a password hash fails permanently on
   any box that has run `deploy-test` — which silently costs you `verify` as a

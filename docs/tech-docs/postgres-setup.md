@@ -10,7 +10,7 @@ single key:
 
 | Key | Who reads it |
 | --- | --- |
-| `DATABASE_URL` | the service pods, **and** the host tooling — `manage-database.sh`, `run-tests.sh`, `run-db-tests.sh`, `deploy-test-data.sh`, `generate-rust-entities.sh` |
+| `DATABASE_URL` | the service pods, **and** the host tooling — `manage-database.sh`, `run-tests.sh`, `run-db-tests.sh`, `generate-rust-entities.sh` |
 
 Because both audiences read the same value, the host in it has to resolve and
 route the same way from inside a pod and from the host:

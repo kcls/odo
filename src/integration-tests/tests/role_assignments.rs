@@ -1,6 +1,6 @@
 //! User role assignment CRUD (odo-auth authz/user-role/*).
 //!
-//! Requires the e2e test users (src/test-data). The org-scoped test also
+//! Requires the e2e test users (src/sqitch/test-data). The org-scoped test also
 //! exercises min_depth enforcement end-to-end using the platform seed's
 //! org tree: OLS is the root and MAIN (Main Street Branch) is a branch two
 //! levels below it. Org unit and user ids are resolved at runtime.

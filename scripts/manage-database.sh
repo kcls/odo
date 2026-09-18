@@ -22,13 +22,19 @@ DRY_RUN=${DRY_RUN:-false}
 NAMESPACE=${NAMESPACE:-odo-core}
 
 # Sqitch directories
+# Three trees under src/sqitch, deployed in this order:
+#
+#   core/       the schema and platform seed. Every install needs it.
+#   demo-data/  a separate sqitch project (%project=odo-demo) holding the
+#               sample org tree. Depends on odo:002_odo_seed, so it
+#               deploys after core and reverts before it. An installation
+#               with its own org structure skips it.
+#   test-data/  plain idempotent SQL, not a sqitch project: dev/CI
+#               fixtures applied in filename order with no revert path.
 SQITCH_DIR="${SQITCH_DIR:-$PROJECT_ROOT/src/sqitch}"
-SQITCH_SCHEMA_DIR="${SQITCH_SCHEMA_DIR:-$SQITCH_DIR/schema}"
-# The demo org tree is a separate sqitch project (%project=odo-demo) in the
-# same database, so an installation deploying into a real org structure can
-# skip it. It depends on odo:002_odo_seed, which means it deploys after the
-# schema project and reverts before it.
-SQITCH_DEMO_DIR="${SQITCH_DEMO_DIR:-$SQITCH_DIR/demo}"
+SQITCH_CORE_DIR="${SQITCH_CORE_DIR:-$SQITCH_DIR/core}"
+SQITCH_DEMO_DIR="${SQITCH_DEMO_DIR:-$SQITCH_DIR/demo-data}"
+TEST_DATA_DIR="${TEST_DATA_DIR:-$SQITCH_DIR/test-data}"
 
 # Function to show usage
 usage() {
@@ -53,7 +59,7 @@ usage() {
     echo "  status-demo      Show demo project deployment status"
     echo
     echo "Test Data Commands:"
-    echo "  deploy-test      Deploy test data (idempotent SQL, src/test-data/)"
+    echo "  deploy-test      Deploy test data (idempotent SQL, src/sqitch/test-data/)"
     echo "  reset-demo       DESTRUCTIVE: revert + redeploy everything (schema + demo), then reload test data"
     echo
     echo "Database Admin Commands:"
@@ -67,8 +73,9 @@ usage() {
     echo "  PGPASSWORD=password       Override database password (default: from secret)"
     echo "  DRY_RUN=true              Show what would be done without making changes"
     echo "  NAMESPACE=name            Kubernetes namespace for secrets (default: odo-core)"
-    echo "  SQITCH_SCHEMA_DIR=/path   Override schema directory (default: $SQITCH_SCHEMA_DIR)"
-    echo "  SQITCH_DEMO_DIR=/path     Override demo directory (default: $SQITCH_DEMO_DIR)"
+    echo "  SQITCH_CORE_DIR=/path     Override core directory (default: $SQITCH_CORE_DIR)"
+    echo "  SQITCH_DEMO_DIR=/path     Override demo-data directory (default: $SQITCH_DEMO_DIR)"
+    echo "  TEST_DATA_DIR=/path       Override test-data directory (default: $TEST_DATA_DIR)"
     echo
     echo "Note: Database credentials are retrieved from Kubernetes secret by default"
     echo "      but can be overridden with environment variables"
@@ -204,7 +211,7 @@ run_sqitch() {
 sqitch_deploy() {
     local target="${2:-HEAD}"
     echo -e "\n${YELLOW}Deploying database schema changes${NC}"
-    run_sqitch "$SQITCH_SCHEMA_DIR" deploy $target
+    run_sqitch "$SQITCH_CORE_DIR" deploy $target
     echo -e "${GREEN}Schema deployment completed successfully${NC}"
 }
 
@@ -218,7 +225,7 @@ sqitch_revert() {
     fi
     
     echo -e "\n${YELLOW}Reverting database schema changes to $target${NC}"
-    run_sqitch "$SQITCH_SCHEMA_DIR" revert $target
+    run_sqitch "$SQITCH_CORE_DIR" revert $target
     echo -e "${GREEN}Schema revert completed successfully${NC}"
 }
 
@@ -278,38 +285,56 @@ sqitch_revert_all() {
     echo -e "${RED}WARNING: This will remove all deployed schema changes!${NC}"
 
     revert_demo_if_deployed
-    run_sqitch "$SQITCH_SCHEMA_DIR" revert
+    run_sqitch "$SQITCH_CORE_DIR" revert
     echo -e "${GREEN}All schema changes reverted successfully${NC}"
 }
 
 sqitch_status() {
     echo -e "\n${YELLOW}Checking schema deployment status${NC}"
-    run_sqitch "$SQITCH_SCHEMA_DIR" status
+    run_sqitch "$SQITCH_CORE_DIR" status
 }
 
 sqitch_verify() {
     echo -e "\n${YELLOW}Verifying deployed schema changes${NC}"
-    run_sqitch "$SQITCH_SCHEMA_DIR" verify
+    run_sqitch "$SQITCH_CORE_DIR" verify
     echo -e "${GREEN}Schema verification completed${NC}"
 }
 
 sqitch_log() {
     echo -e "\n${YELLOW}Schema deployment history${NC}"
-    run_sqitch "$SQITCH_SCHEMA_DIR" log
+    run_sqitch "$SQITCH_CORE_DIR" log
 }
 
-# Test data: plain idempotent SQL files applied in order (no sqitch, no
-# revert -- reloading pairs with a full DB rebuild). See src/test-data/.
+# Test data: plain idempotent SQL files applied in filename order. Not a
+# sqitch project -- there is no revert path, and reloading pairs with a
+# full database rebuild rather than with a revert.
 deploy_test_data() {
     echo -e "\n${YELLOW}Deploying test data${NC}"
-    "$SCRIPT_DIR/deploy-test-data.sh"
+
+    if [ ! -d "$TEST_DATA_DIR" ]; then
+        echo -e "${RED}Test data directory not found: $TEST_DATA_DIR${NC}"
+        return 1
+    fi
+
+    echo -e "${BLUE}Applying test data to $PGUSER@$PGHOST:$PGPORT/$PGDATABASE${NC}"
+    local f
+    for f in "$TEST_DATA_DIR"/[0-9]*.sql; do
+        [ -e "$f" ] || { echo -e "${YELLOW}  no test data files${NC}"; return 0; }
+        echo -e "${BLUE}  applying $(basename "$f")${NC}"
+        if [[ "$DRY_RUN" == "true" ]]; then
+            continue
+        fi
+        PGPASSWORD="$PGPASSWORD" psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" \
+            -d "$PGDATABASE" -q -v ON_ERROR_STOP=1 -f "$f" || return 1
+    done
+
     echo -e "${GREEN}Test data deployment completed successfully${NC}"
 }
 
 # Demo/platform reset: DESTRUCTIVE. The platform seed content is the sqitch
 # change 002_odo_seed, so a dev reset is: revert all schema changes,
 # redeploy (baseline + seed), then reload the idempotent test data
-# (src/test-data/).
+# (src/sqitch/test-data/).
 reset_demo_data() {
     echo -e "\n${RED}WARNING: this reverts and redeploys ALL schema changes in database '${PGDATABASE}', wiping all data.${NC}"
     read -r -p "Type 'reset' to confirm: " confirmation
@@ -318,8 +343,8 @@ reset_demo_data() {
         exit 1
     fi
     revert_demo_if_deployed
-    run_sqitch "$SQITCH_SCHEMA_DIR" revert -y
-    run_sqitch "$SQITCH_SCHEMA_DIR" deploy
+    run_sqitch "$SQITCH_CORE_DIR" revert -y
+    run_sqitch "$SQITCH_CORE_DIR" deploy
     run_sqitch "$SQITCH_DEMO_DIR" deploy
     deploy_test_data
     echo -e "${GREEN}Demo reset completed${NC}"
