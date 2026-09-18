@@ -1,10 +1,30 @@
 -- Deploy odo:002_odo_seed to pg
 -- requires: 001_odo_baseline
 
+-- Root org unit identity. Defaults reproduce the demo install; an
+-- installation overrides them (see the org.unit section below).
+\if :{?root_code}
+\else
+  \set root_code OLS
+\endif
+\if :{?root_label}
+\else
+  \set root_label 'Odo Library System'
+\endif
+\if :{?root_uuid}
+\else
+  \set root_uuid 5eed0000-0000-4000-a000-000000000201
+\endif
+
 -- Platform seed for a fresh odo install: the odo.* permissions, the
--- platform roles (odo-admin, odo-notify-service, odo-registration) and their grants, a small
--- generic org tree exercising every unit type, and the machine
--- accounts (dev-default passwords -- change in production).
+-- platform roles (odo-admin, odo-notify-service, odo-registration) and
+-- their grants, the org unit types, the root org unit (parameterized --
+-- see below), and the machine accounts (dev-default passwords -- change
+-- in production).
+--
+-- The demo org tree below the root is NOT here: it lives in the separate
+-- `demo` sqitch project (src/sqitch/demo), so an installation deploying
+-- into a real org structure can skip it.
 --
 -- No hard-coded database ids: rows are created with generated ids and
 -- referenced by natural keys (code/label/username) or by their pinned
@@ -118,52 +138,32 @@ INSERT INTO org.unit_type (label, parent, can_have_staff, can_have_patrons, uuid
     ('Locker', (SELECT id FROM org.unit_type WHERE label = 'Branch'), false, false,
      '5eed0000-0000-4000-a000-000000000104');
 
--- ---- org.unit --------------------------------------------------------------
+-- ---- org.unit (root only) --------------------------------------------------
 
--- A small generic sample tree that exercises every unit type:
+-- The root org unit, and only the root. Every other unit belongs to an
+-- installation, and an installation registers its own tree through
+-- odo-register manifests -- except that it cannot register a root:
+-- unit/create takes a non-optional parent, and org.unit carries a
+-- single-root unique index. So the root has to be seeded, and a real
+-- installation's root is not "Odo Library System".
 --
---   Odo Library System (Root, OLS)
---   ├── East Region (ERG)
---   │   ├── Main Street Branch (MAIN)
---   │   │   └── Main Street Locker (MAINL)
---   │   └── Riverside Branch (RIVR)
---   └── West Region (WRG)
---       ├── Hilltop Branch (HILL)
---       └── Lakeside Branch (LAKE)
+-- Hence three deploy-time variables, defaulting to the demo values:
 --
--- Parents resolved by code; no hard-coded ids.
+--   sqitch deploy -s root_code=KCLS -s root_label='KCLS' \
+--                 -s root_uuid=5c2a0a5b-...
+--
+-- or, better for an installation that deploys repeatedly, in its
+-- sqitch.conf so `sqitch verify` sees them too:
+--
+--   [core "variables"]
+--       root_code = KCLS
+--
+-- Deploying without them produces the demo root, which is what a public
+-- install, the e2e suites and a new developer's checkout all want.
 INSERT INTO org.unit (label, code, parent, unit_type, timezone, uuid) VALUES
-    ('Odo Library System', 'OLS', NULL,
+    (:'root_label', :'root_code', NULL,
      (SELECT id FROM org.unit_type WHERE label = 'Root'),
-     NULL, '5eed0000-0000-4000-a000-000000000201');
-INSERT INTO org.unit (label, code, parent, unit_type, timezone, uuid) VALUES
-    ('East Region', 'ERG', (SELECT id FROM org.unit WHERE code = 'OLS'),
-     (SELECT id FROM org.unit_type WHERE label = 'Region'),
-     NULL, '5eed0000-0000-4000-a000-000000000202');
-INSERT INTO org.unit (label, code, parent, unit_type, timezone, uuid) VALUES
-    ('West Region', 'WRG', (SELECT id FROM org.unit WHERE code = 'OLS'),
-     (SELECT id FROM org.unit_type WHERE label = 'Region'),
-     NULL, '5eed0000-0000-4000-a000-000000000203');
-INSERT INTO org.unit (label, code, parent, unit_type, timezone, uuid) VALUES
-    ('Main Street Branch', 'MAIN', (SELECT id FROM org.unit WHERE code = 'ERG'),
-     (SELECT id FROM org.unit_type WHERE label = 'Branch'),
-     'America/Los_Angeles', '5eed0000-0000-4000-a000-000000000204');
-INSERT INTO org.unit (label, code, parent, unit_type, timezone, uuid) VALUES
-    ('Riverside Branch', 'RIVR', (SELECT id FROM org.unit WHERE code = 'ERG'),
-     (SELECT id FROM org.unit_type WHERE label = 'Branch'),
-     'America/Los_Angeles', '5eed0000-0000-4000-a000-000000000205');
-INSERT INTO org.unit (label, code, parent, unit_type, timezone, uuid) VALUES
-    ('Hilltop Branch', 'HILL', (SELECT id FROM org.unit WHERE code = 'WRG'),
-     (SELECT id FROM org.unit_type WHERE label = 'Branch'),
-     'America/Los_Angeles', '5eed0000-0000-4000-a000-000000000206');
-INSERT INTO org.unit (label, code, parent, unit_type, timezone, uuid) VALUES
-    ('Lakeside Branch', 'LAKE', (SELECT id FROM org.unit WHERE code = 'WRG'),
-     (SELECT id FROM org.unit_type WHERE label = 'Branch'),
-     'America/Los_Angeles', '5eed0000-0000-4000-a000-000000000207');
-INSERT INTO org.unit (label, code, parent, unit_type, timezone, uuid) VALUES
-    ('Main Street Locker', 'MAINL', (SELECT id FROM org.unit WHERE code = 'MAIN'),
-     (SELECT id FROM org.unit_type WHERE label = 'Locker'),
-     'America/Los_Angeles', '5eed0000-0000-4000-a000-000000000208');
+     NULL, :'root_uuid');
 
 -- ---- accounts --------------------------------------------------------------
 
