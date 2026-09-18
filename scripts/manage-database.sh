@@ -17,7 +17,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$SCRIPT_DIR/common.sh"
 
 # Default values
-COMMAND=${1:-setup}
+COMMAND=${1:-help}
 DRY_RUN=${DRY_RUN:-false}
 NAMESPACE=${NAMESPACE:-odo-core}
 
@@ -41,7 +41,7 @@ usage() {
     echo -e "${BLUE}Usage: $0 [command] [options]${NC}"
     echo
     echo "Database Commands (require sudo):"
-    echo "  setup            Create database, user, and sqitch schema (default)"
+    echo "  setup            Create database, user, and sqitch schema"
     echo "  update-password  Update database user password only"
     echo
     echo "Schema Commands:"
@@ -79,7 +79,9 @@ usage() {
     echo
     echo "Note: Database credentials are retrieved from Kubernetes secret by default"
     echo "      but can be overridden with environment variables"
-    exit 1
+    # Caller decides the exit status: asking for help succeeds, being
+    # shown it after a bad command does not.
+    exit "${1:-0}"
 }
 
 # Check if running with sudo (only for initial user creation)
@@ -583,6 +585,6 @@ case "$COMMAND" in
         ;;
     *)
         echo -e "${RED}Error: Unknown command '$COMMAND'${NC}"
-        usage
+        usage 1
         ;;
 esac
