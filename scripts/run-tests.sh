@@ -112,7 +112,7 @@ run_pgtap_tests() {
 run_odo_integration_tests() {
     print_section "Running odo integration tests"
 
-    cd "$PROJECT_ROOT/src/integration-tests"
+    cd "$PROJECT_ROOT/tests/integration"
     cargo test
 
     echo "odo integration tests passed"
@@ -121,10 +121,10 @@ run_odo_integration_tests() {
 run_load_tests() {
     print_section "Running odo API load test"
 
-    cd "$PROJECT_ROOT/src/load-tests"
+    cd "$PROJECT_ROOT/tests/load"
 
     # Read-only smoke by default; tune with LOAD_WORKERS / LOAD_DURATION or
-    # pass anything else through LOAD_ARGS (see src/load-tests/README.md).
+    # pass anything else through LOAD_ARGS (see tests/load/README.md).
     # --fail-on-concerns makes flagged concerns fail the suite.
     # shellcheck disable=SC2086
     cargo run --release -- \
@@ -139,7 +139,7 @@ run_load_tests() {
 run_e2e_tests() {
     print_section "Running UI e2e tests"
 
-    cd "$PROJECT_ROOT/src/e2e"
+    cd "$PROJECT_ROOT/tests/e2e"
 
     # Run against the containerized/k3s UIs. All Playwright projects.
     BASE_URL=http://localhost:30080 npm run test
@@ -165,7 +165,7 @@ usage() {
     echo "Environment variables (all optional):"
     echo "  PGHOST/PGPORT  Override the endpoint (default: from the secret)"
     echo "  PGPASSWORD   PostgreSQL password (default: read from k8s secrets)"
-    echo "  LOAD_WORKERS / LOAD_DURATION / LOAD_ARGS   --load tuning (see src/load-tests/README.md)"
+    echo "  LOAD_WORKERS / LOAD_DURATION / LOAD_ARGS   --load tuning (see tests/load/README.md)"
 }
 
 print_results() {

@@ -137,7 +137,7 @@ install_dev_packages() {
         libdbd-pg-perl \
         postgresql-client
 
-    # pg_prove, the client-side runner src/db-tests is executed with.
+    # pg_prove, the client-side runner tests/db is executed with.
     # Deliberately not the `pgtap` metapackage: that pulls
     # postgresql-N-pgtap, which depends on the postgresql-N *server*.
     # The extension itself belongs on the database host - the
@@ -205,7 +205,7 @@ install_e2e_packages() {
     # Playwright's system libraries (libatk, libcups, libgbm, ...) come
     # from install-deps.
     (
-        cd ./src/e2e
+        cd ./tests/e2e
         npm install
         npx playwright install-deps
     )

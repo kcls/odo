@@ -34,8 +34,8 @@ templates, or fixtures.
 - `src/sqitch/test-data/` — flat idempotent SQL e2e fixtures (`e2e.*`
   users with pinned `e2e00000-…` uuids), not a sqitch project; applied by
   `manage-database.sh deploy-test`.
-- `src/integration-tests/`, `src/e2e/` (Playwright, odo-admin project),
-  `src/db-tests/` (pgTAP), `src/load-tests/` (weighted API load harness).
+- `tests/integration/`, `tests/e2e/` (Playwright, odo-admin project),
+  `tests/db/` (pgTAP), `tests/load/` (weighted API load harness).
 - `src/ui/odo-admin/` — Angular admin SPA (`/odo/admin`); `src/ui/core` —
   shared UI lib it depends on.
 - `k8s/` — gateway, envoy routes/security, registry. The README
@@ -62,7 +62,7 @@ templates, or fixtures.
 - `./scripts/run-tests.sh --db --integration --e2e --unit --load`
   (the DB endpoint resolves from the secret's `DATABASE_URL`; `PG*` env
   vars only override it).
-- e2e locally: `cd src/e2e && BASE_URL=http://localhost:30080 npm test`.
+- e2e locally: `cd tests/e2e && BASE_URL=http://localhost:30080 npm test`.
   The UIs need a recent Node (the Angular CLI requires >= 20).
 - OpenAPI: `./scripts/generate-openapi.sh` regenerates `openapi/*.json` +
   the admin UI's generated TS types; `--check` is the drift gate. Commit

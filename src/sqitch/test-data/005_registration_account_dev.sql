@@ -12,7 +12,7 @@
 -- never load it, and should reach the account through
 -- scripts/load-data-manifest.sh instead.
 --
--- Keep in sync with REGISTRATION_PASSWORD in src/integration-tests/src/lib.rs.
+-- Keep in sync with REGISTRATION_PASSWORD in tests/integration/src/lib.rs.
 --
 -- Idempotent: safe to re-run.
 

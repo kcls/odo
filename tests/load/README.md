@@ -5,14 +5,14 @@ asset). Runs a weighted mix of API operations through the gateway,
 prints live per-window progress, and finishes with a per-endpoint
 latency/error summary plus an **Areas of concern** section.
 
-Distinct from `src/integration-tests` on purpose: those are
+Distinct from `tests/integration` on purpose: those are
 single-threaded correctness tests; this hammers the system concurrently
 and only ever asserts statistics.
 
 ## Quick start
 
 ```bash
-cd src/load-tests
+cd tests/load
 
 # 10 workers for 60 seconds against the local dev gateway
 cargo run --release
