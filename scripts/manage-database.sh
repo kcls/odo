@@ -24,17 +24,21 @@ NAMESPACE=${NAMESPACE:-odo-core}
 # Sqitch directories
 # Three trees under src/sqitch, deployed in this order:
 #
+# Two sqitch projects under src/sqitch, deployed in this order:
+#
 #   core/       the schema and platform seed. Every install needs it.
 #   demo-data/  a separate sqitch project (%project=odo-demo) holding the
 #               sample org tree. Depends on odo:002_odo_seed, so it
 #               deploys after core and reverts before it. An installation
 #               with its own org structure skips it.
-#   test-data/  plain idempotent SQL, not a sqitch project: dev/CI
-#               fixtures applied in filename order with no revert path.
+#
+# Then the dev/CI fixtures, which are not a sqitch project -- plain
+# idempotent SQL applied in filename order, with no revert path. They
+# live with the suites that consume them, not with the schema.
 SQITCH_DIR="${SQITCH_DIR:-$PROJECT_ROOT/src/sqitch}"
 SQITCH_CORE_DIR="${SQITCH_CORE_DIR:-$SQITCH_DIR/core}"
 SQITCH_DEMO_DIR="${SQITCH_DEMO_DIR:-$SQITCH_DIR/demo-data}"
-TEST_DATA_DIR="${TEST_DATA_DIR:-$SQITCH_DIR/test-data}"
+TEST_DATA_DIR="${TEST_DATA_DIR:-$PROJECT_ROOT/tests/fixtures}"
 
 # Function to show usage
 usage() {
@@ -59,7 +63,7 @@ usage() {
     echo "  status-demo      Show demo project deployment status"
     echo
     echo "Test Data Commands:"
-    echo "  deploy-test      Deploy test data (idempotent SQL, src/sqitch/test-data/)"
+    echo "  deploy-test      Deploy test data (idempotent SQL, tests/fixtures/)"
     echo "  reset-demo       DESTRUCTIVE: revert + redeploy everything (schema + demo), then reload test data"
     echo
     echo "Database Admin Commands:"
@@ -75,7 +79,7 @@ usage() {
     echo "  NAMESPACE=name            Kubernetes namespace for secrets (default: odo-core)"
     echo "  SQITCH_CORE_DIR=/path     Override core directory (default: $SQITCH_CORE_DIR)"
     echo "  SQITCH_DEMO_DIR=/path     Override demo-data directory (default: $SQITCH_DEMO_DIR)"
-    echo "  TEST_DATA_DIR=/path       Override test-data directory (default: $TEST_DATA_DIR)"
+    echo "  TEST_DATA_DIR=/path       Override fixtures directory (default: $TEST_DATA_DIR)"
     echo
     echo "Note: Database credentials are retrieved from Kubernetes secret by default"
     echo "      but can be overridden with environment variables"
@@ -336,7 +340,7 @@ deploy_test_data() {
 # Demo/platform reset: DESTRUCTIVE. The platform seed content is the sqitch
 # change 002_odo_seed, so a dev reset is: revert all schema changes,
 # redeploy (baseline + seed), then reload the idempotent test data
-# (src/sqitch/test-data/).
+# (tests/fixtures/).
 reset_demo_data() {
     echo -e "\n${RED}WARNING: this reverts and redeploys ALL schema changes in database '${PGDATABASE}', wiping all data.${NC}"
     read -r -p "Type 'reset' to confirm: " confirmation
