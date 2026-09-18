@@ -248,19 +248,33 @@ setup_database() {
 deploy_database_schema() {
     print_section "Deploying database schema + seed"
 
-    # The sqitch plan: baseline schema plus the generic platform seed
-    # (permissions, platform roles, machine accounts, demo org tree).
+    # src/sqitch/core: the baseline schema plus the platform seed
+    # (permissions, platform roles, unit types, the root org unit and the
+    # machine accounts). Everything every install needs.
     with_dev_env ./scripts/manage-database.sh deploy
 
     echo "Database schema + seed deployed"
 }
 
+deploy_demo_data() {
+    print_section "Deploying demo org tree"
+
+    # src/sqitch/demo-data: the sample org tree below the seeded root
+    # (regions, branches, a locker). A separate sqitch project so a real
+    # installation can skip it -- a dev cluster wants it, because the
+    # fixtures and both test suites address org units by these codes.
+    with_dev_env ./scripts/manage-database.sh deploy-demo
+
+    echo "Demo org tree deployed"
+}
+
 deploy_test_data() {
     print_section "Deploying e2e/dev test data"
 
-    # Flat idempotent fixtures (src/test-data): the e2e.odo.* users, the
-    # login-only e2e-test-role, MockSAML config, soft-deleted rows. Safe
-    # to re-run at any time.
+    # src/sqitch/test-data: flat idempotent fixtures -- the e2e.odo.*
+    # users, the login-only e2e-test-role, MockSAML config, soft-deleted
+    # rows, and the dev passwords for the two machine accounts (which
+    # ship unusable). Safe to re-run at any time.
     with_dev_env ./scripts/manage-database.sh deploy-test
 
     echo "Test data deployed"
@@ -328,6 +342,7 @@ main() {
 
     setup_database
     deploy_database_schema
+    deploy_demo_data
     deploy_test_data
     build_and_deploy_services
     build_odo_register

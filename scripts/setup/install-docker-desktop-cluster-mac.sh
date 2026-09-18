@@ -552,10 +552,11 @@ deploy_test_data() {
 
     print_section "Deploying e2e/dev test data"
 
-    # Flat idempotent fixtures (src/test-data): the e2e.odo.* users, the
-    # login-only e2e-test-role, MockSAML config, soft-deleted rows. Safe
-    # to re-run at any time. Resolves the endpoint from the secret's
-    # DATABASE_URL.
+    # src/sqitch/test-data: flat idempotent fixtures -- the e2e.odo.*
+    # users, the login-only e2e-test-role, MockSAML config, soft-deleted
+    # rows, and the dev passwords for the two machine accounts (which
+    # ship unusable). Safe to re-run. Resolves the endpoint from the
+    # secret's DATABASE_URL.
     ./scripts/manage-database.sh deploy-test
 
     echo "Test data deployed"
@@ -592,10 +593,24 @@ setup_database() {
 deploy_database_schema() {
     print_section "Deploying database schema"
 
-    # Resolves the endpoint from the secret's DATABASE_URL.
+    # src/sqitch/core: schema plus the platform seed. Resolves the
+    # endpoint from the secret's DATABASE_URL.
     ./scripts/manage-database.sh deploy
 
     echo "Database schema deployed"
+}
+
+deploy_demo_data() {
+    print_section "Deploying demo org tree"
+
+    # src/sqitch/demo-data: the sample org tree below the seeded root. A
+    # separate sqitch project so a real installation can skip it. Not
+    # gated on --with-test-deps: the org codes it creates are what the
+    # UI and the fixtures address, so a cluster without it has a root
+    # and nothing else.
+    ./scripts/manage-database.sh deploy-demo
+
+    echo "Demo org tree deployed"
 }
 
 generate_jwt_secret() {
@@ -677,6 +692,7 @@ main() {
     apply_namespaces_and_secrets
     setup_database
     deploy_database_schema
+    deploy_demo_data
     deploy_test_data
     generate_jwt_secret
     build_and_deploy_services
