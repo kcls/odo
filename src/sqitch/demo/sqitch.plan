@@ -1,0 +1,5 @@
+%syntax-version=1.0.0
+%project=odo-demo
+%uri=https://github.com/kcls/odo-demo
+
+001_demo_org_tree [odo:002_odo_seed] 2026-09-17T00:00:00Z Bill Erickson <bserickson@kcls.org> # Sample org tree below the seeded root, for demos and the e2e suites

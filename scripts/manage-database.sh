@@ -24,6 +24,11 @@ NAMESPACE=${NAMESPACE:-odo-core}
 # Sqitch directories
 SQITCH_DIR="${SQITCH_DIR:-$PROJECT_ROOT/src/sqitch}"
 SQITCH_SCHEMA_DIR="${SQITCH_SCHEMA_DIR:-$SQITCH_DIR/schema}"
+# The demo org tree is a separate sqitch project (%project=odo-demo) in the
+# same database, so an installation deploying into a real org structure can
+# skip it. It depends on odo:002_odo_seed, which means it deploys after the
+# schema project and reverts before it.
+SQITCH_DEMO_DIR="${SQITCH_DEMO_DIR:-$SQITCH_DIR/demo}"
 
 # Function to show usage
 usage() {
@@ -42,9 +47,14 @@ usage() {
     echo "  verify           Verify deployed schema changes"
     echo "  log              Show schema deployment history"
     echo
+    echo "Demo Data Commands (the sample org tree; skip on a real installation):"
+    echo "  deploy-demo      Deploy the demo org tree (requires the schema project)"
+    echo "  revert-demo      Revert the demo org tree, leaving the schema in place"
+    echo "  status-demo      Show demo project deployment status"
+    echo
     echo "Test Data Commands:"
     echo "  deploy-test      Deploy test data (idempotent SQL, src/test-data/)"
-    echo "  reset-demo       DESTRUCTIVE: revert + redeploy all schema changes (baseline + seed), then reload test data"
+    echo "  reset-demo       DESTRUCTIVE: revert + redeploy everything (schema + demo), then reload test data"
     echo
     echo "Database Admin Commands:"
     echo "  purge-all        Drop all application schemas (prompts for confirmation)"
@@ -58,6 +68,7 @@ usage() {
     echo "  DRY_RUN=true              Show what would be done without making changes"
     echo "  NAMESPACE=name            Kubernetes namespace for secrets (default: odo-core)"
     echo "  SQITCH_SCHEMA_DIR=/path   Override schema directory (default: $SQITCH_SCHEMA_DIR)"
+    echo "  SQITCH_DEMO_DIR=/path     Override demo directory (default: $SQITCH_DEMO_DIR)"
     echo
     echo "Note: Database credentials are retrieved from Kubernetes secret by default"
     echo "      but can be overridden with environment variables"
@@ -211,11 +222,62 @@ sqitch_revert() {
     echo -e "${GREEN}Schema revert completed successfully${NC}"
 }
 
+# Demo commands
+#
+# TODO (root_code): the schema project parameterizes the root org unit
+# (root_code / root_label / root_uuid), and nothing here passes those
+# values -- so every deploy from this script produces the demo root. That
+# is right for a public checkout and wrong for an installation, which
+# today has to run sqitch by hand or set the variables in sqitch.conf
+# under [core "variables"] (which `sqitch verify` also reads, unlike -s on
+# the command line). Decide whether this script should read them from the
+# environment, from a file, or not at all.
+sqitch_deploy_demo() {
+    local target="${2:-HEAD}"
+    echo -e "\n${YELLOW}Deploying the demo org tree${NC}"
+    run_sqitch "$SQITCH_DEMO_DIR" deploy $target
+    echo -e "${GREEN}Demo deployment completed successfully${NC}"
+}
+
+sqitch_revert_demo() {
+    echo -e "\n${YELLOW}Reverting the demo org tree${NC}"
+    run_sqitch "$SQITCH_DEMO_DIR" revert -y
+    echo -e "${GREEN}Demo revert completed successfully${NC}"
+}
+
+sqitch_status_demo() {
+    echo -e "\n${YELLOW}Checking demo project deployment status${NC}"
+    run_sqitch "$SQITCH_DEMO_DIR" status
+}
+
+# Revert the demo project if it has anything deployed. The demo change
+# declares a dependency on odo:002_odo_seed, so sqitch refuses to revert
+# the schema project out from under it -- correctly, but it means any
+# whole-database revert has to come here first.
+revert_demo_if_deployed() {
+    [ -d "$SQITCH_DEMO_DIR" ] || return 0
+
+    # Ask the registry rather than sqitch: this runs before the schema
+    # revert, when the registry still exists, and it stays quiet when the
+    # demo project was never deployed.
+    local deployed
+    deployed=$(PGPASSWORD="$PGPASSWORD" psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" \
+        -d "$PGDATABASE" -tAc \
+        "SELECT 1 FROM sqitch.changes c
+           JOIN sqitch.projects p ON p.project = c.project
+          WHERE p.project = 'odo-demo' LIMIT 1" 2>/dev/null)
+
+    if [ "$deployed" == "1" ]; then
+        echo -e "${BLUE}Reverting the demo project first: the schema project cannot revert while it depends on it${NC}"
+        run_sqitch "$SQITCH_DEMO_DIR" revert -y
+    fi
+}
+
 sqitch_revert_all() {
     echo -e "\n${YELLOW}Reverting all database schema changes${NC}"
     echo -e "${RED}WARNING: This will remove all deployed schema changes!${NC}"
-    
-    #run_sqitch "$SQITCH_SCHEMA_DIR" revert --to @ROOT
+
+    revert_demo_if_deployed
     run_sqitch "$SQITCH_SCHEMA_DIR" revert
     echo -e "${GREEN}All schema changes reverted successfully${NC}"
 }
@@ -255,18 +317,17 @@ reset_demo_data() {
         echo "Aborted."
         exit 1
     fi
+    revert_demo_if_deployed
     run_sqitch "$SQITCH_SCHEMA_DIR" revert -y
     run_sqitch "$SQITCH_SCHEMA_DIR" deploy
+    run_sqitch "$SQITCH_DEMO_DIR" deploy
     deploy_test_data
     echo -e "${GREEN}Demo reset completed${NC}"
 }
 
 purge_all_schemas() {
-    echo -e "\n${RED}WARNING: This will drop all application schemas in database '${PGDATABASE}'.${NC}"
-
-    local schemas=(notification asset auth audit authz org sqitch)
-
-    echo -e "${RED}Schemas that will be dropped: $schemas${NC}"
+    echo -e "\n${RED}WARNING: This will DROP AND RECREATE database '${PGDATABASE}'.${NC}"
+    echo -e "${RED}Everything in it is lost, including both sqitch registries.${NC}"
     read -r -p "Type 'purge' to confirm: " confirmation
 
     if [[ "$confirmation" != "purge" ]]; then
@@ -274,13 +335,28 @@ purge_all_schemas() {
         return
     fi
 
-    echo -e "${YELLOW}Dropping application schemas...${NC}"
-    for schema in "${schemas[@]}"; do
-        echo -e "${BLUE}Dropping schema '$schema'${NC}"
-        execute_psql "DROP SCHEMA IF EXISTS \"$schema\" CASCADE;" "$PGDATABASE"
-    done
+    # Drop and recreate rather than dropping schemas one at a time: the
+    # old list had to be kept in step with every new schema, and it left
+    # behind anything outside it (extensions, types, ownership). A fresh
+    # database is the same thing every CI run and every new checkout
+    # starts from.
+    #
+    # Terminate other sessions first: DROP DATABASE fails while any
+    # connection remains, and a running service reconnects faster than
+    # the drop can land.
+    echo -e "${YELLOW}Disconnecting other sessions from '${PGDATABASE}'${NC}"
+    execute_psql "SELECT pg_terminate_backend(pid)
+                    FROM pg_stat_activity
+                   WHERE datname = '$PGDATABASE'
+                     AND pid <> pg_backend_pid();"
 
-    echo -e "${GREEN}All application schemas dropped.${NC}"
+    echo -e "${YELLOW}Dropping database '${PGDATABASE}'${NC}"
+    execute_psql "DROP DATABASE IF EXISTS $PGDATABASE;"
+
+    echo -e "${GREEN}Recreating database '${PGDATABASE}'${NC}"
+    execute_psql "CREATE DATABASE $PGDATABASE OWNER $PGUSER;"
+
+    echo -e "${GREEN}Database recreated. Run '$0 deploy' to rebuild the schema.${NC}"
 }
 
 # Function to setup database
@@ -435,6 +511,15 @@ case "$COMMAND" in
         ;;
     log)
         sqitch_log
+        ;;
+    deploy-demo)
+        sqitch_deploy_demo "$@"
+        ;;
+    revert-demo)
+        sqitch_revert_demo
+        ;;
+    status-demo)
+        sqitch_status_demo
         ;;
     deploy-test)
         deploy_test_data
