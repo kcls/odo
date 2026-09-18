@@ -328,7 +328,6 @@ reset_demo_data() {
 purge_all_schemas() {
     echo -e "\n${RED}WARNING: This will drop all application schemas in database '${PGDATABASE}'.${NC}"
     echo -e "${RED}Everything in them is lost, including both sqitch registries.${NC}"
-    echo -e "${RED}Connected services will be disconnected and will need restarting.${NC}"
 
     # Schema-level drops rather than DROP DATABASE: the pooled service
     # credentials cannot create a database, and pgbouncer does not pool
