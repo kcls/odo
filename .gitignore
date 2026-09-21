@@ -89,3 +89,8 @@ tmp/
 AGENTS.md
 CLAUDE.local.md
 
+# Rust build output. Each crate carries its own /target/ ignore, but those
+# only cover crates that currently exist -- a renamed or removed crate
+# leaves its target/ behind, untracked and unignored, where `git add -A`
+# will happily stage several thousand build artifacts.
+target/
