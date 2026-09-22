@@ -429,7 +429,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .layer(middleware::from_fn_with_state(state.clone(), require_auth));
 
         let saml_public_routes = Router::new()
-            .route("/api/v1/odo/auth/saml/metadata", get(saml::get_metadata))
             .route(
                 "/api/v1/odo/auth/saml/sso/initiate",
                 get(saml::initiate_sso),

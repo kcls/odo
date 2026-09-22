@@ -2079,9 +2079,7 @@
         "type": "object",
         "required": [
           "entity_id",
-          "acs_url",
-          "x509_cert",
-          "private_key"
+          "acs_url"
         ],
         "properties": {
           "acs_url": {
@@ -2127,17 +2125,11 @@
               "null"
             ]
           },
-          "private_key": {
-            "type": "string"
-          },
           "slo_url": {
             "type": [
               "string",
               "null"
             ]
-          },
-          "x509_cert": {
-            "type": "string"
           }
         }
       },
@@ -3206,9 +3198,7 @@
           "id",
           "entity_id",
           "acs_url",
-          "is_active",
-          "x509_cert",
-          "has_private_key"
+          "is_active"
         ],
         "properties": {
           "acs_url": {
@@ -3229,9 +3219,6 @@
           },
           "entity_id": {
             "type": "string"
-          },
-          "has_private_key": {
-            "type": "boolean"
           },
           "id": {
             "type": "integer",
@@ -3283,9 +3270,6 @@
               "null"
             ],
             "format": "date-time"
-          },
-          "x509_cert": {
-            "type": "string"
           }
         }
       },
@@ -3581,20 +3565,7 @@
               "null"
             ]
           },
-          "private_key": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Empty or absent leaves the existing key unchanged."
-          },
           "slo_url": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "x509_cert": {
             "type": [
               "string",
               "null"

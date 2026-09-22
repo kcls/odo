@@ -927,9 +927,7 @@ export interface components {
             is_active?: boolean | null;
             label?: string | null;
             metadata_url?: string | null;
-            private_key: string;
             slo_url?: string | null;
-            x509_cert: string;
         };
         CreateUserRequest: {
             /**
@@ -1320,7 +1318,6 @@ export interface components {
             /** Format: date-time */
             created_at?: string | null;
             entity_id: string;
-            has_private_key: boolean;
             /** Format: int32 */
             id: number;
             /** Format: int32 */
@@ -1333,7 +1330,6 @@ export interface components {
             slo_url?: string | null;
             /** Format: date-time */
             updated_at?: string | null;
-            x509_cert: string;
         };
         TokenClaims: {
             auth_method: string;
@@ -1406,10 +1402,7 @@ export interface components {
             is_active?: boolean | null;
             label?: string | null;
             metadata_url?: string | null;
-            /** @description Empty or absent leaves the existing key unchanged. */
-            private_key?: string | null;
             slo_url?: string | null;
-            x509_cert?: string | null;
         };
         UpdateUserRequest: {
             /**

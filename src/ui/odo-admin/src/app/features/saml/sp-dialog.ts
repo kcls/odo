@@ -96,28 +96,6 @@ export interface SpDialogData {
         >
 
         <mat-form-field appearance="outline" class="dialog-field">
-          <mat-label i18n="SP field label">SP certificate (x509)</mat-label>
-          <textarea matInput name="x509Cert" rows="4" [(ngModel)]="x509Cert"></textarea>
-        </mat-form-field>
-
-        <mat-form-field appearance="outline" class="dialog-field">
-          <mat-label i18n="SP field label">SP private key</mat-label>
-          <textarea
-            matInput
-            name="privateKey"
-            rows="4"
-            [(ngModel)]="privateKey"
-            i18n-placeholder="Placeholder shown when editing an SP with a stored key"
-            [placeholder]="isEdit ? keepKeyPlaceholder : ''"
-          ></textarea>
-          @if (isEdit) {
-            <mat-hint i18n="Hint for the private key field when editing"
-              >Leave blank to keep the stored key. The key is never displayed.</mat-hint
-            >
-          }
-        </mat-form-field>
-
-        <mat-form-field appearance="outline" class="dialog-field">
           <mat-label i18n="SP field label">IdP certificate (x509)</mat-label>
           <textarea
             matInput
@@ -151,7 +129,6 @@ export class SpDialog {
   protected readonly data = inject<SpDialogData>(MAT_DIALOG_DATA);
 
   protected readonly isEdit = !!this.data.sp;
-  protected readonly keepKeyPlaceholder = $localize`(unchanged)`;
 
   protected label = this.data.sp?.label ?? '';
   protected entityId = this.data.sp?.entity_id ?? '';
@@ -161,9 +138,6 @@ export class SpDialog {
   protected idp: number | null =
     this.data.sp?.idp ?? this.data.defaultIdp ?? null;
   protected isActive = this.data.sp?.is_active ?? true;
-  protected x509Cert = this.data.sp?.x509_cert ?? '';
-  // Write-only: the API never returns the private key, so it always starts empty.
-  protected privateKey = '';
   protected idpX509Cert = this.data.sp?.idp_x509_cert ?? '';
 
   protected readonly saving = signal(false);
@@ -172,12 +146,7 @@ export class SpDialog {
   protected readonly entityIdMatcher = new ServerErrorStateMatcher(this.entityIdError);
 
   protected canSave(): boolean {
-    if (this.saving() || !this.entityId.trim() || !this.acsUrl.trim()) return false;
-    // Creation needs cert + key; edits may leave them untouched.
-    if (!this.isEdit && (!this.x509Cert.trim() || !this.privateKey.trim())) {
-      return false;
-    }
-    return true;
+    return !(this.saving() || !this.entityId.trim() || !this.acsUrl.trim());
   }
 
   protected async save(): Promise<void> {
@@ -185,9 +154,10 @@ export class SpDialog {
     this.error.set('');
     this.entityIdError.set('');
 
-    // Partial: entity_id/acs_url are required for create (guarded by canSave),
-    // and left absent on update only when blank. The private key is write-only:
-    // sent only when the operator typed one, so a blank edit keeps the stored key.
+    // Partial: entity_id/acs_url are required for create (guarded by
+    // canSave), and left absent on update only when blank. The SP has no
+    // signing material of its own -- idp_x509_cert below is the IdP's
+    // certificate, used to verify incoming assertions.
     const params: Partial<CreateSpRequest> = {
       entity_id: this.entityId.trim(),
       label: this.label.trim(),
@@ -197,8 +167,6 @@ export class SpDialog {
       is_active: this.isActive,
       idp_x509_cert: this.idpX509Cert.trim(),
       ...(this.idp !== null ? { idp: this.idp } : {}),
-      ...(this.x509Cert.trim() ? { x509_cert: this.x509Cert.trim() } : {}),
-      ...(this.privateKey.trim() ? { private_key: this.privateKey.trim() } : {}),
     };
 
     try {

@@ -4,9 +4,10 @@
  * generated types from the committed OpenAPI spec (source of truth: the Rust
  * structs), so a backend field change surfaces here as a compile error.
  *
- * Security note: the SP private key is write-only. `SpRow` never carries it
- * (only `has_private_key`); the dialog sends it on create/update but nothing
- * ever renders it.
+ * The SP has no signing material of its own: odo never signs, so
+ * odo:006_drop_sp_signing_material removed its key and certificate. The
+ * `idp_x509_cert` on an SP row is the *IdP's* certificate, used to verify
+ * incoming assertions.
  */
 import { apiPost } from '../../core/api';
 import type { components } from '../../core/api-types/odo-auth';

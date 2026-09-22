@@ -116,11 +116,11 @@ struct SamlMaps {
 
 /// A SAML service provider: this installation's own SAML identity.
 ///
-/// Everything here is public by nature -- the entity id, the URLs the IdP
-/// redirects to, and the certificate the IdP verifies signatures against.
-/// The matching private key deliberately has no field: it is a working
-/// credential, so it is set out of band after registration, the same way
-/// database passwords are.
+/// No signing material: odo never signs anything, so the SP has no key
+/// or certificate of its own (odo:006_drop_sp_signing_material). The
+/// IdP's certificate, which incoming assertions are verified against,
+/// is `idp_x509_cert` and belongs to the SP row rather than here --
+/// odo-auth fetches it from the IdP's metadata.
 ///
 /// `idp_entity_id` names the IdP this SP belongs to. It is resolved to an
 /// id at apply time, so a manifest never carries a database key.
@@ -128,7 +128,6 @@ struct SamlMaps {
 struct SamlSpSpec {
     entity_id: String,
     acs_url: String,
-    x509_cert: String,
     #[serde(default)]
     idp_entity_id: Option<String>,
     #[serde(default)]
@@ -582,13 +581,6 @@ async fn apply(client: &Client, manifest: &Manifest) -> Result<(), String> {
             let mut body = json!({
                 "entity_id": sp.entity_id,
                 "acs_url": sp.acs_url,
-                "x509_cert": sp.x509_cert,
-                // create requires a key. An empty one registers the SP
-                // with no usable signing key, which is the intent: the
-                // real key is installed out of band afterwards, and
-                // update treats an empty value as "leave unchanged", so
-                // re-running this never clobbers it.
-                "private_key": "",
             });
             let obj = body.as_object_mut().expect("json object");
             if let Some(v) = &sp.label { obj.insert("label".into(), json!(v)); }
@@ -785,8 +777,8 @@ async fn main() -> ExitCode {
 mod tests {
     use super::*;
 
-    /// The SAML keys must accept a real site manifest, and must not have
-    /// a private_key field for one to land in.
+    /// The SAML keys must accept a real site manifest, and must carry no
+    /// signing material for any to land in.
     #[test]
     fn saml_manifest_parses_without_a_private_key() {
         let m: Manifest = serde_json::from_str(
@@ -817,7 +809,6 @@ mod tests {
         let sp = &m.saml_sps[0];
         assert_eq!(sp.idp_entity_id.as_deref(), Some("https://idp.example.org/"));
         assert_eq!(sp.entity_id, "https://site.example.org");
-        assert!(sp.x509_cert.contains("BEGIN CERTIFICATE"));
     }
 
     /// The manifest actually shipped for bizapps02 must parse, and must
@@ -840,14 +831,15 @@ mod tests {
         let m: Manifest = serde_json::from_str(&raw).expect("shipped manifest parses");
         assert_eq!(m.saml_idps.len(), 1);
         assert_eq!(m.saml_sps.len(), 1);
-        assert!(m.saml_sps[0].x509_cert.contains("BEGIN CERTIFICATE"));
+        assert_eq!(m.saml_sps[0].entity_id, "https://bizapps02.demo.kclseg.org");
     }
 
-    /// A manifest carrying a private key is a mistake worth catching in
-    /// review, not silently dropping -- serde's default is to ignore
-    /// unknown fields, so this records the current behaviour explicitly.
+    /// Signing material in a manifest is a leftover from before
+    /// odo:006_drop_sp_signing_material. serde ignores unknown fields, so
+    /// an old manifest still loads and the material simply goes nowhere;
+    /// this records that rather than leaving it to chance.
     #[test]
-    fn a_private_key_in_a_manifest_is_ignored_not_applied() {
+    fn stale_signing_material_in_a_manifest_is_ignored() {
         let m: Manifest = serde_json::from_str(
             r#"{"saml_sps": [{
                 "entity_id": "https://site.example.org",
@@ -857,8 +849,8 @@ mod tests {
             }]}"#,
         )
         .expect("manifest parses");
-        // The field does not exist on SamlSpSpec, so nothing carries it
-        // to the API; the SP is created with an empty key either way.
+        // Neither field exists on SamlSpSpec any more, so nothing
+        // carries them to the API.
         assert_eq!(m.saml_sps.len(), 1);
     }
 }

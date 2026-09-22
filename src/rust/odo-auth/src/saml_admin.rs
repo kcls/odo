@@ -1,8 +1,7 @@
 //! Admin CRUD for auth.saml_idp_config and auth.saml_sp_config.
 //!
 //! Reads require `auth.saml.read`; writes require `auth.saml.write`.
-//! The SP `private_key` is write-only: accepted on create/update, never
-//! returned (responses expose `has_private_key` instead). Deletes are
+//! Deletes are
 //! refused with a 409 while other rows reference the target.
 //!
 //! Routes live under /api/v1/odo/auth/saml/admin/* — the /saml PathPrefix
@@ -86,9 +85,7 @@ pub struct SpRow {
     pub idp: Option<i32>,
     pub idp_name: Option<String>,
     pub is_active: bool,
-    pub x509_cert: String,
     pub idp_x509_cert: Option<String>,
-    pub has_private_key: bool,
     pub created_at: Option<chrono::DateTime<chrono::FixedOffset>>,
     pub updated_at: Option<chrono::DateTime<chrono::FixedOffset>>,
 }
@@ -106,9 +103,7 @@ impl SpRow {
             idp: m.idp,
             idp_name,
             is_active: m.is_active,
-            x509_cert: m.x509_cert,
             idp_x509_cert: m.idp_x509_cert,
-            has_private_key: !m.private_key.is_empty(),
             created_at: m.created_at,
             updated_at: m.updated_at,
         }
@@ -182,8 +177,6 @@ pub struct IdpIdRequest {
 pub struct CreateSpRequest {
     entity_id: String,
     acs_url: String,
-    x509_cert: String,
-    private_key: String,
     #[serde(default)]
     label: Option<String>,
     #[serde(default)]
@@ -207,11 +200,6 @@ pub struct UpdateSpRequest {
     entity_id: Option<String>,
     #[serde(default)]
     acs_url: Option<String>,
-    /// Empty or absent leaves the existing key unchanged.
-    #[serde(default)]
-    private_key: Option<String>,
-    #[serde(default)]
-    x509_cert: Option<String>,
     #[serde(default)]
     label: Option<String>,
     #[serde(default)]
@@ -494,8 +482,6 @@ pub async fn create_sp(
 
     let entity_id = clean_required(&params.entity_id, "entity_id")?;
     let acs_url = clean_required(&params.acs_url, "acs_url")?;
-    let x509_cert = clean_required(&params.x509_cert, "x509_cert")?;
-    let private_key = clean_required(&params.private_key, "private_key")?;
 
     // The sp_config table has no DB unique constraint on entity_id (unlike
     // idp_config), so enforce it here.
@@ -508,8 +494,6 @@ pub async fn create_sp(
     let mut model = saml_sp_config::ActiveModel {
         entity_id: Set(entity_id),
         acs_url: Set(acs_url),
-        x509_cert: Set(x509_cert),
-        private_key: Set(private_key),
         label: Set(clean_optional(params.label.as_deref())),
         slo_url: Set(clean_optional(params.slo_url.as_deref())),
         metadata_url: Set(clean_optional(params.metadata_url.as_deref())),
@@ -557,17 +541,7 @@ pub async fn update_sp(
     if let Some(ref acs_url) = params.acs_url {
         model.acs_url = Set(clean_required(acs_url, "acs_url")?);
     }
-    if let Some(ref x509_cert) = params.x509_cert
-        && !x509_cert.trim().is_empty()
-    {
-        model.x509_cert = Set(x509_cert.trim().to_string());
-    }
     // Only replace the private key when a non-empty value is supplied.
-    if let Some(ref private_key) = params.private_key
-        && !private_key.trim().is_empty()
-    {
-        model.private_key = Set(private_key.trim().to_string());
-    }
     if params.label.is_some() {
         model.label = Set(clean_optional(params.label.as_deref()));
     }

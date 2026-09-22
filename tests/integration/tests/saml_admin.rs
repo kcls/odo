@@ -168,8 +168,6 @@ async fn sp_crud_lifecycle() {
             "entity_id": sp_entity,
             "label": "Test SP",
             "acs_url": "https://sp.example.com/acs",
-            "x509_cert": "-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----",
-            "private_key": "-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----",
             "idp": idp_id
         }),
     )
@@ -177,12 +175,8 @@ async fn sp_crud_lifecycle() {
     assert_eq!(resp.status(), 200);
     let sp: serde_json::Value = resp.json().await.unwrap();
     let sp_id = sp["id"].as_i64().unwrap();
-    assert_eq!(sp["has_private_key"], true);
     assert_eq!(sp["idp_name"], "SP Test IdP");
-    // The private key must never be returned
-    assert!(sp.get("private_key").is_none());
 
-    // List omits private keys too
     let resp = post_json(&c, &token, "/sp/list", json!({})).await;
     assert_eq!(resp.status(), 200);
     let data: serde_json::Value = resp.json().await.unwrap();
@@ -193,9 +187,13 @@ async fn sp_crud_lifecycle() {
         .find(|s| s["id"].as_i64() == Some(sp_id))
         .expect("created SP missing from list")
         .clone();
+    // Signing material was dropped in odo:006_drop_sp_signing_material;
+    // an SP row must not carry it back in some other form.
     assert!(listed.get("private_key").is_none());
+    assert!(listed.get("x509_cert").is_none());
+    assert!(listed.get("has_private_key").is_none());
 
-    // Update without private_key keeps the existing key
+    // A partial update leaves unmentioned fields alone
     let resp = post_json(
         &c,
         &token,
@@ -206,7 +204,6 @@ async fn sp_crud_lifecycle() {
     assert_eq!(resp.status(), 200);
     let updated: serde_json::Value = resp.json().await.unwrap();
     assert_eq!(updated["label"], "Renamed SP");
-    assert_eq!(updated["has_private_key"], true);
 
     // Duplicate entity_id -> 409
     let resp = post_json(
@@ -216,8 +213,6 @@ async fn sp_crud_lifecycle() {
         json!({
             "entity_id": sp_entity,
             "acs_url": "https://sp2.example.com/acs",
-            "x509_cert": "c",
-            "private_key": "k"
         }),
     )
     .await;
@@ -249,8 +244,6 @@ async fn sp_create_validation() {
         json!({
             "entity_id": unique("bad-idp"),
             "acs_url": "https://x.example.com/acs",
-            "x509_cert": "c",
-            "private_key": "k",
             "idp": 999999999
         }),
     )
@@ -265,8 +258,6 @@ async fn sp_create_validation() {
         json!({
             "entity_id": unique("blank-acs"),
             "acs_url": "  ",
-            "x509_cert": "c",
-            "private_key": "k"
         }),
     )
     .await;

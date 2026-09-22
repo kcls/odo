@@ -15,9 +15,7 @@ pub struct Model {
     #[sea_orm(column_type = "Text", nullable)]
     pub slo_url: Option<String>,
     #[sea_orm(column_type = "Text")]
-    pub x509_cert: String,
     #[sea_orm(column_type = "Text")]
-    pub private_key: String,
     #[sea_orm(column_type = "Text", nullable)]
     pub metadata_url: Option<String>,
     pub created_at: Option<DateTimeWithTimeZone>,
