@@ -94,23 +94,6 @@ async fn initiate_sso_with_relay_state() {
 }
 
 #[tokio::test]
-async fn metadata_for_origin() {
-    let c = client();
-    let resp = c
-        .get(format!("{}/api/v1/odo/auth/saml/metadata", auth_base()))
-        .query(&[("origin", ORIGIN)])
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(resp.status(), 200);
-    let content_type = resp.headers().get("content-type").unwrap().to_str().unwrap();
-    assert!(content_type.contains("application/xml"));
-    let body = resp.text().await.unwrap();
-    assert!(body.contains("EntityDescriptor"));
-    assert!(body.contains(ORIGIN));
-}
-
-#[tokio::test]
 async fn acs_rejects_garbage() {
     let c = client();
     let resp = c

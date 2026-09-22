@@ -74,18 +74,6 @@ async fn get_idp_not_found() {
 }
 
 #[tokio::test]
-async fn metadata_unknown_origin() {
-    let c = client();
-    let resp = c
-        .get(format!("{}/api/v1/odo/auth/saml/metadata", auth_base()))
-        .query(&[("origin", "https://nonexistent.example.com")])
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(resp.status(), 404);
-}
-
-#[tokio::test]
 async fn acs_invalid_response() {
     let c = client();
     let resp = c

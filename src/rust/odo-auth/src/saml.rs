@@ -38,11 +38,6 @@ use odo_client::error::ApiResult;
 // ---------------------------------------------------------------------------
 
 #[derive(Deserialize)]
-pub struct MetadataQuery {
-    origin: String,
-}
-
-#[derive(Deserialize)]
 pub struct InitiateSsoQuery {
     sp_id: i32,
     #[serde(default)]
@@ -656,46 +651,6 @@ async fn upsert_saml_identity(
 // ---------------------------------------------------------------------------
 // HTTP handlers
 // ---------------------------------------------------------------------------
-
-/// GET /odo/auth/saml/metadata?origin=... — returns raw SP metadata XML.
-pub async fn get_metadata(
-    State(state): State<Arc<AppState>>,
-    Query(params): Query<MetadataQuery>,
-) -> Result<Response, odo_client::error::ApiError> {
-    let sp = saml_sp_config::Entity::find()
-        .filter(saml_sp_config::Column::EntityId.eq(&params.origin))
-        .filter(saml_sp_config::Column::IsActive.eq(true))
-        .one(&state.db)
-        .await?
-        .ok_or(LocalError::not_found("saml sp"))?;
-
-    let x509_cert_inline = sp.x509_cert.replace('\n', "");
-    let slo_url = sp.slo_url.as_deref().unwrap_or("/saml/sls");
-
-    let metadata_xml = format!(
-        r#"<?xml version="1.0"?>
-<EntityDescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata" entityID="{}">
-    <SPSSODescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
-        <KeyDescriptor use="signing">
-            <KeyInfo xmlns="http://www.w3.org/2000/09/xmldsig#">
-                <X509Data>
-                    <X509Certificate>{}</X509Certificate>
-                </X509Data>
-            </KeyInfo>
-        </KeyDescriptor>
-        <SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST" Location="{}"/>
-        <AssertionConsumerService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST" Location="{}" index="0"/>
-    </SPSSODescriptor>
-</EntityDescriptor>"#,
-        sp.entity_id, x509_cert_inline, slo_url, sp.acs_url
-    );
-
-    Ok((
-        [(axum::http::header::CONTENT_TYPE, "application/xml")],
-        metadata_xml,
-    )
-        .into_response())
-}
 
 /// GET /odo/auth/saml/sso/initiate?sp_id=X&relay_state=... — redirects to IdP.
 pub async fn initiate_sso(
