@@ -276,6 +276,8 @@ KNOWN_KEYS='["org_unit_types","org_units","permissions","roles","role_permission
 META_KEYS='["app","description","comment","version","$schema"]'
 
 summarize() {
+    local tmp
+    tmp="$(mktemp)"
     jq -r --argjson known "$KNOWN_KEYS" --argjson meta "$META_KEYS" '
         def cnt($m; $k):
             if $k == "saml_attr_role_maps"
@@ -298,7 +300,17 @@ summarize() {
           ( $m | keys_unsorted[]
             | select(. as $k | ($known + $meta) | index($k) | not)
             | "    ? unknown key \"\(.)\" - odo-register will ignore it" )
-    ' "$1" | column -t -s'|'
+    ' "$1" > "$tmp" || { rm -f "$tmp"; return 1; }
+
+    # Align the columns when `column` is available (util-linux /
+    # bsdextrautils); fall back to the raw rows when it is not. This is
+    # cosmetic, and a server without it must not look like a parse error.
+    if command -v column >/dev/null 2>&1; then
+        column -t -s'|' < "$tmp"
+    else
+        sed 's/|/  /' "$tmp"
+    fi
+    rm -f "$tmp"
 }
 
 echo
