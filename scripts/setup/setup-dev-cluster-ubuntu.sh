@@ -14,9 +14,11 @@
 # The database connection comes from the postgres-credentials secret those
 # steps wrote; no PG* environment variables are needed.
 #
-# --with-test-deps additionally installs what ./scripts/run-tests.sh needs:
-# the pgTAP client runner, the Playwright system libraries, the e2e npm
-# packages, and the e2e fixtures.
+# Everything ./scripts/run-tests.sh needs is installed too: the pgTAP
+# client runner, the Playwright system libraries, the e2e npm packages,
+# and the e2e fixtures. The Mac installer gates those behind
+# --with-test-deps; this one does not, because a dev cluster on Ubuntu
+# is a machine you run the suites on.
 #
 # Run as a normal user from the project root directory. The script uses
 # sudo and sg where needed; no logout/login required during execution.
@@ -351,24 +353,21 @@ main() {
 }
 
 usage() {
-    echo "Usage: $0 [--with-test-deps]"
+    echo "Usage: $0"
     echo
     echo "Turns an Odo k3s cluster into a development machine: installs Node,"
     echo "Rust, and the build dependencies, starts the local Docker registry,"
     echo "creates the database, deploys the schema and platform seed, builds"
-    echo "and deploys every service, and builds the odo-register CLI."
+    echo "and deploys every service, and builds the odo-register CLI. It"
+    echo "also installs what ./scripts/run-tests.sh needs: the pgTAP client"
+    echo "runner, the Playwright system libraries, the e2e npm packages,"
+    echo "and the e2e fixtures."
     echo
     echo "Run the PostgreSQL and cluster installers first:"
     echo "  ./scripts/setup/install-postgres-server-ubuntu.sh --with-pgtap"
     echo "  ./scripts/setup/install-k3s-cluster-ubuntu.sh"
     echo
     echo "Options:"
-    echo "  --with-test-deps   Also install what ./scripts/run-tests.sh"
-    echo "                     needs: the pgTAP client runner, the Playwright"
-    echo "                     system libraries, the e2e npm packages, and"
-    echo "                     the e2e fixtures. Omitted by default, which"
-    echo "                     leaves the database carrying only the"
-    echo "                     platform seed."
     echo "  --help, -h         Show this message"
     echo
     echo "Run as a normal user from the project root directory."

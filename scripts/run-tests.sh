@@ -10,9 +10,9 @@
 #   --all          every suite above
 #
 # Requires the test dependencies to have been installed first: on Ubuntu,
-# ./scripts/setup/setup-dev-cluster-ubuntu.sh --with-test-deps (with the
-# pgtap extension on the database server); on macOS, the cluster installer
-# with --with-test-deps.
+# ./scripts/setup/setup-dev-cluster-ubuntu.sh installs them as a matter of
+# course (with the pgtap extension on the database server); on macOS, the
+# cluster installer with --with-test-deps.
 #
 # Usage:
 #   scripts/run-tests.sh --db --integration --e2e   # the cluster suites

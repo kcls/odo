@@ -16,7 +16,7 @@ On Ubuntu:
 
 ```bash
 ./scripts/setup/install-postgres-server-ubuntu.sh --with-pgtap  # the extension
-./scripts/setup/setup-dev-cluster-ubuntu.sh --with-test-deps    # pg_prove
+./scripts/setup/setup-dev-cluster-ubuntu.sh                     # pg_prove
 ```
 
 When the database lives on a host the installer never touches, install the

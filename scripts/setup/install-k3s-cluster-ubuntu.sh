@@ -502,7 +502,7 @@ print_post_install() {
     echo "  kubectl get pods -A"
     echo
     echo "On a development machine, continue with:"
-    echo "  ./scripts/setup/setup-dev-cluster-ubuntu.sh --with-test-deps"
+    echo "  ./scripts/setup/setup-dev-cluster-ubuntu.sh"
     echo
 }
 
