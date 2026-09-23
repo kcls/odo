@@ -22,6 +22,11 @@
 #
 # Environment variables:
 #   ODO_URL=url               Gateway base URL (default: http://localhost:30080)
+#   ODO_REGISTER_NO_BUILD=1   do not rebuild odo-register before running.
+#                             By default it is rebuilt from this checkout
+#                             (a fraction of a second when unchanged), so
+#                             the binary cannot trail the manifest keys
+#                             the checkout supports.
 #   ODO_REGISTER=path         odo-register binary (default: looked up on PATH,
 #                             then src/rust/odo-register/target/release|debug)
 #   GITHUB_TOKEN=token        Sent as a bearer token when fetching from
@@ -70,6 +75,7 @@ usage() {
     echo "Environment variables:"
     echo "  ODO_URL=url               Gateway base URL (default: http://localhost:30080)"
     echo "  ODO_REGISTER=path         odo-register binary to run"
+    echo "  ODO_REGISTER_NO_BUILD=1   skip rebuilding odo-register first"
     echo "  PGHOST/PGPORT/PGDATABASE/PGUSER/PGPASSWORD"
     echo "                            Override the database connection"
     echo "  NAMESPACE=name            Kubernetes namespace for secrets (default: odo-core)"
@@ -95,6 +101,52 @@ set -- "${ARGS[@]+"${ARGS[@]}"}"
 
 [ $# -ge 1 ] || usage
 
+# Build odo-register from this checkout when it is the one we will run.
+#
+# The binary lives outside git, so it can trail the source it was built
+# from by any amount. That failure is nasty: a manifest using a key the
+# checkout supports is rejected as invalid by a binary that predates it,
+# which reads as a broken manifest rather than a stale build. Rebuilding
+# costs a fraction of a second when nothing changed.
+#
+# Skipped for ODO_REGISTER or a binary on PATH: those are deliberate
+# choices to run something other than this checkout, and rebuilding
+# would not affect them anyway.
+build_odo_register() {
+    local crate="$PROJECT_ROOT/src/rust/odo-register"
+    [ -f "$crate/Cargo.toml" ] || return 0
+    [ "${ODO_REGISTER_NO_BUILD:-}" != "1" ] || return 0
+
+    if ! command -v cargo &>/dev/null; then
+        # Only worth mentioning if there is also nothing to fall back on.
+        [ -x "$crate/target/release/odo-register" ] || \
+        [ -x "$crate/target/debug/odo-register" ] || \
+            echo -e "${YELLOW}cargo not found and no odo-register built yet.${NC}" >&2
+        return 0
+    fi
+
+    # Match whichever profile is already built, so the rebuild replaces
+    # the binary that would otherwise be selected below. A release build
+    # present and a debug build refreshed would mean running the stale
+    # one, since release is preferred.
+    local profile=() what=debug
+    if [ -x "$crate/target/release/odo-register" ]; then
+        profile=(--release); what=release
+    fi
+
+    echo -e "${BLUE}Building odo-register ($what)${NC}" >&2
+    if ! ( cd "$crate" && cargo build "${profile[@]}" 2>&1 | sed 's/^/  /' >&2 ); then
+        # A build failure with a usable binary present is a choice: run
+        # the old one and risk the mismatch, or stop. Stopping is right --
+        # the source is broken, and what the old binary does with a new
+        # manifest is not something to find out mid-deployment.
+        echo -e "${RED}odo-register failed to build.${NC}" >&2
+        echo "Fix the build, or set ODO_REGISTER_NO_BUILD=1 to run the" >&2
+        echo "existing binary anyway, or ODO_REGISTER=/path/to/binary." >&2
+        exit 1
+    fi
+}
+
 # Locate odo-register: an explicit override, then PATH, then a local build.
 find_odo_register() {
     if [ -n "${ODO_REGISTER:-}" ]; then
@@ -111,6 +163,13 @@ find_odo_register() {
     done
     return 1
 }
+
+# Before the lookup, and outside the command substitution it runs in:
+# build_odo_register exits on failure, and an exit inside $(...) would
+# only end the subshell and let the run continue.
+if [ -z "${ODO_REGISTER:-}" ] && ! command -v odo-register &>/dev/null; then
+    build_odo_register
+fi
 
 if ! ODO_REGISTER_BIN="$(find_odo_register)"; then
     echo -e "${RED}odo-register not found.${NC}" >&2
