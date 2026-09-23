@@ -73,6 +73,8 @@ struct Manifest {
     #[serde(default)]
     saml_sps: Vec<SamlSpSpec>,
     #[serde(default)]
+    saml_idp_attributes: Vec<SamlAttrSpec>,
+    #[serde(default)]
     saml_attr_role_maps: Option<SamlMaps>,
     #[serde(default)]
     users: Vec<Value>,
@@ -106,6 +108,23 @@ struct OrgUnitSpec {
     unit_type: String,
     #[serde(default)]
     timezone: Option<String>,
+}
+
+/// A SAML attribute an IdP asserts, which role maps then match against.
+///
+/// `idp_entity_id` names the owning IdP, resolved at apply time so a
+/// manifest never carries a database key. Omit it when the install has a
+/// single IdP and the attribute belongs to it.
+#[derive(Deserialize)]
+struct SamlAttrSpec {
+    key: String,
+    label: String,
+    #[serde(default)]
+    idp_entity_id: Option<String>,
+    #[serde(default)]
+    is_location: Option<bool>,
+    #[serde(default)]
+    normalizer: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -616,6 +635,103 @@ async fn apply(client: &Client, manifest: &Manifest) -> Result<(), String> {
         t.report("saml sps");
     }
 
+    if !manifest.saml_idp_attributes.is_empty() {
+        // Same entity_id -> id resolution the SPs use. Re-read rather
+        // than reuse: this run may have just created the IdP.
+        let (status, idps) = client
+            .post(
+                format!("{}/api/v1/odo/auth/saml/admin/idp/list", client.base),
+                &json!({}),
+            )
+            .await?;
+        if status != 200 {
+            return Err(format!("saml idp list: {status}"));
+        }
+        let rows = idps["idps"].as_array().cloned().unwrap_or_default();
+        let by_entity: HashMap<&str, i64> = rows
+            .iter()
+            .filter_map(|i| Some((i["entity_id"].as_str()?, i["id"].as_i64()?)))
+            .collect();
+
+        let mut t = Tally::new();
+        for attr in &manifest.saml_idp_attributes {
+            // With one IdP and no entity named, the attribute is its.
+            // Naming it is required as soon as there is more than one,
+            // since guessing would silently attach it to the wrong IdP.
+            let idp_id = match &attr.idp_entity_id {
+                Some(entity) => match by_entity.get(entity.as_str()) {
+                    Some(id) => *id,
+                    None => {
+                        println!(
+                            "saml attribute {}: no IdP with entity_id '{}' - skipped",
+                            attr.key, entity
+                        );
+                        continue;
+                    }
+                },
+                None if rows.len() == 1 => rows[0]["id"].as_i64().unwrap_or_default(),
+                None => {
+                    println!(
+                        "saml attribute {}: {} IdPs configured and no idp_entity_id - skipped",
+                        attr.key,
+                        rows.len()
+                    );
+                    continue;
+                }
+            };
+
+            let mut body = json!({
+                "idp": idp_id,
+                "key": attr.key,
+                "label": attr.label,
+            });
+            let obj = body.as_object_mut().expect("json object");
+            if let Some(v) = attr.is_location { obj.insert("is_location".into(), json!(v)); }
+            if let Some(v) = &attr.normalizer { obj.insert("normalizer".into(), json!(v)); }
+
+            // The unique constraint is on (idp, key, normalizer), and a
+            // NULL normalizer never equals itself in Postgres -- so an
+            // attribute without one can be created over and over and the
+            // database will not complain. Check before creating rather
+            // than rely on a 409 that will not come.
+            let (status, existing) = client
+                .post(
+                    format!("{}/api/v1/odo/auth/saml/admin/attribute/list", client.base),
+                    &json!({}),
+                )
+                .await?;
+            if status != 200 {
+                return Err(format!("saml attribute list: {status}"));
+            }
+            let already = existing["attributes"]
+                .as_array()
+                .map(|a| {
+                    a.iter().any(|e| {
+                        e["idp"].as_i64() == Some(idp_id)
+                            && e["key"].as_str() == Some(attr.key.as_str())
+                            && e["normalizer"].as_str() == attr.normalizer.as_deref()
+                    })
+                })
+                .unwrap_or(false);
+            if already {
+                t.add(Outcome::Exists);
+                continue;
+            }
+
+            let label = format!("saml attribute {}", attr.key);
+            t.add(
+                client
+                    .upsert(
+                        &label,
+                        format!("{}/api/v1/odo/auth/saml/admin/attribute/create", client.base),
+                        &body,
+                    )
+                    .await?,
+            );
+        }
+        t.report("saml attributes");
+    }
+
     if let Some(saml) = &manifest.saml_attr_role_maps {
         // Resolve the attribute id per active IdP; skip with a notice when
         // the install has no SSO or the IdP lacks the attribute.
@@ -832,6 +948,67 @@ mod tests {
         assert_eq!(m.saml_idps.len(), 1);
         assert_eq!(m.saml_sps.len(), 1);
         assert_eq!(m.saml_sps[0].entity_id, "https://bizapps02.demo.kclseg.org");
+    }
+
+    /// Attributes parse, and the IdP may be named or left implicit.
+    #[test]
+    fn saml_idp_attributes_parse() {
+        let m: Manifest = serde_json::from_str(
+            r#"{"saml_idp_attributes": [
+                {"key": "Title", "label": "Job Title"},
+                {"key": "Branch", "label": "Home Branch",
+                 "idp_entity_id": "https://idp.example.org/",
+                 "is_location": true, "normalizer": "split_slash_last"}
+            ]}"#,
+        )
+        .expect("manifest parses");
+        assert_eq!(m.saml_idp_attributes.len(), 2);
+        assert_eq!(m.saml_idp_attributes[0].key, "Title");
+        assert!(m.saml_idp_attributes[0].idp_entity_id.is_none());
+        assert_eq!(m.saml_idp_attributes[1].is_location, Some(true));
+        assert_eq!(
+            m.saml_idp_attributes[1].normalizer.as_deref(),
+            Some("split_slash_last")
+        );
+    }
+
+    /// Every site manifest that maps roles off an attribute must also
+    /// declare it. Without the attribute the maps silently apply to
+    /// nothing, which looks like a successful run and leaves SSO users
+    /// with no roles.
+    #[test]
+    fn every_site_declares_the_attribute_its_maps_need() {
+        let sites = concat!(env!("CARGO_MANIFEST_DIR"), "/../../../../odo-deploy/sites");
+        let Ok(entries) = std::fs::read_dir(sites) else {
+            return; // odo-deploy is a private sibling checkout; skip when absent.
+        };
+        let mut checked = 0;
+        for site in entries.filter_map(Result::ok) {
+            let dir = site.path().join("data/manifests");
+            if !dir.is_dir() {
+                continue;
+            }
+            let mut declared: Vec<String> = Vec::new();
+            let mut needed: Vec<String> = Vec::new();
+            for f in std::fs::read_dir(&dir).unwrap().filter_map(Result::ok) {
+                let raw = std::fs::read_to_string(f.path()).unwrap();
+                let m: Manifest = serde_json::from_str(&raw)
+                    .unwrap_or_else(|e| panic!("{}: {e}", f.path().display()));
+                declared.extend(m.saml_idp_attributes.iter().map(|a| a.key.clone()));
+                if let Some(maps) = &m.saml_attr_role_maps {
+                    needed.push(maps.attr_key.clone());
+                }
+            }
+            for key in &needed {
+                assert!(
+                    declared.contains(key),
+                    "{}: maps roles off attribute '{key}' but no manifest declares it",
+                    site.file_name().to_string_lossy()
+                );
+            }
+            checked += 1;
+        }
+        assert!(checked > 0, "no site manifests found to check");
     }
 
     /// Signing material in a manifest is a leftover from before
