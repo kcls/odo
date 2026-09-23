@@ -270,7 +270,7 @@ done
 # Top-level keys odo-register understands. Anything else in a manifest is
 # silently ignored by the deserializer, so a typo'd key is a section that
 # quietly does nothing -- worth catching here rather than after the fact.
-KNOWN_KEYS='["org_unit_types","org_units","permissions","roles","role_permissions","notification_templates","asset_directories","saml_attr_role_maps","users","user_role_assignments"]'
+KNOWN_KEYS='["org_unit_types","org_units","permissions","roles","role_permissions","notification_templates","asset_directories","saml_idps","saml_sps","saml_attr_role_maps","users","user_role_assignments"]'
 # Keys manifests carry for humans. Not warned about, so the typo warning
 # above stays worth reading.
 META_KEYS='["app","description","comment","version","$schema"]'
