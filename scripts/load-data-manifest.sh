@@ -26,7 +26,13 @@
 #                             By default it is rebuilt from this checkout
 #                             (a fraction of a second when unchanged), so
 #                             the binary cannot trail the manifest keys
-#                             the checkout supports.
+#                             the checkout supports. Hosts without cargo
+#                             fetch the released binary instead with
+#                             scripts/fetch-odo-register.sh; a fetched
+#                             binary is checked against the checkout's tag.
+#   ODO_REGISTER_SKIP_VERSION_CHECK=1
+#                             run a fetched binary whose release tag
+#                             differs from this checkout's.
 #   ODO_REGISTER=path         odo-register binary (default: looked up on PATH,
 #                             then src/rust/odo-register/target/release|debug)
 #   GITHUB_TOKEN=token        Sent as a bearer token when fetching from
@@ -76,6 +82,8 @@ usage() {
     echo "  ODO_URL=url               Gateway base URL (default: http://localhost:30080)"
     echo "  ODO_REGISTER=path         odo-register binary to run"
     echo "  ODO_REGISTER_NO_BUILD=1   skip rebuilding odo-register first"
+    echo "  ODO_REGISTER_SKIP_VERSION_CHECK=1"
+    echo "                            run a fetched binary from another release"
     echo "  PGHOST/PGPORT/PGDATABASE/PGUSER/PGPASSWORD"
     echo "                            Override the database connection"
     echo "  NAMESPACE=name            Kubernetes namespace for secrets (default: odo-core)"
@@ -173,10 +181,30 @@ fi
 
 if ! ODO_REGISTER_BIN="$(find_odo_register)"; then
     echo -e "${RED}odo-register not found.${NC}" >&2
-    echo "Build it with: (cd src/rust/odo-register && cargo build --release)" >&2
+    echo "Fetch the released binary:  scripts/fetch-odo-register.sh" >&2
+    echo "or build it:                (cd src/rust/odo-register && cargo build --release)" >&2
     echo "or set ODO_REGISTER=/path/to/odo-register" >&2
     exit 1
 fi
+
+# A fetched binary is stamped with its release tag. When this checkout is
+# on a tag too, the two have to agree -- the manifests here are written
+# for this release's odo-register. A local cargo build reports the crate
+# version instead, and a binary older than --version prints usage; both
+# are left alone, since there is nothing to compare.
+check_odo_register_version() {
+    local tag reported
+    tag="$(git -C "$PROJECT_ROOT" describe --tags --exact-match HEAD 2>/dev/null)" || return 0
+    reported="$("$ODO_REGISTER_BIN" --version 2>/dev/null | awk '{print $2}')" || return 0
+    [[ "$reported" == v* ]] || return 0
+    [ "$reported" = "$tag" ] && return 0
+
+    echo -e "${RED}odo-register is $reported but this checkout is $tag.${NC}" >&2
+    echo "Fetch the matching one with scripts/fetch-odo-register.sh, or set" >&2
+    echo "ODO_REGISTER_SKIP_VERSION_CHECK=1 to run it anyway." >&2
+    [ "${ODO_REGISTER_SKIP_VERSION_CHECK:-}" = "1" ] || exit 1
+}
+check_odo_register_version
 
 # Anything downloaded lands here and is removed on the way out. Created
 # lazily so a run with only local paths touches no temp storage.

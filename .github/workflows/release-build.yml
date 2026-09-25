@@ -10,6 +10,11 @@ name: Release Build
 # A published vX.Y.Z tag is never re-pointed; a bad release is superseded by
 # the next patch. See docs/tech-docs/release-management.md.
 #
+# Alongside the images, every run builds odo-register as a static binary for
+# x86_64 and aarch64. A tag push attaches those to the GitHub Release, so a
+# host that only runs k3s can fetch the tool (scripts/fetch-odo-register.sh)
+# instead of carrying a Rust toolchain to build it.
+#
 # Deployment is deliberately out of scope: this repository publishes images and
 # manifests, and a private per-installation repository decides what runs where.
 
@@ -209,19 +214,102 @@ jobs:
             BUILD_COMMIT=${{ github.sha }}
             VERSION=${{ needs.plan.outputs.version }}
 
+  odo-register:
+    name: Build odo-register (${{ matrix.target }})
+    needs: plan
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        # Pinned rather than ubuntu-latest so both rows build on the same
+        # release and the job does not move when the latest label does.
+        # Nothing from the runner ends up in a static musl binary anyway.
+        include:
+          - target: x86_64-unknown-linux-musl
+            runner: ubuntu-26.04
+          - target: aarch64-unknown-linux-musl
+            runner: ubuntu-26.04-arm
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src/rust/odo-register
+          key: ${{ matrix.target }}
+
+      # musl links statically with no C dependencies to satisfy: odo-register
+      # is reqwest without TLS (it talks to the gateway on localhost), serde
+      # and tokio. The result runs on any Linux of the same architecture.
+      - name: Build
+        env:
+          ODO_REGISTER_BUILD_VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          cd src/rust/odo-register
+          cargo build --release --locked --target "${{ matrix.target }}"
+
+          bin="target/${{ matrix.target }}/release/odo-register"
+          file "$bin"
+          # rustc emits a static-pie for musl; file reports that as
+          # "static-pie linked", older toolchains as "statically linked".
+          if ! file "$bin" | grep -Eq 'static(ally|-pie) linked'; then
+            echo "::error::odo-register is not statically linked" >&2
+            exit 1
+          fi
+
+          # The stamp is what the fetch script checks the download against.
+          "$bin" --version
+          [ "$("$bin" --version)" = "odo-register $ODO_REGISTER_BUILD_VERSION" ]
+
+          mkdir -p "$GITHUB_WORKSPACE/dist"
+          cp "$bin" "$GITHUB_WORKSPACE/dist/odo-register-${{ matrix.target }}"
+
+      # Handed to the release job; on a non-release run this is the only
+      # place the binary lands, and a week is plenty for a smoke test.
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: odo-register-${{ matrix.target }}
+          path: dist/odo-register-${{ matrix.target }}
+          if-no-files-found: error
+          retention-days: 7
+
   github-release:
     name: Publish GitHub Release
-    needs: [plan, build]
-    # Only after the images exist: a release entry announcing a version whose
-    # build failed is worse than no entry.
+    needs: [plan, build, odo-register]
+    # Only after the images and binaries exist: a release entry announcing
+    # a version whose build failed is worse than no entry.
     if: needs.plan.outputs.is-release == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      # No checkout: gh works from GH_REPO, and there is nothing to upload.
-      # Deployment repositories read k8s/ and openapi/ as a kustomize remote
-      # base pinned to this tag, so the release carries no artifacts.
+      # No checkout: gh works from GH_REPO. Deployment repositories read
+      # k8s/ and openapi/ as a kustomize remote base pinned to this tag, so
+      # the manifests are not packaged; the only assets are the odo-register
+      # binaries, for hosts with no toolchain.
+      - name: Collect odo-register binaries
+        uses: actions/download-artifact@v4
+        with:
+          pattern: odo-register-*
+          path: dist
+          merge-multiple: true
+
+      - name: Checksum the assets
+        run: |
+          cd dist
+          chmod 0755 odo-register-*
+          sha256sum odo-register-* > SHA256SUMS
+          cat SHA256SUMS
+
       - name: Create the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -230,7 +318,20 @@ jobs:
           PRERELEASE: ${{ needs.plan.outputs.is-prerelease }}
         run: |
           if gh release view "$VERSION" >/dev/null 2>&1; then
-            echo "Release $VERSION already exists; leaving it alone."
+            # Notes someone edited stay as they are. Assets are only added
+            # where missing, never replaced: a re-run of the same commit
+            # produces a different binary, and a downloaded checksum must
+            # keep matching what the release served before.
+            echo "Release $VERSION already exists; leaving notes alone."
+            existing="$(gh release view "$VERSION" --json assets --jq '.assets[].name')"
+            for f in dist/*; do
+              if grep -qxF "$(basename "$f")" <<<"$existing"; then
+                echo "  asset $(basename "$f") already present"
+              else
+                gh release upload "$VERSION" "$f"
+                echo "  uploaded $(basename "$f")"
+              fi
+            done
             exit 0
           fi
 
@@ -241,11 +342,11 @@ jobs:
             args+=(--prerelease)
           fi
 
-          gh release create "$VERSION" "${args[@]}"
+          gh release create "$VERSION" "${args[@]}" dist/*
 
   summary:
     name: Build Summary
-    needs: [plan, build]
+    needs: [plan, build, odo-register]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -260,7 +361,8 @@ jobs:
             echo "| Version | \`${{ needs.plan.outputs.version }}\` |"
             echo "| Release tag | ${{ needs.plan.outputs.is-release }} |"
             echo "| Commit | \`${{ github.sha }}\` |"
-            echo "| Result | ${{ needs.build.result }} |"
+            echo "| Images | ${{ needs.build.result }} |"
+            echo "| odo-register | ${{ needs.odo-register.result }} |"
             echo
             echo "**Services**"
             echo '```json'

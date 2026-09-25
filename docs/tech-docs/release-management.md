@@ -126,10 +126,15 @@ repository.
 
 A tag push also creates the **GitHub Release**, with generated notes; a
 suffixed tag is marked as a prerelease so it is not presented as the latest.
-The release carries no artifacts — deployment repositories read `k8s/` and
-`openapi/` straight out of the tagged source (see below), so there is nothing
-to package. The job is skipped if the release already exists, so re-running a
-build never overwrites notes someone has edited.
+The manifests are not packaged — deployment repositories read `k8s/` and
+`openapi/` straight out of the tagged source (see below). The release's only
+assets are `odo-register` as a static binary for x86_64 and aarch64, plus a
+`SHA256SUMS`, so a host with no Rust toolchain can run registration
+(`scripts/fetch-odo-register.sh` downloads, verifies and installs the one
+matching a checkout's tag). If the release already exists the notes are left
+alone and only missing assets are added; an asset is never replaced, since a
+rebuild of the same commit yields a different binary and downloaded checksums
+have to keep matching.
 
 ## Cross-project version coupling
 
@@ -223,8 +228,10 @@ and the version in effect is visible in the diff of any change. The overlay
 then patches what is installation-specific — image tags, replicas, hostnames,
 secret references — leaving the upstream manifests untouched.
 
-This is why neither public repository publishes release artifacts: the tag
-*is* the artifact.
+This is why neither public repository packages its manifests as release
+artifacts: the tag *is* the artifact. (odo's release does carry the
+`odo-register` binaries, which are a tool for applying manifests rather than
+something a deployment overlays.)
 
 ### One repository, not two
 
