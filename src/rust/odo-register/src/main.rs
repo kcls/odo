@@ -835,11 +835,25 @@ async fn apply(client: &Client, manifest: &Manifest) -> Result<(), String> {
     Ok(())
 }
 
+/// What `--version` prints. A release build stamps the git tag in through
+/// ODO_REGISTER_BUILD_VERSION so a fetched binary can be checked against
+/// the checkout whose manifests it is about to apply; a local cargo build
+/// has no tag and reports the crate version instead.
+fn build_version() -> &'static str {
+    option_env!("ODO_REGISTER_BUILD_VERSION").unwrap_or(env!("CARGO_PKG_VERSION"))
+}
+
+
 #[tokio::main]
 async fn main() -> ExitCode {
     let paths: Vec<String> = std::env::args().skip(1).collect();
+    if paths.iter().any(|a| a == "--version" || a == "-V") {
+        println!("odo-register {}", build_version());
+        return ExitCode::SUCCESS;
+    }
     if paths.is_empty() {
         eprintln!("usage: odo-register <manifest.json> [more-manifests...]");
+        eprintln!("       odo-register --version");
         return ExitCode::from(2);
     }
 
