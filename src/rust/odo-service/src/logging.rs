@@ -5,10 +5,14 @@
 //! current span) and adds process-level Kubernetes identity fields so
 //! every line, including startup and background-worker output, can be
 //! attributed to a pod once it reaches a JSON-aware log receiver.
+//!
+//! Timestamps are RFC 3339 in UTC unless `ODO_LOG_TIMEZONE` names an
+//! IANA zone such as `America/Los_Angeles`.
 
 use std::fmt;
 
 use chrono::{SecondsFormat, Utc};
+use chrono_tz::Tz;
 use serde::ser::{SerializeMap, Serializer};
 use serde_json::Value;
 use tracing::field::{Field, Visit};
@@ -26,21 +30,46 @@ const K8S_ENV_FIELDS: &[(&str, &str)] = &[
     ("service", "K8S_SERVICE"),
 ];
 
+/// IANA time zone name used for the `timestamp` field. Defaults to UTC.
+const TIMEZONE_ENV: &str = "ODO_LOG_TIMEZONE";
+
 pub fn init(default_filter: &str) {
+    let (timezone, timezone_error) = match std::env::var(TIMEZONE_ENV) {
+        Ok(value) => match parse_timezone(&value) {
+            Ok(tz) => (tz, None),
+            Err(err) => (Tz::UTC, Some(err)),
+        },
+        Err(_) => (Tz::UTC, None),
+    };
+
     tracing_subscriber::fmt()
         .fmt_fields(JsonFields::new())
-        .event_format(K8sJson::from_env())
+        .event_format(K8sJson::from_env().with_timezone(timezone))
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
                 .unwrap_or_else(|_| default_filter.parse().unwrap()),
         )
         .init();
+
+    // The subscriber is installed now, so this reaches the log output.
+    if let Some(err) = timezone_error {
+        tracing::warn!(
+            variable = TIMEZONE_ENV,
+            error = %err,
+            "invalid log timezone, falling back to UTC"
+        );
+    }
+}
+
+fn parse_timezone(value: &str) -> Result<Tz, String> {
+    value.trim().parse::<Tz>().map_err(|e| e.to_string())
 }
 
 /// Event formatter producing one JSON object per line with a fixed set
 /// of extra top-level fields.
 pub struct K8sJson {
     static_fields: Vec<(&'static str, String)>,
+    timezone: Tz,
 }
 
 impl K8sJson {
@@ -57,11 +86,19 @@ impl K8sJson {
                     .map(|v| (*key, v))
             })
             .collect();
-        Self { static_fields }
+        Self::with_fields(static_fields)
     }
 
     pub fn with_fields(static_fields: Vec<(&'static str, String)>) -> Self {
-        Self { static_fields }
+        Self {
+            static_fields,
+            timezone: Tz::UTC,
+        }
+    }
+
+    pub fn with_timezone(mut self, timezone: Tz) -> Self {
+        self.timezone = timezone;
+        self
     }
 }
 
@@ -85,7 +122,9 @@ where
         let mut ser = serde_json::Serializer::new(&mut buf);
         let mut map = ser.serialize_map(None).map_err(|_| fmt::Error)?;
 
-        let timestamp = Utc::now().to_rfc3339_opts(SecondsFormat::Micros, true);
+        let timestamp = Utc::now()
+            .with_timezone(&self.timezone)
+            .to_rfc3339_opts(SecondsFormat::Micros, true);
         map.serialize_entry("timestamp", &timestamp)
             .map_err(|_| fmt::Error)?;
         map.serialize_entry("level", &meta.level().to_string())
@@ -300,5 +339,47 @@ mod tests {
         for key in ["pod", "namespace", "node", "service"] {
             assert!(line.get(key).is_none(), "{key} should be absent");
         }
+    }
+
+    #[test]
+    fn timestamp_defaults_to_utc_with_z_suffix() {
+        let lines = capture_lines(K8sJson::with_fields(Vec::new()), || {
+            tracing::info!("utc");
+        });
+        let ts = lines[0]["timestamp"].as_str().unwrap();
+        assert!(ts.ends_with('Z'), "got {ts}");
+        chrono::DateTime::parse_from_rfc3339(ts).expect("valid RFC 3339");
+    }
+
+    #[test]
+    fn timestamp_uses_configured_timezone_offset() {
+        use chrono::{Offset, TimeZone};
+
+        let tz = chrono_tz::America::Los_Angeles;
+        let lines = capture_lines(K8sJson::with_fields(Vec::new()).with_timezone(tz), || {
+            tracing::info!("local")
+        });
+        let ts = lines[0]["timestamp"].as_str().unwrap();
+        let parsed = chrono::DateTime::parse_from_rfc3339(ts).expect("valid RFC 3339");
+
+        // Compare against the zone's offset at that instant, so the test
+        // holds on either side of a DST transition.
+        let expected = tz.offset_from_utc_datetime(&parsed.naive_utc()).fix();
+        assert_eq!(
+            parsed.offset().local_minus_utc(),
+            expected.local_minus_utc()
+        );
+        assert!(ts.ends_with("-07:00") || ts.ends_with("-08:00"), "got {ts}");
+    }
+
+    #[test]
+    fn parse_timezone_accepts_iana_names_and_rejects_garbage() {
+        assert_eq!(
+            parse_timezone("America/Los_Angeles").unwrap(),
+            chrono_tz::America::Los_Angeles
+        );
+        assert_eq!(parse_timezone(" UTC ").unwrap(), Tz::UTC);
+        assert!(parse_timezone("Mars/Olympus_Mons").is_err());
+        assert!(parse_timezone("").is_err());
     }
 }
