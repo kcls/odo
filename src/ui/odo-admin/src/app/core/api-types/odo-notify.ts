@@ -382,6 +382,11 @@ export interface components {
             member_count: number;
             /** Format: date-time */
             updated_at: string;
+            /**
+             * @description Stable reference for apps outside the odo database (e.g. routing
+             *     rules that name a group to notify).
+             */
+            uuid: string;
         };
         EnqueueRequest: {
             dedup_key?: string | null;
@@ -468,16 +473,23 @@ export interface components {
             body_html?: string | null;
             subject?: string | null;
         };
+        /**
+         * @description A recipient is referenced by id or by stable uuid. Callers outside the
+         *     odo database (apps that hold only uuids) use the uuid; when both are
+         *     given, the id wins.
+         */
         Recipient: {
             channels: string[];
             /** @enum {string} */
             type: "user";
             /** Format: int64 */
-            user_id: number;
+            user_id?: number | null;
+            user_uuid?: string | null;
         } | {
             channels: string[];
             /** Format: int64 */
-            email_group_id: number;
+            email_group_id?: number | null;
+            email_group_uuid?: string | null;
             /** @enum {string} */
             type: "email_group";
         };

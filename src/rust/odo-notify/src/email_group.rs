@@ -32,6 +32,9 @@ const WRITE_PERM: &str = "odo.notify.email_group.write";
 #[derive(Debug, Serialize, ToSchema)]
 pub struct EmailGroupRow {
     pub id: i32,
+    /// Stable reference for apps outside the odo database (e.g. routing
+    /// rules that name a group to notify).
+    pub uuid: String,
     pub code: String,
     pub label: String,
     pub is_active: bool,
@@ -45,6 +48,7 @@ impl EmailGroupRow {
     fn new(group: email_group::Model, member_count: i64, active_member_count: i64) -> Self {
         Self {
             id: group.id,
+            uuid: group.uuid.to_string(),
             code: group.code,
             label: group.label,
             is_active: group.is_active,

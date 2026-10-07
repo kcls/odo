@@ -859,6 +859,7 @@
         "type": "object",
         "required": [
           "id",
+          "uuid",
           "code",
           "label",
           "is_active",
@@ -896,6 +897,10 @@
           "updated_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "uuid": {
+            "type": "string",
+            "description": "Stable reference for apps outside the odo database (e.g. routing\nrules that name a group to notify)."
           }
         }
       },
@@ -1197,7 +1202,6 @@
           {
             "type": "object",
             "required": [
-              "user_id",
               "channels",
               "type"
             ],
@@ -1215,15 +1219,23 @@
                 ]
               },
               "user_id": {
-                "type": "integer",
+                "type": [
+                  "integer",
+                  "null"
+                ],
                 "format": "int64"
+              },
+              "user_uuid": {
+                "type": [
+                  "string",
+                  "null"
+                ]
               }
             }
           },
           {
             "type": "object",
             "required": [
-              "email_group_id",
               "channels",
               "type"
             ],
@@ -1235,8 +1247,17 @@
                 }
               },
               "email_group_id": {
-                "type": "integer",
+                "type": [
+                  "integer",
+                  "null"
+                ],
                 "format": "int64"
+              },
+              "email_group_uuid": {
+                "type": [
+                  "string",
+                  "null"
+                ]
               },
               "type": {
                 "type": "string",
@@ -1246,7 +1267,8 @@
               }
             }
           }
-        ]
+        ],
+        "description": "A recipient is referenced by id or by stable uuid. Callers outside the\nodo database (apps that hold only uuids) use the uuid; when both are\ngiven, the id wins."
       },
       "Sort": {
         "type": "object",
