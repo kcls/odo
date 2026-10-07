@@ -190,10 +190,15 @@ impl Client {
             .send()
             .await
             .map_err(|e| format!("login request failed: {e}"))?;
-        if !resp.status().is_success() {
-            return Err(format!("login as {username} failed: {}", resp.status()));
+        let status = resp.status().as_u16();
+        let body = read_body(resp).await;
+        if !(200..300).contains(&status) {
+            return Err(http_error(
+                &format!("login as {username} failed"),
+                status,
+                &body,
+            ));
         }
-        let body: Value = resp.json().await.map_err(|e| e.to_string())?;
         let token = body["access_token"]
             .as_str()
             .ok_or("login response had no access_token")?
@@ -211,8 +216,7 @@ impl Client {
             .await
             .map_err(|e| format!("{url}: {e}"))?;
         let status = resp.status().as_u16();
-        let body = resp.json().await.unwrap_or(Value::Null);
-        Ok((status, body))
+        Ok((status, read_body(resp).await))
     }
 
     /// Create; 409 (already registered) is success. Anything else fails.
@@ -220,7 +224,7 @@ impl Client {
         match self.post(url, body).await? {
             (200, _) => Ok(Outcome::Created),
             (409, _) => Ok(Outcome::Exists),
-            (status, detail) => Err(format!("{label}: {status} {detail}")),
+            (status, detail) => Err(http_error(label, status, &detail)),
         }
     }
 
@@ -229,7 +233,7 @@ impl Client {
         let display = url.clone();
         match self.post(url, body).await? {
             (200, body) => Ok(body),
-            (status, detail) => Err(format!("{display}: {status} {detail}")),
+            (status, detail) => Err(http_error(&display, status, &detail)),
         }
     }
 
@@ -241,11 +245,53 @@ impl Client {
             .send()
             .await
             .map_err(|e| format!("{url}: {e}"))?;
-        if !resp.status().is_success() {
-            return Err(format!("{url}: {}", resp.status()));
+        let status = resp.status().as_u16();
+        let body = read_body(resp).await;
+        if !(200..300).contains(&status) {
+            return Err(http_error(&url, status, &body));
         }
-        resp.json().await.map_err(|e| e.to_string())
+        // A success that is not JSON is still a failure for a JSON API:
+        // callers would read every field as missing.
+        if let Value::String(_) = body {
+            return Err(http_error(&format!("{url}: expected JSON"), status, &body));
+        }
+        Ok(body)
     }
+}
+
+/// Read a response body as JSON, keeping it as text when it is not JSON.
+/// Error bodies from the gateway or a proxy are often plain text or HTML,
+/// and dropping them would hide the one thing that explains the failure.
+async fn read_body(resp: reqwest::Response) -> Value {
+    let text = resp.text().await.unwrap_or_default();
+    parse_body(&text)
+}
+
+fn parse_body(text: &str) -> Value {
+    if text.trim().is_empty() {
+        return Value::Null;
+    }
+    serde_json::from_str(text).unwrap_or_else(|_| Value::String(text.trim().to_string()))
+}
+
+/// Upper bound on how much of a response body an error message carries, so
+/// an HTML error page does not flood the terminal.
+const ERROR_BODY_MAX_CHARS: usize = 1000;
+
+/// "<context>: <status> <body>", with the body as compact JSON or raw text.
+fn http_error(context: &str, status: u16, body: &Value) -> String {
+    let detail = match body {
+        Value::Null => "(empty body)".to_string(),
+        Value::String(text) => text.clone(),
+        other => other.to_string(),
+    };
+    let detail = if detail.chars().count() > ERROR_BODY_MAX_CHARS {
+        let cut: String = detail.chars().take(ERROR_BODY_MAX_CHARS).collect();
+        format!("{cut}... (truncated)")
+    } else {
+        detail
+    };
+    format!("{context}: {status} {detail}")
 }
 
 fn env_or(key: &str, default: &str) -> String {
@@ -379,7 +425,7 @@ async fn apply_unit_types(client: &Client, specs: &[OrgUnitTypeSpec]) -> Result<
                 ids.insert(spec.label.clone(), id);
                 t.add(Outcome::Created);
             }
-            (status, detail) => return Err(format!("{label}: {status} {detail}")),
+            (status, detail) => return Err(http_error(&label, status, &detail)),
         }
     }
     t.report("org unit types");
@@ -453,7 +499,7 @@ async fn apply_units(client: &Client, specs: &[OrgUnitSpec]) -> Result<(), Strin
                 );
                 t.add(Outcome::Created);
             }
-            (status, detail) => return Err(format!("{label}: {status} {detail}")),
+            (status, detail) => return Err(http_error(&label, status, &detail)),
         }
     }
     t.report("org units");
@@ -584,7 +630,7 @@ async fn apply(client: &Client, manifest: &Manifest) -> Result<(), String> {
             )
             .await?;
         if status != 200 {
-            return Err(format!("saml idp list: {status}"));
+            return Err(http_error("saml idp list", status, &idps));
         }
         let by_entity: HashMap<&str, i64> = idps["idps"]
             .as_array()
@@ -602,15 +648,27 @@ async fn apply(client: &Client, manifest: &Manifest) -> Result<(), String> {
                 "acs_url": sp.acs_url,
             });
             let obj = body.as_object_mut().expect("json object");
-            if let Some(v) = &sp.label { obj.insert("label".into(), json!(v)); }
-            if let Some(v) = &sp.slo_url { obj.insert("slo_url".into(), json!(v)); }
-            if let Some(v) = &sp.metadata_url { obj.insert("metadata_url".into(), json!(v)); }
-            if let Some(v) = &sp.callback_url { obj.insert("callback_url".into(), json!(v)); }
-            if let Some(v) = sp.is_active { obj.insert("is_active".into(), json!(v)); }
+            if let Some(v) = &sp.label {
+                obj.insert("label".into(), json!(v));
+            }
+            if let Some(v) = &sp.slo_url {
+                obj.insert("slo_url".into(), json!(v));
+            }
+            if let Some(v) = &sp.metadata_url {
+                obj.insert("metadata_url".into(), json!(v));
+            }
+            if let Some(v) = &sp.callback_url {
+                obj.insert("callback_url".into(), json!(v));
+            }
+            if let Some(v) = sp.is_active {
+                obj.insert("is_active".into(), json!(v));
+            }
 
             if let Some(entity) = &sp.idp_entity_id {
                 match by_entity.get(entity.as_str()) {
-                    Some(id) => { obj.insert("idp".into(), json!(id)); }
+                    Some(id) => {
+                        obj.insert("idp".into(), json!(id));
+                    }
                     None => {
                         println!(
                             "saml sp {}: no IdP with entity_id '{}' - skipped",
@@ -645,7 +703,7 @@ async fn apply(client: &Client, manifest: &Manifest) -> Result<(), String> {
             )
             .await?;
         if status != 200 {
-            return Err(format!("saml idp list: {status}"));
+            return Err(http_error("saml idp list", status, &idps));
         }
         let rows = idps["idps"].as_array().cloned().unwrap_or_default();
         let by_entity: HashMap<&str, i64> = rows
@@ -686,8 +744,12 @@ async fn apply(client: &Client, manifest: &Manifest) -> Result<(), String> {
                 "label": attr.label,
             });
             let obj = body.as_object_mut().expect("json object");
-            if let Some(v) = attr.is_location { obj.insert("is_location".into(), json!(v)); }
-            if let Some(v) = &attr.normalizer { obj.insert("normalizer".into(), json!(v)); }
+            if let Some(v) = attr.is_location {
+                obj.insert("is_location".into(), json!(v));
+            }
+            if let Some(v) = &attr.normalizer {
+                obj.insert("normalizer".into(), json!(v));
+            }
 
             // The unique constraint is on (idp, key, normalizer), and a
             // NULL normalizer never equals itself in Postgres -- so an
@@ -701,7 +763,7 @@ async fn apply(client: &Client, manifest: &Manifest) -> Result<(), String> {
                 )
                 .await?;
             if status != 200 {
-                return Err(format!("saml attribute list: {status}"));
+                return Err(http_error("saml attribute list", status, &existing));
             }
             let already = existing["attributes"]
                 .as_array()
@@ -723,7 +785,10 @@ async fn apply(client: &Client, manifest: &Manifest) -> Result<(), String> {
                 client
                     .upsert(
                         &label,
-                        format!("{}/api/v1/odo/auth/saml/admin/attribute/create", client.base),
+                        format!(
+                            "{}/api/v1/odo/auth/saml/admin/attribute/create",
+                            client.base
+                        ),
                         &body,
                     )
                     .await?,
@@ -742,7 +807,7 @@ async fn apply(client: &Client, manifest: &Manifest) -> Result<(), String> {
             )
             .await?;
         if status != 200 {
-            return Err(format!("saml attribute list: {status}"));
+            return Err(http_error("saml attribute list", status, &attrs));
         }
         let targets: Vec<&Value> = attrs["attributes"]
             .as_array()
@@ -843,7 +908,6 @@ fn build_version() -> &'static str {
     option_env!("ODO_REGISTER_BUILD_VERSION").unwrap_or(env!("CARGO_PKG_VERSION"))
 }
 
-
 #[tokio::main]
 async fn main() -> ExitCode {
     let paths: Vec<String> = std::env::args().skip(1).collect();
@@ -907,6 +971,40 @@ async fn main() -> ExitCode {
 mod tests {
     use super::*;
 
+    #[test]
+    fn http_error_includes_a_json_body() {
+        let body =
+            parse_body(r#"{"code":"PERMISSION_DENIED","message":"odo.auth.saml.read required"}"#);
+        assert_eq!(
+            http_error("saml idp list", 403, &body),
+            r#"saml idp list: 403 {"code":"PERMISSION_DENIED","message":"odo.auth.saml.read required"}"#
+        );
+    }
+
+    #[test]
+    fn http_error_keeps_a_non_json_body_as_text() {
+        let body = parse_body("Jwt is missing\n");
+        assert_eq!(body, Value::String("Jwt is missing".into()));
+        assert_eq!(http_error("x", 401, &body), "x: 401 Jwt is missing");
+    }
+
+    #[test]
+    fn http_error_marks_an_empty_body() {
+        assert_eq!(parse_body("  "), Value::Null);
+        assert_eq!(http_error("x", 502, &Value::Null), "x: 502 (empty body)");
+    }
+
+    #[test]
+    fn http_error_truncates_a_long_body() {
+        let long = "é".repeat(ERROR_BODY_MAX_CHARS + 50);
+        let msg = http_error("x", 500, &parse_body(&long));
+        assert!(msg.ends_with("... (truncated)"), "{msg}");
+        let kept = msg
+            .trim_start_matches("x: 500 ")
+            .trim_end_matches("... (truncated)");
+        assert_eq!(kept.chars().count(), ERROR_BODY_MAX_CHARS);
+    }
+
     /// The SAML keys must accept a real site manifest, and must carry no
     /// signing material for any to land in.
     #[test]
@@ -937,7 +1035,10 @@ mod tests {
         assert_eq!(m.saml_idps.len(), 1);
         assert_eq!(m.saml_sps.len(), 1);
         let sp = &m.saml_sps[0];
-        assert_eq!(sp.idp_entity_id.as_deref(), Some("https://idp.example.org/"));
+        assert_eq!(
+            sp.idp_entity_id.as_deref(),
+            Some("https://idp.example.org/")
+        );
         assert_eq!(sp.entity_id, "https://site.example.org");
     }
 
