@@ -28,9 +28,10 @@ NAMESPACE=${NAMESPACE:-odo-core}
 #
 #   core/       the schema and platform seed. Every install needs it.
 #   demo-data/  a separate sqitch project (%project=odo-demo) holding the
-#               sample org tree. Depends on odo:002_odo_seed, so it
-#               deploys after core and reverts before it. An installation
-#               with its own org structure skips it.
+#               sample org tree and notification email groups. Depends
+#               on odo:002_odo_seed, so it deploys after core and reverts
+#               before it. An installation with its own org structure
+#               skips it.
 #
 # Then the dev/CI fixtures, which are not a sqitch project -- plain
 # idempotent SQL applied in filename order, with no revert path. They
@@ -57,9 +58,9 @@ usage() {
     echo "  verify           Verify deployed schema changes"
     echo "  log              Show schema deployment history"
     echo
-    echo "Demo Data Commands (the sample org tree; skip on a real installation):"
-    echo "  deploy-demo      Deploy the demo org tree (requires the schema project)"
-    echo "  revert-demo      Revert the demo org tree, leaving the schema in place"
+    echo "Demo Data Commands (sample org tree and email groups; skip on a real installation):"
+    echo "  deploy-demo      Deploy the demo data (requires the schema project)"
+    echo "  revert-demo      Revert the demo data, leaving the schema in place"
     echo "  status-demo      Show demo project deployment status"
     echo
     echo "Test Data Commands:"
@@ -247,13 +248,13 @@ sqitch_revert() {
 # environment, from a file, or not at all.
 sqitch_deploy_demo() {
     local target="${2:-HEAD}"
-    echo -e "\n${YELLOW}Deploying the demo org tree${NC}"
+    echo -e "\n${YELLOW}Deploying the demo data${NC}"
     run_sqitch "$SQITCH_DEMO_DIR" deploy $target
     echo -e "${GREEN}Demo deployment completed successfully${NC}"
 }
 
 sqitch_revert_demo() {
-    echo -e "\n${YELLOW}Reverting the demo org tree${NC}"
+    echo -e "\n${YELLOW}Reverting the demo data${NC}"
     run_sqitch "$SQITCH_DEMO_DIR" revert -y
     echo -e "${GREEN}Demo revert completed successfully${NC}"
 }

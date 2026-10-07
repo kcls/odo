@@ -3,3 +3,4 @@
 %uri=https://github.com/kcls/odo-demo
 
 001_demo_org_tree [odo:002_odo_seed] 2026-09-17T00:00:00Z Bill Erickson <bserickson@kcls.org> # Sample org tree below the seeded root, for demos and the e2e suites
+002_demo_email_groups [001_demo_org_tree] 2026-10-07T00:00:00Z Bill Erickson <bserickson@kcls.org> # Sample notification email groups with non-deliverable members, for demo alert routing

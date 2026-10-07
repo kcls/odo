@@ -28,7 +28,9 @@ templates, or fixtures.
   accounts, and the root org unit — whose code/label/uuid are deploy-time
   variables defaulting to the demo values).
 - `src/sqitch/demo-data/` — sqitch project `odo-demo`: the sample org tree
-  below the root (pinned `5eed0000-…` uuids), depending on
+  below the root and sample notification email groups whose members are
+  undeliverable `example.org` addresses (pinned `5eed0000-…` uuids:
+  `02xx` units, `03xx` groups), depending on
   `odo:002_odo_seed`. Separate so an installation with its own org
   structure can skip it. `manage-database.sh deploy-demo`.
 - `tests/fixtures/` — flat idempotent SQL e2e fixtures (`e2e.*` users
