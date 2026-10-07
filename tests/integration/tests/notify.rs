@@ -279,6 +279,107 @@ async fn enqueue_invalid_action_url() {
     assert_eq!(resp.status(), 400);
 }
 
+// --- Recipients by uuid ---
+
+async fn enqueue_to(
+    c: &reqwest::Client,
+    token: &str,
+    recipient: serde_json::Value,
+) -> reqwest::Response {
+    c.post(format!("{}/api/v1/odo/notify/enqueue", notify_base()))
+        .headers(auth_header(token))
+        .json(&json!({
+            "recipients": [recipient],
+            "template_code": TEST_TEMPLATE,
+            "source_service": "integration-tests",
+        }))
+        .send()
+        .await
+        .unwrap()
+}
+
+#[tokio::test]
+async fn enqueue_user_by_uuid() {
+    let c = client();
+    let token = ensure_test_template(&c).await;
+    let resp = enqueue_to(
+        &c,
+        &token,
+        json!({"type": "user", "user_uuid": STAFF.uuid, "channels": ["in_app"]}),
+    )
+    .await;
+    assert_eq!(resp.status(), 200);
+    let data: serde_json::Value = resp.json().await.unwrap();
+    assert_eq!(data["deliveries"][0]["recipient_user"], staff_id(&c).await);
+}
+
+#[tokio::test]
+async fn enqueue_unknown_user_uuid() {
+    let c = client();
+    let token = ensure_test_template(&c).await;
+    let resp = enqueue_to(
+        &c,
+        &token,
+        json!({"type": "user", "user_uuid": "e2e00000-0000-4000-a000-0000000fffff", "channels": ["in_app"]}),
+    )
+    .await;
+    assert_eq!(resp.status(), 404);
+}
+
+#[tokio::test]
+async fn enqueue_malformed_user_uuid() {
+    let c = client();
+    let token = ensure_test_template(&c).await;
+    let resp = enqueue_to(
+        &c,
+        &token,
+        json!({"type": "user", "user_uuid": "not-a-uuid", "channels": ["in_app"]}),
+    )
+    .await;
+    assert_eq!(resp.status(), 400);
+}
+
+#[tokio::test]
+async fn enqueue_user_without_reference() {
+    let c = client();
+    let token = ensure_test_template(&c).await;
+    let resp = enqueue_to(&c, &token, json!({"type": "user", "channels": ["in_app"]})).await;
+    assert_eq!(resp.status(), 400);
+}
+
+#[tokio::test]
+async fn enqueue_email_group_by_uuid() {
+    let c = client();
+    let token = ensure_test_template(&c).await;
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let resp = c
+        .post(format!(
+            "{}/api/v1/odo/notify/email-group/create",
+            notify_base()
+        ))
+        .headers(auth_header(&token))
+        .json(&json!({"code": format!("itest-uuid-{nanos}"), "label": "uuid recipient test"}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+    let group: serde_json::Value = resp.json().await.unwrap();
+    let group_uuid = group["uuid"].as_str().expect("email group uuid");
+
+    let resp = enqueue_to(
+        &c,
+        &token,
+        json!({"type": "email_group", "email_group_uuid": group_uuid, "channels": ["email"]}),
+    )
+    .await;
+    assert_eq!(resp.status(), 200);
+    let data: serde_json::Value = resp.json().await.unwrap();
+    assert_eq!(data["deliveries"][0]["recipient_email_group"], group["id"]);
+}
+
 // --- Service account (background jobs) ---
 
 #[tokio::test]

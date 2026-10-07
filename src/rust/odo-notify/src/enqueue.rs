@@ -3,7 +3,8 @@ use axum::extract::State;
 use chrono::Utc;
 use odo_client::context::RequestContext;
 use odo_client::error::{ApiResult, LocalError};
-use odo_entity::notification::{delivery, event, template};
+use odo_entity::auth::usr;
+use odo_entity::notification::{delivery, email_group, event, template};
 use sea_orm::prelude::*;
 use sea_orm::{Condition, Set};
 use serde::{Deserialize, Serialize};
@@ -12,15 +13,24 @@ use utoipa::ToSchema;
 
 use crate::AppState;
 
+/// A recipient is referenced by id or by stable uuid. Callers outside the
+/// odo database (apps that hold only uuids) use the uuid; when both are
+/// given, the id wins.
 #[derive(Deserialize, ToSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Recipient {
     User {
-        user_id: i64,
+        #[serde(default)]
+        user_id: Option<i64>,
+        #[serde(default)]
+        user_uuid: Option<String>,
         channels: Vec<String>,
     },
     EmailGroup {
-        email_group_id: i64,
+        #[serde(default)]
+        email_group_id: Option<i64>,
+        #[serde(default)]
+        email_group_uuid: Option<String>,
         channels: Vec<String>,
     },
 }
@@ -32,6 +42,88 @@ impl Recipient {
             Recipient::EmailGroup { channels, .. } => channels,
         }
     }
+}
+
+/// A recipient with its reference resolved to a database id.
+enum ResolvedRecipient<'a> {
+    User(i32, &'a [String]),
+    EmailGroup(i32, &'a [String]),
+}
+
+impl ResolvedRecipient<'_> {
+    fn channels(&self) -> &[String] {
+        match self {
+            ResolvedRecipient::User(_, channels) | ResolvedRecipient::EmailGroup(_, channels) => {
+                channels
+            }
+        }
+    }
+}
+
+fn parse_uuid(raw: &str) -> Result<Uuid, LocalError> {
+    raw.parse()
+        .map_err(|_| LocalError::invalid_input(format!("invalid uuid {raw}")))
+}
+
+/// Resolve each recipient's id-or-uuid reference. A uuid that matches no
+/// row is a 404, so a caller holding a stale uuid finds out rather than
+/// silently notifying nobody.
+async fn resolve_recipients<'a>(
+    db: &DatabaseConnection,
+    recipients: &'a [Recipient],
+) -> ApiResult<Vec<ResolvedRecipient<'a>>> {
+    let mut out = Vec::with_capacity(recipients.len());
+    for recipient in recipients {
+        let resolved = match recipient {
+            Recipient::User {
+                user_id: Some(id),
+                channels,
+                ..
+            } => ResolvedRecipient::User(*id as i32, channels),
+            Recipient::User {
+                user_uuid: Some(uuid),
+                channels,
+                ..
+            } => {
+                let row = usr::Entity::find()
+                    .filter(usr::Column::Uuid.eq(parse_uuid(uuid)?))
+                    .one(db)
+                    .await?
+                    .ok_or_else(|| LocalError::not_found(format!("user {uuid}")))?;
+                ResolvedRecipient::User(row.id, channels)
+            }
+            Recipient::User { .. } => {
+                return Err(
+                    LocalError::invalid_input("user recipient needs user_id or user_uuid").into(),
+                );
+            }
+            Recipient::EmailGroup {
+                email_group_id: Some(id),
+                channels,
+                ..
+            } => ResolvedRecipient::EmailGroup(*id as i32, channels),
+            Recipient::EmailGroup {
+                email_group_uuid: Some(uuid),
+                channels,
+                ..
+            } => {
+                let row = email_group::Entity::find()
+                    .filter(email_group::Column::Uuid.eq(parse_uuid(uuid)?))
+                    .one(db)
+                    .await?
+                    .ok_or_else(|| LocalError::not_found(format!("email group {uuid}")))?;
+                ResolvedRecipient::EmailGroup(row.id, channels)
+            }
+            Recipient::EmailGroup { .. } => {
+                return Err(LocalError::invalid_input(
+                    "email_group recipient needs email_group_id or email_group_uuid",
+                )
+                .into());
+            }
+        };
+        out.push(resolved);
+    }
+    Ok(out)
 }
 
 #[derive(Deserialize, ToSchema)]
@@ -162,6 +254,10 @@ pub async fn enqueue(
         .into());
     }
 
+    // Resolved before the event is written, so a bad reference leaves no
+    // orphan event behind.
+    let recipients = resolve_recipients(&state.db, &params.recipients).await?;
+
     // Create event
     let scheduled_for = params
         .scheduled_for
@@ -190,7 +286,7 @@ pub async fn enqueue(
     // Create deliveries
     let mut delivery_infos = Vec::new();
 
-    for recipient in &params.recipients {
+    for recipient in &recipients {
         for channel in recipient.channels() {
             let body_template = if channel == "email" {
                 tmpl.body_template_html
@@ -205,10 +301,8 @@ pub async fn enqueue(
                     .map_err(|e| LocalError::internal(format!("Template render error: {e}")))?;
 
             let (recipient_user, recipient_email_group) = match recipient {
-                Recipient::User { user_id, .. } => (Some(*user_id as i32), None),
-                Recipient::EmailGroup { email_group_id, .. } => {
-                    (None, Some(*email_group_id as i32))
-                }
+                ResolvedRecipient::User(id, _) => (Some(*id), None),
+                ResolvedRecipient::EmailGroup(id, _) => (None, Some(*id)),
             };
 
             let delivery_action_url = if channel == "in_app" {
