@@ -31,3 +31,6 @@ rand = "0.9"
 [[bin]]
 name = "odo-notify"
 path = "src/bin/odo-notify.rs"
+
+[dev-dependencies]
+sea-orm = { version = "2.0", features = ["mock"] }

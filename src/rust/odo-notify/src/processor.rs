@@ -4,7 +4,7 @@ use lettre::transport::smtp::authentication::Credentials;
 use lettre::transport::smtp::client::{Tls, TlsParameters};
 use lettre::{AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor};
 use odo_entity::auth::usr;
-use odo_entity::notification::{delivery, email_group_member, event};
+use odo_entity::notification::{delivery, email_group, email_group_member, event};
 use rand::Rng;
 use sea_orm::prelude::*;
 use sea_orm::{Condition, DatabaseConnection, DbBackend, QueryOrder, QuerySelect, Set, Statement};
@@ -166,10 +166,12 @@ async fn claim_and_process(
     Ok(())
 }
 
-struct ProcessingResult {
-    success: bool,
-    error_message: Option<String>,
-    metadata: Option<serde_json::Value>,
+enum ProcessingResult {
+    Sent(serde_json::Value),
+    /// Retried until `max_retries`, then failed.
+    Failed(String),
+    /// Nothing to retry: the recipient is gone or switched off. Terminal.
+    Skipped(String),
 }
 
 async fn process_email(
@@ -179,20 +181,13 @@ async fn process_email(
     _evt: &event::Model,
 ) -> ProcessingResult {
     let recipients = match resolve_recipients(db, dlv).await {
-        Ok(r) if r.is_empty() => {
-            return ProcessingResult {
-                success: false,
-                error_message: Some("No recipients resolved".to_string()),
-                metadata: None,
-            };
+        Ok(Recipients::Skip(reason)) => return ProcessingResult::Skipped(reason),
+        Ok(Recipients::Send(r)) if r.is_empty() => {
+            return ProcessingResult::Failed("No recipients resolved".to_string());
         }
-        Ok(r) => r,
+        Ok(Recipients::Send(r)) => r,
         Err(e) => {
-            return ProcessingResult {
-                success: false,
-                error_message: Some(format!("Failed to resolve recipients: {e}")),
-                metadata: None,
-            };
+            return ProcessingResult::Failed(format!("Failed to resolve recipients: {e}"));
         }
     };
 
@@ -200,38 +195,58 @@ async fn process_email(
     let body_html = dlv.body_rendered.as_deref().unwrap_or("");
 
     match send_email(smtp, &recipients, subject, body_html).await {
-        Ok(metadata) => ProcessingResult {
-            success: true,
-            error_message: None,
-            metadata: Some(metadata),
-        },
-        Err(e) => ProcessingResult {
-            success: false,
-            error_message: Some(e.to_string()),
-            metadata: None,
-        },
+        Ok(metadata) => ProcessingResult::Sent(metadata),
+        Err(e) => ProcessingResult::Failed(e.to_string()),
     }
 }
 
+enum Recipients {
+    Send(Vec<String>),
+    /// The recipient was deleted or deactivated after the delivery was
+    /// queued (or, for a group, before -- enqueue does not check).
+    Skip(String),
+}
+
+/// Checked at send time rather than enqueue so that switching a group off
+/// also stops deliveries already in the queue.
 async fn resolve_recipients(
     db: &DatabaseConnection,
     dlv: &delivery::Model,
-) -> Result<Vec<String>, sea_orm::DbErr> {
+) -> Result<Recipients, sea_orm::DbErr> {
     if let Some(user_id) = dlv.recipient_user {
         let user = usr::Entity::find_by_id(user_id).one(db).await?;
         match user {
-            Some(u) => Ok(vec![u.email]),
-            None => Ok(vec![]),
+            Some(u) if u.deleted_at.is_some() || u.status.as_deref() == Some("deleted") => {
+                Ok(Recipients::Skip(format!("user {user_id} is deleted")))
+            }
+            Some(u) => Ok(Recipients::Send(vec![u.email])),
+            None => Ok(Recipients::Send(vec![])),
         }
     } else if let Some(group_id) = dlv.recipient_email_group {
-        let members = email_group_member::Entity::find()
-            .filter(email_group_member::Column::EmailGroup.eq(group_id))
-            .filter(email_group_member::Column::IsActive.eq(true))
-            .all(db)
-            .await?;
-        Ok(members.into_iter().map(|m| m.email).collect())
+        let group = email_group::Entity::find_by_id(group_id).one(db).await?;
+        match group {
+            Some(g) if g.deleted_at.is_some() => Ok(Recipients::Skip(format!(
+                "email group {} ({group_id}) is deleted",
+                g.code
+            ))),
+            Some(g) if !g.is_active => Ok(Recipients::Skip(format!(
+                "email group {} ({group_id}) is inactive",
+                g.code
+            ))),
+            Some(_) => {
+                let members = email_group_member::Entity::find()
+                    .filter(email_group_member::Column::EmailGroup.eq(group_id))
+                    .filter(email_group_member::Column::IsActive.eq(true))
+                    .all(db)
+                    .await?;
+                Ok(Recipients::Send(
+                    members.into_iter().map(|m| m.email).collect(),
+                ))
+            }
+            None => Ok(Recipients::Send(vec![])),
+        }
     } else {
-        Ok(vec![])
+        Ok(Recipients::Send(vec![]))
     }
 }
 
@@ -339,89 +354,257 @@ async fn finalize_delivery(
 
     let template = dlv.template_code.as_deref().unwrap_or("-");
 
-    if result.success {
-        let mut active: delivery::ActiveModel = dlv.clone().into();
-        active.status = Set("delivered".to_string());
-        active.processed_at = Set(Some(now.into()));
-        active.processing_started_at = Set(None);
-        active.processing_expires_at = Set(None);
-        active.processing_owner = Set(None);
-        active.updated_at = Set(now.into());
-        if let Some(meta) = result.metadata {
-            active.channel_metadata = Set(Some(meta));
-        }
-        active.update(db).await?;
-
-        info!(
-            delivery_id = dlv.id,
-            event_id = dlv.event_id,
-            channel = %dlv.channel,
-            template = template,
-            recipient_user = dlv.recipient_user,
-            recipient_email_group = dlv.recipient_email_group,
-            "Delivery sent"
-        );
-    } else {
-        let retry_count = dlv.retry_count + 1;
-        let error_msg = result
-            .error_message
-            .unwrap_or_else(|| "unknown error".to_string());
-
-        if retry_count >= dlv.max_retries {
+    match result {
+        ProcessingResult::Sent(meta) => {
             let mut active: delivery::ActiveModel = dlv.clone().into();
-            active.status = Set("failed".to_string());
-            active.error_code = Set(Some("MAX_RETRIES".to_string()));
-            active.error_message = Set(Some(error_msg.clone()));
+            active.status = Set("delivered".to_string());
             active.processed_at = Set(Some(now.into()));
             active.processing_started_at = Set(None);
             active.processing_expires_at = Set(None);
             active.processing_owner = Set(None);
-            active.retry_count = Set(retry_count);
             active.updated_at = Set(now.into());
+            active.channel_metadata = Set(Some(meta));
             active.update(db).await?;
 
-            error!(
+            info!(
                 delivery_id = dlv.id,
                 event_id = dlv.event_id,
                 channel = %dlv.channel,
                 template = template,
                 recipient_user = dlv.recipient_user,
                 recipient_email_group = dlv.recipient_email_group,
-                retries = retry_count,
-                error = %error_msg,
-                "Delivery failed permanently"
+                "Delivery sent"
             );
-        } else {
-            let base_delay = (1i64 << retry_count).min(3600);
-            let jitter = rand::rng().random_range(0..=base_delay / 2);
-            let next_retry = now + chrono::Duration::seconds(base_delay + jitter);
-
+        }
+        ProcessingResult::Skipped(reason) => {
             let mut active: delivery::ActiveModel = dlv.clone().into();
-            active.status = Set("pending".to_string());
-            active.retry_count = Set(retry_count);
-            active.next_retry_at = Set(Some(next_retry.into()));
+            active.status = Set("skipped".to_string());
+            active.error_code = Set(Some("RECIPIENT_INACTIVE".to_string()));
+            active.error_message = Set(Some(reason.clone()));
+            active.processed_at = Set(Some(now.into()));
             active.processing_started_at = Set(None);
             active.processing_expires_at = Set(None);
             active.processing_owner = Set(None);
-            active.error_message = Set(Some(error_msg.clone()));
             active.updated_at = Set(now.into());
             active.update(db).await?;
 
-            warn!(
+            info!(
                 delivery_id = dlv.id,
                 event_id = dlv.event_id,
                 channel = %dlv.channel,
                 template = template,
                 recipient_user = dlv.recipient_user,
                 recipient_email_group = dlv.recipient_email_group,
-                retry = retry_count,
-                max_retries = dlv.max_retries,
-                next_retry = %next_retry.to_rfc3339(),
-                error = %error_msg,
-                "Delivery failed, will retry"
+                reason = %reason,
+                "Delivery skipped"
             );
+        }
+        ProcessingResult::Failed(error_msg) => {
+            let retry_count = dlv.retry_count + 1;
+
+            if retry_count >= dlv.max_retries {
+                let mut active: delivery::ActiveModel = dlv.clone().into();
+                active.status = Set("failed".to_string());
+                active.error_code = Set(Some("MAX_RETRIES".to_string()));
+                active.error_message = Set(Some(error_msg.clone()));
+                active.processed_at = Set(Some(now.into()));
+                active.processing_started_at = Set(None);
+                active.processing_expires_at = Set(None);
+                active.processing_owner = Set(None);
+                active.retry_count = Set(retry_count);
+                active.updated_at = Set(now.into());
+                active.update(db).await?;
+
+                error!(
+                    delivery_id = dlv.id,
+                    event_id = dlv.event_id,
+                    channel = %dlv.channel,
+                    template = template,
+                    recipient_user = dlv.recipient_user,
+                    recipient_email_group = dlv.recipient_email_group,
+                    retries = retry_count,
+                    error = %error_msg,
+                    "Delivery failed permanently"
+                );
+            } else {
+                let base_delay = (1i64 << retry_count).min(3600);
+                let jitter = rand::rng().random_range(0..=base_delay / 2);
+                let next_retry = now + chrono::Duration::seconds(base_delay + jitter);
+
+                let mut active: delivery::ActiveModel = dlv.clone().into();
+                active.status = Set("pending".to_string());
+                active.retry_count = Set(retry_count);
+                active.next_retry_at = Set(Some(next_retry.into()));
+                active.processing_started_at = Set(None);
+                active.processing_expires_at = Set(None);
+                active.processing_owner = Set(None);
+                active.error_message = Set(Some(error_msg.clone()));
+                active.updated_at = Set(now.into());
+                active.update(db).await?;
+
+                warn!(
+                    delivery_id = dlv.id,
+                    event_id = dlv.event_id,
+                    channel = %dlv.channel,
+                    template = template,
+                    recipient_user = dlv.recipient_user,
+                    recipient_email_group = dlv.recipient_email_group,
+                    retry = retry_count,
+                    max_retries = dlv.max_retries,
+                    next_retry = %next_retry.to_rfc3339(),
+                    error = %error_msg,
+                    "Delivery failed, will retry"
+                );
+            }
         }
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sea_orm::{DatabaseBackend, MockDatabase};
+
+    fn delivery_to(user: Option<i32>, group: Option<i32>) -> delivery::Model {
+        let now = Utc::now().fixed_offset();
+        delivery::Model {
+            id: 1,
+            event_id: 1,
+            channel: "email".into(),
+            template_code: None,
+            title_rendered: "t".into(),
+            body_rendered: None,
+            action_url: None,
+            status: "processing".into(),
+            scheduled_for: None,
+            processing_started_at: None,
+            processing_expires_at: None,
+            processing_owner: None,
+            processed_at: None,
+            retry_count: 0,
+            max_retries: 3,
+            next_retry_at: None,
+            error_code: None,
+            error_message: None,
+            channel_metadata: None,
+            created_at: now,
+            updated_at: now,
+            recipient_user: user,
+            recipient_email_group: group,
+            read_at: None,
+            dismissed_at: None,
+        }
+    }
+
+    fn group(is_active: bool, deleted: bool) -> email_group::Model {
+        let now = Utc::now().fixed_offset();
+        email_group::Model {
+            id: 7,
+            code: "east".into(),
+            label: "East".into(),
+            is_active,
+            created_at: now,
+            updated_at: now,
+            deleted_at: deleted.then_some(now),
+            uuid: Uuid::nil(),
+        }
+    }
+
+    fn member(email: &str) -> email_group_member::Model {
+        email_group_member::Model {
+            id: 1,
+            email_group: 7,
+            email: email.into(),
+            is_active: true,
+            created_at: Utc::now().fixed_offset(),
+        }
+    }
+
+    fn user(status: &str, deleted: bool) -> usr::Model {
+        let now = Utc::now().fixed_offset();
+        usr::Model {
+            id: 3,
+            email: "pat@example.org".into(),
+            username: None,
+            first_given_name: None,
+            second_given_name: None,
+            family_name: None,
+            status: Some(status.into()),
+            auth_method: "local".into(),
+            created_at: None,
+            updated_at: None,
+            last_login_at: None,
+            display_name: "Pat".into(),
+            deleted_at: deleted.then_some(now),
+            deleted_by: None,
+            uuid: Uuid::nil(),
+        }
+    }
+
+    async fn resolve_group(g: email_group::Model) -> Recipients {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results([vec![g]])
+            .append_query_results([vec![member("a@example.org")]])
+            .into_connection();
+        resolve_recipients(&db, &delivery_to(None, Some(7)))
+            .await
+            .unwrap()
+    }
+
+    async fn resolve_user(u: usr::Model) -> Recipients {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results([vec![u]])
+            .into_connection();
+        resolve_recipients(&db, &delivery_to(Some(3), None))
+            .await
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn active_group_sends_to_members() {
+        match resolve_group(group(true, false)).await {
+            Recipients::Send(r) => assert_eq!(r, vec!["a@example.org"]),
+            Recipients::Skip(r) => panic!("skipped: {r}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn inactive_group_is_skipped() {
+        match resolve_group(group(false, false)).await {
+            Recipients::Skip(r) => assert!(r.contains("inactive"), "{r}"),
+            Recipients::Send(_) => panic!("sent to an inactive group"),
+        }
+    }
+
+    #[tokio::test]
+    async fn deleted_group_is_skipped() {
+        // Deleted wins over is_active: a soft-deleted group may still
+        // carry is_active = true.
+        match resolve_group(group(true, true)).await {
+            Recipients::Skip(r) => assert!(r.contains("deleted"), "{r}"),
+            Recipients::Send(_) => panic!("sent to a deleted group"),
+        }
+    }
+
+    #[tokio::test]
+    async fn active_user_is_sent() {
+        match resolve_user(user("active", false)).await {
+            Recipients::Send(r) => assert_eq!(r, vec!["pat@example.org"]),
+            Recipients::Skip(r) => panic!("skipped: {r}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn deleted_user_is_skipped() {
+        assert!(matches!(
+            resolve_user(user("active", true)).await,
+            Recipients::Skip(_)
+        ));
+        assert!(matches!(
+            resolve_user(user("deleted", false)).await,
+            Recipients::Skip(_)
+        ));
+    }
 }
