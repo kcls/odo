@@ -1,41 +1,10 @@
 # Odo as a durable source of stable references
 
-Status: **implemented**. This was a prerequisite for decoupling Current onto
-its own database, which has since happened (see `docs/app-repo-structure.md`).
-Kept as the record of the contract and its rationale.
-
-## Why
-
-Applications reference odo-owned data — Current's `incidents.*` rows carry
-org-unit, user, and file references; authz maps roles to org units;
-notifications reference templates and email groups. When everything shared one
-database, ordinary foreign keys (`ON DELETE NO ACTION`) stopped odo from
-hard-deleting a row something still referenced.
-
-That protection was **intra-database**. Now that applications run their own
-databases, those cross-database FKs are gone and nothing at the SQL layer stops
-odo from hard-deleting a row another service still references — leaving a
-dangling reference that can never be resolved again (the name/label would be
-gone from the only place it existed).
-
-Rather than rebuild integrity as cross-service machinery, odo upholds a simple,
-explicit contract so that a plain stored reference is *always* resolvable:
-
-> **The contract.** Rows in odo's shared tables are **never hard-deleted**. A
-> row's identity (uuid) is stable forever. "Deleting" is a soft-delete
-> (`deleted_at`), plus an explicit anonymize step for personal data.
-> Resolve-by-id APIs return soft-deleted rows (flagged) so historical
-> references still render.
-
-With this guarantee, a consumer holding a reference never has to worry that
-the referenced entity vanished — the failure mode API-only integrity genuinely
-can't handle simply doesn't occur.
-
 ## How it's implemented
 
 All of the below is in the baseline schema (`src/sqitch/core`).
 
-### 1. No hard deletes
+### 1. No hard deletes for common data
 
 `audit.prevent_hard_delete()` — a `BEFORE DELETE` trigger on every shared
 table (`org.unit`, `org.unit_type`, `auth.usr`, `asset.file_upload`,

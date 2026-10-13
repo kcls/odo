@@ -5,9 +5,6 @@
 > Ubuntu path and needs additional testing. Expect rough edges, and prefer
 > Ubuntu + k3s for a cluster anyone else depends on.
 
-Unlike Ubuntu — where setup is split into three scripts, two of which are
-usable in production — macOS is a single development-only script.
-
 ## Prerequisites
 
 Install these by hand first:

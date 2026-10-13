@@ -63,8 +63,3 @@ the new group to allow access to `kubectl` for managing the cluster.
 Navigate in your browser to http://DEV-HOST-IP:30080/odo/admin and log in
 with `e2e.odo.admin` and defualt password `test123!`.
 
-## Addtional Documentation
-
-* [Release Management](docs/tech-docs/release-management.md)
-* [Advanced PostgreSQL Setup](docs/tech-docs/postgres-setup.md)
-* [Mac Setup (Docker Desktop)](docs/tech-docs/mac-setup.md)

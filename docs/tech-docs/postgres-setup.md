@@ -1,7 +1,6 @@
 # PostgreSQL Setup
 
-PostgreSQL runs **outside** the Kubernetes cluster. Nothing in `k8s/` manages
-it; the cluster is simply pointed at a server.
+PostgreSQL runs **outside** the Kubernetes cluster.
 
 ## One connection URL
 
@@ -81,22 +80,3 @@ before writing the secret. `--database-url` skips the prompts:
 ./scripts/setup/install-k3s-cluster-ubuntu.sh \
   --database-url postgres://odo:secret@db.example.org:5432/odo
 ```
-
-The server needs:
-
-* a superuser role (`odo` by default) with that password — the database itself
-  is created later by `manage-database.sh setup`
-* `listen_addresses` and `pg_hba.conf` accepting connections from the cluster
-  nodes and from any host running the odo tooling
-* the `pgtap` extension, installed by hand, if you intend to run
-  `./scripts/run-db-tests.sh` against it
-
-## macOS (Docker Desktop)
-
-`install-docker-desktop-cluster-mac.sh` installs Homebrew's `postgresql@N`
-(latest stable by default) and asks the same address question. On a Mac that
-means the machine's **LAN address** — `host.docker.internal` resolves inside a
-pod but not on the host, so it cannot serve as the one shared URL.
-
-See [Mac Setup](mac-setup.md) for the details; that path is a work in progress
-and needs more testing.
