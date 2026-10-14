@@ -36,7 +36,8 @@ $ODO_HOME/scripts/build-and-deploy-service.sh ui-my-app
 act on the nearest `service-map.yaml` at or above the current directory,
 falling back to this checkout; set `ODO_PROJECT_ROOT` to choose a project
 explicitly. Each run prints the project it resolved. See
-[scripts/lib/project.sh](scripts/lib/project.sh).
+[scripts/lib/project.sh](scripts/lib/project.sh). `set-service-env.sh`
+works the same way.
 
 ## Quick Install Guide for Developers
 
