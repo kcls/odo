@@ -1,41 +1,58 @@
 #!/bin/bash
-# Script to manage PostgreSQL database and Sqitch migrations for the Odo platform
-# Requires sudo for database setup commands
+# Manage a project's PostgreSQL database and Sqitch migrations: odo's own,
+# or an app's when run from (or pointed at) the app's checkout (see
+# lib/project.sh).
 #
 # Connection settings (in order of precedence):
 #   1. Environment variables: PGHOST, PGPORT, PGDATABASE, PGUSER, PGPASSWORD
-#   2. Kubernetes secret: postgres-credentials in odo-pub namespace
+#   2. The Kubernetes secret named by the `database:` block of the
+#      project's service-map.yaml (DATABASE_URL)
 #   3. Defaults: localhost:5432 (for host/port only)
+#
+# The same `database:` block sets what differs between projects:
+#   schemas      the application schemas purge-all drops
+#   owns_server  true when the project's role is a server superuser that
+#                `setup` creates and `update-password` may reset (odo).
+#                Otherwise the role and an empty database it owns are
+#                created on the server by hand, and the script only ever
+#                acts as that role.
+#
+# Layout, under the project root:
+#   src/sqitch/core/       the schema and seed. Every install needs it.
+#   src/sqitch/demo-data/  optional sample data, its own sqitch project
+#                          (named by %project in its sqitch.plan). It
+#                          depends on core, so it deploys after core and
+#                          reverts before it. An installation with its own
+#                          data skips it.
+#   tests/fixtures/        dev/CI fixtures: not a sqitch project, plain
+#                          idempotent SQL applied in filename order, with
+#                          no revert path.
 
 set -e
 
 # Get script directory and project root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+source "$SCRIPT_DIR/lib/project.sh"
+PROJECT_ROOT="$(resolve_project_root "$(cd "$SCRIPT_DIR/.." && pwd)")"
+echo "Project: $PROJECT_ROOT"
 
 # Source common database functions
 source "$SCRIPT_DIR/common.sh"
+load_db_config "$PROJECT_ROOT" || exit 1
+
+SERVICE_MAP="$PROJECT_ROOT/service-map.yaml"
+OWNS_SERVER="$(yq eval '.database.owns_server // false' "$SERVICE_MAP")"
+mapfile -t SCHEMAS < <(yq eval '.database.schemas // [] | .[]' "$SERVICE_MAP")
+
+# How to refer to this script in messages: a wrapper in an app checkout
+# that hands off here sets ODO_INVOKED_AS to its own name.
+ME="${ODO_INVOKED_AS:-$0}"
 
 # Default values
 COMMAND=${1:-help}
 DRY_RUN=${DRY_RUN:-false}
-NAMESPACE=${NAMESPACE:-odo-pub}
+NAMESPACE=$DB_SECRET_NAMESPACE
 
-# Sqitch directories
-# Three trees under src/sqitch, deployed in this order:
-#
-# Two sqitch projects under src/sqitch, deployed in this order:
-#
-#   core/       the schema and platform seed. Every install needs it.
-#   demo-data/  a separate sqitch project (%project=odo-demo) holding the
-#               sample org tree and notification email groups. Depends
-#               on odo:002_odo_seed, so it deploys after core and reverts
-#               before it. An installation with its own org structure
-#               skips it.
-#
-# Then the dev/CI fixtures, which are not a sqitch project -- plain
-# idempotent SQL applied in filename order, with no revert path. They
-# live with the suites that consume them, not with the schema.
 SQITCH_DIR="${SQITCH_DIR:-$PROJECT_ROOT/src/sqitch}"
 SQITCH_CORE_DIR="${SQITCH_CORE_DIR:-$SQITCH_DIR/core}"
 SQITCH_DEMO_DIR="${SQITCH_DEMO_DIR:-$SQITCH_DIR/demo-data}"
@@ -43,10 +60,12 @@ TEST_DATA_DIR="${TEST_DATA_DIR:-$PROJECT_ROOT/tests/fixtures}"
 
 # Function to show usage
 usage() {
-    echo -e "${BLUE}Usage: $0 [command] [options]${NC}"
+    echo -e "${BLUE}Usage: $ME [command] [options]${NC}"
     echo
-    echo "Database Commands (require sudo):"
-    echo "  setup            Create database, user, and sqitch schema"
+    echo "Database Commands:"
+    if [[ "$OWNS_SERVER" == "true" ]]; then
+        echo "  setup            Create database, user, and sqitch schema (requires sudo)"
+    fi
     echo "  update-password  Update database user password only"
     echo
     echo "Schema Commands:"
@@ -58,7 +77,7 @@ usage() {
     echo "  verify           Verify deployed schema changes"
     echo "  log              Show schema deployment history"
     echo
-    echo "Demo Data Commands (sample org tree and email groups; skip on a real installation):"
+    echo "Demo Data Commands (sample data; skip on a real installation):"
     echo "  deploy-demo      Deploy the demo data (requires the schema project)"
     echo "  revert-demo      Revert the demo data, leaving the schema in place"
     echo "  status-demo      Show demo project deployment status"
@@ -77,7 +96,8 @@ usage() {
     echo "  PGUSER=username           Override database user (default: from secret)"
     echo "  PGPASSWORD=password       Override database password (default: from secret)"
     echo "  DRY_RUN=true              Show what would be done without making changes"
-    echo "  NAMESPACE=name            Kubernetes namespace for secrets (default: odo-pub)"
+    echo "  NAMESPACE=name            Kubernetes namespace for secrets (default: $DB_SECRET_NAMESPACE)"
+    echo "  ODO_PROJECT_ROOT=/path    Project to act on (default: see lib/project.sh)"
     echo "  SQITCH_CORE_DIR=/path     Override core directory (default: $SQITCH_CORE_DIR)"
     echo "  SQITCH_DEMO_DIR=/path     Override demo-data directory (default: $SQITCH_DEMO_DIR)"
     echo "  TEST_DATA_DIR=/path       Override fixtures directory (default: $TEST_DATA_DIR)"
@@ -91,7 +111,7 @@ usage() {
 
 # Check if running with sudo (only for initial user creation)
 check_sudo() {
-    if [ "$EUID" -ne 0 ]; then 
+    if [ "$EUID" -ne 0 ]; then
         echo -e "${RED}Please run with sudo for initial user creation${NC}"
         exit 1
     fi
@@ -184,20 +204,20 @@ run_sqitch() {
     local sqitch_command="$2"
     shift 2
     local sqitch_args="$@"
-    
+
     # Check if sqitch is available
     if ! command -v sqitch &> /dev/null; then
         echo -e "${RED}sqitch command not found${NC}"
         echo "Please install sqitch: https://sqitch.org"
         exit 1
     fi
-    
+
     # Check if sqitch directory exists
     if [ ! -d "$sqitch_dir" ]; then
         echo -e "${RED}Sqitch directory not found: $sqitch_dir${NC}"
         exit 1
     fi
-    
+
     # Build database URI
     local db_uri="db:pg://${PGUSER}:${PGPASSWORD}@${PGHOST}:${PGPORT}/${PGDATABASE}"
 
@@ -226,11 +246,11 @@ sqitch_revert() {
     local target="$2"
     if [ -z "$target" ]; then
         echo -e "${RED}Error: revert command requires a target${NC}"
-        echo "Usage: $0 revert <target>"
-        echo "Example: $0 revert @HEAD^ (revert last change)"
+        echo "Usage: $ME revert <target>"
+        echo "Example: $ME revert @HEAD^ (revert last change)"
         exit 1
     fi
-    
+
     echo -e "\n${YELLOW}Reverting database schema changes to $target${NC}"
     run_sqitch "$SQITCH_CORE_DIR" revert $target
     echo -e "${GREEN}Schema revert completed successfully${NC}"
@@ -238,7 +258,7 @@ sqitch_revert() {
 
 # Demo commands
 #
-# TODO (root_code): the schema project parameterizes the root org unit
+# TODO (root_code): odo's schema project parameterizes the root org unit
 # (root_code / root_label / root_uuid), and nothing here passes those
 # values -- so every deploy from this script produces the demo root. That
 # is right for a public checkout and wrong for an installation, which
@@ -264,12 +284,24 @@ sqitch_status_demo() {
     run_sqitch "$SQITCH_DEMO_DIR" status
 }
 
-# Revert the demo project if it has anything deployed. The demo change
-# declares a dependency on odo:002_odo_seed, so sqitch refuses to revert
-# the schema project out from under it -- correctly, but it means any
-# whole-database revert has to come here first.
+# The demo project's sqitch name, from the %project pragma of its plan.
+demo_project_name() {
+    sed -n 's/^%project=\([^[:space:]]*\).*/\1/p' "$SQITCH_DEMO_DIR/sqitch.plan" 2>/dev/null | head -1
+}
+
+# Revert the demo project if it has anything deployed. The demo project
+# depends on the core project, so sqitch refuses to revert core out from
+# under it -- correctly, but it means any whole-database revert has to
+# come here first.
 revert_demo_if_deployed() {
     [ -d "$SQITCH_DEMO_DIR" ] || return 0
+
+    local project
+    project="$(demo_project_name)"
+    if [ -z "$project" ]; then
+        echo -e "${RED}No %project in $SQITCH_DEMO_DIR/sqitch.plan${NC}" >&2
+        return 1
+    fi
 
     # Ask the registry rather than sqitch: this runs before the schema
     # revert, when the registry still exists, and it stays quiet when the
@@ -279,7 +311,7 @@ revert_demo_if_deployed() {
         -d "$PGDATABASE" -tAc \
         "SELECT 1 FROM sqitch.changes c
            JOIN sqitch.projects p ON p.project = c.project
-          WHERE p.project = 'odo-demo' LIMIT 1" 2>/dev/null)
+          WHERE p.project = '$project' LIMIT 1" 2>/dev/null)
 
     if [ "$deployed" == "1" ]; then
         echo -e "${BLUE}Reverting the demo project first: the schema project cannot revert while it depends on it${NC}"
@@ -338,10 +370,10 @@ deploy_test_data() {
     echo -e "${GREEN}Test data deployment completed successfully${NC}"
 }
 
-# Demo/platform reset: DESTRUCTIVE. The platform seed content is the sqitch
-# change 002_odo_seed, so a dev reset is: revert all schema changes,
-# redeploy (baseline + seed), then reload the idempotent test data
-# (tests/fixtures/).
+# Demo reset: DESTRUCTIVE. The seed content is part of the core sqitch
+# project, so a dev reset is: revert all schema changes, redeploy core
+# (and the demo project, when there is one), then reload the idempotent
+# test data (tests/fixtures/).
 reset_demo_data() {
     echo -e "\n${RED}WARNING: this reverts and redeploys ALL schema changes in database '${PGDATABASE}', wiping all data.${NC}"
     read -r -p "Type 'reset' to confirm: " confirmation
@@ -352,14 +384,31 @@ reset_demo_data() {
     revert_demo_if_deployed
     run_sqitch "$SQITCH_CORE_DIR" revert -y
     run_sqitch "$SQITCH_CORE_DIR" deploy
-    run_sqitch "$SQITCH_DEMO_DIR" deploy
+    if [ -d "$SQITCH_DEMO_DIR" ]; then
+        run_sqitch "$SQITCH_DEMO_DIR" deploy
+    fi
     deploy_test_data
     echo -e "${GREEN}Demo reset completed${NC}"
 }
 
 purge_all_schemas() {
+    local schemas=("${SCHEMAS[@]}")
+    if [ ${#schemas[@]} -eq 0 ]; then
+        echo -e "${RED}No database.schemas in $SERVICE_MAP; nothing to purge.${NC}" >&2
+        return 1
+    fi
+    # The names land in SQL below; accept plain identifiers only.
+    local schema
+    for schema in "${schemas[@]}"; do
+        if [[ ! "$schema" =~ ^[a-z_][a-z0-9_]*$ ]]; then
+            echo -e "${RED}Unsupported schema name in database.schemas: '$schema'${NC}" >&2
+            return 1
+        fi
+    done
+
     echo -e "\n${RED}WARNING: This will drop all application schemas in database '${PGDATABASE}'.${NC}"
-    echo -e "${RED}Everything in them is lost, including both sqitch registries.${NC}"
+    echo -e "${RED}Everything in them is lost, including the sqitch registry.${NC}"
+    echo -e "${RED}Connected services will be disconnected and will need restarting.${NC}"
 
     # Schema-level drops rather than DROP DATABASE: the pooled service
     # credentials cannot create a database, and pgbouncer does not pool
@@ -376,8 +425,9 @@ purge_all_schemas() {
     #
     # Note the direct port: pgbouncer fronts the pooled databases, and
     # an admin role is usually not among its configured users.
-    local schemas=(notification asset auth audit authz org sqitch)
 
+    # odo-deploy's reset-site-data.sh answers this prompt and checks for
+    # "cancelled" in the output: keep both wordings in step with it.
     echo -e "${RED}Schemas that will be dropped: ${schemas[*]}${NC}"
     read -r -p "Type 'purge' to confirm: " confirmation
 
@@ -389,19 +439,21 @@ purge_all_schemas() {
     # Check ownership before dropping anything: a partial purge leaves a
     # database that neither deploys nor reverts, and the bare
     # "must be owner of schema" error does not say what to do about it.
+    local array_sql
+    array_sql="ARRAY['$(IFS=,; echo "${schemas[*]}" | sed "s/,/','/g")']"
     local not_owned
     not_owned=$(PGPASSWORD="$PGPASSWORD" psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" \
         -d "$PGDATABASE" -tAc \
         "SELECT string_agg(nspname, ', ' ORDER BY nspname)
            FROM pg_namespace
-          WHERE nspname = ANY(ARRAY['notification','asset','auth','audit','authz','org','sqitch'])
+          WHERE nspname = ANY($array_sql)
             AND pg_get_userbyid(nspowner) <> current_user
             AND NOT pg_has_role(current_user, nspowner, 'MEMBER')" 2>/dev/null)
 
     if [ -n "$not_owned" ]; then
         echo -e "${RED}Cannot purge: '$PGUSER' does not own: $not_owned${NC}"
         echo -e "${YELLOW}Re-run with an administrative account, e.g.${NC}"
-        echo "  PGUSER=postgres PGPASSWORD=... PGPORT=5432 $0 purge-all"
+        echo "  PGUSER=postgres PGPASSWORD=... PGPORT=5432 $ME purge-all"
         return 1
     fi
 
@@ -411,12 +463,21 @@ purge_all_schemas() {
         execute_psql "DROP SCHEMA IF EXISTS \"$schema\" CASCADE;" "$PGDATABASE"
     done
 
-    echo -e "${GREEN}All application schemas dropped. Run '$0 deploy' to rebuild.${NC}"
+    echo -e "${GREEN}All application schemas dropped. Run '$ME deploy' to rebuild.${NC}"
 }
 
 # Function to setup database
 setup_database() {
-    echo -e "\n${YELLOW}Setting up PostgreSQL database for Odo${NC}"
+    if [[ "$OWNS_SERVER" != "true" ]]; then
+        echo -e "${RED}setup does not apply to this project.${NC}"
+        echo
+        echo "Its role does not own the PostgreSQL server, so no script here"
+        echo "creates it. Create the role and an empty database it owns on the"
+        echo "server by hand (see the project's README), then run '$ME deploy'."
+        exit 1
+    fi
+
+    echo -e "\n${YELLOW}Setting up PostgreSQL database${NC}"
 
     # First, test if we can connect with the superuser account
     if test_maintenance_connection; then
@@ -444,7 +505,7 @@ setup_database() {
             echo
             echo "  CREATE ROLE \"$PGUSER\" WITH SUPERUSER LOGIN PASSWORD '...';"
             echo
-            echo "Then check the password in the postgres-credentials secret"
+            echo "Then check the password in the $DB_SECRET_NAME secret"
             echo "matches (./scripts/manage-secrets.sh update-db-url)."
             exit 1
         fi
@@ -501,12 +562,34 @@ setup_database() {
     echo "  Sqitch schema: created and configured"
     echo
     echo -e "${BLUE}Next steps:${NC}"
-    echo "1. Run '$0 deploy' to apply database schema migrations"
+    echo "1. Run '$ME deploy' to apply database schema migrations"
 }
 
 # Function to update password only
 update_password() {
     echo -e "\n${YELLOW}Updating password for user '$PGUSER'${NC}"
+
+    if [[ "$OWNS_SERVER" != "true" ]]; then
+        # A role can change its own password, which is all a project that
+        # does not own the server can do: it holds no admin account there.
+        if ! test_connection; then
+            echo -e "${RED}Cannot connect as '$PGUSER' with the credentials in the secret.${NC}"
+            echo
+            echo "This project can only change its own password, so the stored"
+            echo "one has to work first. Reset it on the database server:"
+            echo "  ALTER ROLE $PGUSER WITH PASSWORD '<the password in the secret>';"
+            echo "or point the secret at the working password (manage-secrets.sh"
+            echo "update-db-url)."
+            exit 1
+        fi
+
+        echo -e "${GREEN}Successfully connected with existing credentials${NC}"
+        execute_psql "ALTER ROLE $PGUSER WITH PASSWORD '$PGPASSWORD';" "$PGDATABASE"
+
+        echo -e "\n${GREEN}Password updated!${NC}"
+        echo -e "${YELLOW}Note: The password was retrieved from the Kubernetes secret${NC}"
+        return
+    fi
 
     # First try to connect with existing credentials
     if test_connection; then
@@ -515,7 +598,7 @@ update_password() {
         execute_psql "ALTER USER $PGUSER WITH SUPERUSER PASSWORD '$PGPASSWORD';"
     else
         echo -e "${YELLOW}Cannot connect with current credentials${NC}"
-        echo -e "${RED}If the user doesn't exist, run '$0 setup' first${NC}"
+        echo -e "${RED}If the user doesn't exist, run '$ME setup' first${NC}"
         echo -e "${RED}If the password needs to be reset, run this command with sudo${NC}"
 
         # Check if running with sudo for password reset
@@ -523,7 +606,7 @@ update_password() {
 
         if ! user_exists "$PGUSER"; then
             echo -e "${RED}User '$PGUSER' does not exist${NC}"
-            echo "Run '$0 setup' first to create the user"
+            echo "Run '$ME setup' first to create the user"
             exit 1
         fi
 

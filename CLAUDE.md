@@ -67,9 +67,15 @@ templates, or fixtures.
   from their own checkout instead of copying them
   (`scripts/lib/project.sh`). Keep that working: in these scripts,
   reach sibling scripts via `$SCRIPT_DIR`, never `./scripts/`.
-  `set-service-env.sh` and `run-db-tests.sh` resolve the project the same
-  way; the latter reads the project's `database:` block (secret, namespace,
-  test glob) from its service-map.yaml.
+  `set-service-env.sh`, `run-db-tests.sh` and `manage-database.sh`
+  resolve the project the same way; the latter two read the project's
+  `database:` block (secret, namespace, test glob, purge schemas,
+  `owns_server`) from its service-map.yaml. Only odo `owns_server`: app
+  roles are created by hand, so `setup` refuses for them and
+  `update-password` only changes the role's own password.
+- `manage-database.sh purge-all`'s prompt ("Type 'purge' to confirm")
+  and its "Purge cancelled." are matched by odo-deploy's
+  `reset-site-data.sh`; change them together.
 - `common.sh` defaults to odo's own database (`odo-pub`/
   `postgres-credentials`, the copy the services read; the writers also
   keep one in `odo-core` for odo-deploy). Only scripts that call
