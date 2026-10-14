@@ -12,8 +12,9 @@ NC='\033[0m' # No Color
 # The Kubernetes secret whose DATABASE_URL init_pg_connection reads.
 # These defaults are odo's own database, and stay so for any script that
 # does not call load_db_config: load-data-manifest.sh, for one, runs from
-# app checkouts but always works on odo's database.
-DB_SECRET_NAMESPACE=${NAMESPACE:-odo-core}
+# app checkouts but always works on odo's database. odo-pub's copy is
+# the one the odo services read, so tooling follows what they see.
+DB_SECRET_NAMESPACE=${NAMESPACE:-odo-pub}
 DB_SECRET_NAME=postgres-credentials
 
 # Point the database helpers at a project's own database, from the

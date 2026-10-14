@@ -13,7 +13,8 @@ NC='\033[0m' # No Color
 
 # Default values
 COMMAND=${1:-show}
-POSTGRES_NAMESPACE=${POSTGRES_NAMESPACE:-odo-core}
+# Where update-db-url reads the current URL from: the copy the services use.
+POSTGRES_NAMESPACE=${POSTGRES_NAMESPACE:-odo-pub}
 
 # Function to show usage
 usage() {

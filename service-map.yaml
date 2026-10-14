@@ -9,7 +9,9 @@
 #   tests: glob of pgTAP test files under tests/db (default: *.sql)
 #
 database:
-  namespace: odo-core
+  # The copy the services read. The installers and manage-secrets.sh also
+  # keep one in odo-core, for odo-deploy's apply-site-data.sh.
+  namespace: odo-pub
   secret: postgres-credentials
   # tests/db/seed/ holds helpers that tests include, not tests.
   tests: odo/*.sql
