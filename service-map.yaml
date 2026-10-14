@@ -3,6 +3,17 @@
 # language:
 #   - the programming language/framework of the service (rust, node, etc.)
 #
+# database (optional): the project's own database, for the shared database
+# scripts (common.sh load_db_config, run-db-tests.sh).
+#   namespace, secret: the Kubernetes secret holding DATABASE_URL
+#   tests: glob of pgTAP test files under tests/db (default: *.sql)
+#
+database:
+  namespace: odo-core
+  secret: postgres-credentials
+  # tests/db/seed/ holds helpers that tests include, not tests.
+  tests: odo/*.sql
+
 services:
 
   odo-auth:

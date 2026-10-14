@@ -39,6 +39,13 @@ explicitly. Each run prints the project it resolved. See
 [scripts/lib/project.sh](scripts/lib/project.sh). `set-service-env.sh`
 works the same way.
 
+An application with its own database adds a `database:` block to its
+`service-map.yaml` naming the Kubernetes secret that holds its
+`DATABASE_URL` (see this repo's [service-map.yaml](service-map.yaml)).
+`$ODO_HOME/scripts/run-db-tests.sh` then runs its pgTAP tests against
+it, and its own scripts can source `$ODO_HOME/scripts/common.sh` and
+call `load_db_config` for the same connection helpers.
+
 ## Quick Install Guide for Developers
 
 Install PostgreSQL, [K3S](https://k3s.io/), Docker, dev tools, and initialize 
