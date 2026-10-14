@@ -159,8 +159,8 @@ elif [[ "$BUILD_ALL_SERVICES" == true ]]; then
     SERVICES=($(yq eval '.services | to_entries | .[] | select(.value.language != "node") | .key' service-map.yaml))
 
 elif [[ ${#SERVICES[@]} -eq 0 ]]; then
-    echo "Error: No services specified. Exiting"
-    exit 0
+    echo "Error: No services specified. Use --help for usage information."
+    exit 1
 fi
 
 # Build each service
