@@ -1,6 +1,6 @@
 #!/bin/bash
 # Common functions and utilities for Odo database scripts
-# This file is meant to be sourced by other scripts
+# This file is meant to be sourced by other scripts, odo's and apps'
 
 # Colors for output
 RED='\033[0;31m'
@@ -9,8 +9,39 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Default namespace for Kubernetes secrets
-DEFAULT_NAMESPACE=${NAMESPACE:-odo-core}
+# The Kubernetes secret whose DATABASE_URL init_pg_connection reads.
+# These defaults are odo's own database, and stay so for any script that
+# does not call load_db_config: load-data-manifest.sh, for one, runs from
+# app checkouts but always works on odo's database.
+DB_SECRET_NAMESPACE=${NAMESPACE:-odo-core}
+DB_SECRET_NAME=postgres-credentials
+
+# Point the database helpers at a project's own database, from the
+# `database:` block of its service-map.yaml:
+#
+#   database:
+#     namespace: odo-pub      # where the secret lives
+#     secret: current-api     # holds DATABASE_URL
+#
+# A missing block is an error, never a fallback to odo's database.
+# NAMESPACE in the environment still overrides the namespace.
+# Usage: load_db_config <project-root>
+load_db_config() {
+    local map="$1/service-map.yaml"
+    if ! command -v yq &> /dev/null; then
+        echo -e "${RED}yq is required to read $map${NC}" >&2
+        return 1
+    fi
+    local namespace secret
+    namespace=$(yq eval '.database.namespace // ""' "$map") || return 1
+    secret=$(yq eval '.database.secret // ""' "$map") || return 1
+    if [ -z "$namespace" ] || [ -z "$secret" ]; then
+        echo -e "${RED}No database.namespace and database.secret in $map${NC}" >&2
+        return 1
+    fi
+    DB_SECRET_NAMESPACE=${NAMESPACE:-$namespace}
+    DB_SECRET_NAME=$secret
+}
 
 # Function to get secret value from Kubernetes
 get_secret_value() {
@@ -21,11 +52,14 @@ get_secret_value() {
 }
 
 # Function to initialize PostgreSQL connection parameters
+# Usage: init_pg_connection [namespace] [secret]
+#   (defaults: DB_SECRET_NAMESPACE and DB_SECRET_NAME, see above)
 # Sets: PGHOST, PGPORT, PGDATABASE, PGUSER, PGPASSWORD
 # Returns: 0 on success, 1 on failure
 # Only prints output on error
 init_pg_connection() {
-    local namespace=${1:-$DEFAULT_NAMESPACE}
+    local namespace=${1:-$DB_SECRET_NAMESPACE}
+    local secret=${2:-$DB_SECRET_NAME}
     local errors=""
 
     # Check if kubectl is available
@@ -34,11 +68,11 @@ init_pg_connection() {
         return 1
     fi
 
-    # The postgres-credentials secret stores one connection URL
+    # The secret stores one connection URL
     # (postgres://user:pass@host:port/db?params), shared by the service
     # pods and by host tooling like this - PostgreSQL runs outside the
     # cluster at an address reachable from both. PG* env vars override it.
-    local db_url=$(get_secret_value $namespace postgres-credentials DATABASE_URL)
+    local db_url=$(get_secret_value $namespace $secret DATABASE_URL)
 
     local SECRET_PGHOST="" SECRET_PGPORT="" SECRET_PGDATABASE="" \
           SECRET_PGUSER="" SECRET_PGPASSWORD=""
@@ -101,7 +135,7 @@ init_pg_connection() {
     if [ -z "$PGDATABASE" ] || [ -z "$PGUSER" ] || [ -z "$PGPASSWORD" ]; then
         echo -e "${RED}Failed to retrieve PostgreSQL credentials:${NC}" >&2
         echo -e "${RED}${errors}${NC}" >&2
-        echo "Ensure postgres-credentials secret exists in $namespace namespace" >&2
+        echo "Ensure the $secret secret exists in the $namespace namespace" >&2
         echo "Or provide PGDATABASE, PGUSER, and PGPASSWORD environment variables" >&2
         echo >&2
         echo "Connection details:" >&2
