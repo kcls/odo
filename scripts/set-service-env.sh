@@ -102,10 +102,14 @@ if [[ -n "$ENV_ASSIGNMENT" && "$ENV_ASSIGNMENT" != *=* ]]; then
     usage 1
 fi
 
-# Run from the project root so service-map.yaml resolves.
+# Work in the project root so service-map.yaml resolves: this odo
+# checkout, or an app checkout that runs this from $ODO_HOME (see
+# lib/project.sh).
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+source "$SCRIPT_DIR/lib/project.sh"
+PROJECT_ROOT="$(resolve_project_root "$(cd "$SCRIPT_DIR/.." && pwd)")"
 cd "$PROJECT_ROOT"
+echo "Project: $PROJECT_ROOT"
 
 if ! command -v yq &> /dev/null; then
     echo -e "${RED}yq is required but not found.${NC}" >&2

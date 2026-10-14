@@ -67,6 +67,7 @@ templates, or fixtures.
   from their own checkout instead of copying them
   (`scripts/lib/project.sh`). Keep that working: in these scripts,
   reach sibling scripts via `$SCRIPT_DIR`, never `./scripts/`.
+  `set-service-env.sh` resolves the project the same way.
 - `./scripts/run-tests.sh --db --integration --e2e --unit --load`
   (the DB endpoint resolves from the secret's `DATABASE_URL`; `PG*` env
   vars only override it).
