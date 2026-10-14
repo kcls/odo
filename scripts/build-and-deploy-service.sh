@@ -1,14 +1,11 @@
 #!/bin/bash
-# 
+#
 # Combo script to Build and Deploy a service
 set -e
 
-# Ensure we're in the project root
+# Call the sibling scripts by path rather than ./scripts/: when run from an
+# app checkout, the project root has no scripts/ of its own. Each resolves
+# the project root itself (see lib/project.sh).
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-cd "$PROJECT_ROOT"
 
-./scripts/build-service.sh $@ && ./scripts/deploy-service.sh $@
-
-
-
+"$SCRIPT_DIR/build-service.sh" "$@" && "$SCRIPT_DIR/deploy-service.sh" "$@"

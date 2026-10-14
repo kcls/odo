@@ -61,6 +61,12 @@ templates, or fixtures.
 - `./scripts/build-service.sh <name>` — ONE service per invocation —
   then `./scripts/deploy-service.sh <name>` (or build-and-deploy).
   Wait ~20s after deploy before hitting the service.
+- Those three scripts also serve app repos: they act on the nearest
+  `service-map.yaml` at or above `$PWD` (else this checkout;
+  `ODO_PROJECT_ROOT` overrides), so apps run `$ODO_HOME/scripts/...`
+  from their own checkout instead of copying them
+  (`scripts/lib/project.sh`). Keep that working: in these scripts,
+  reach sibling scripts via `$SCRIPT_DIR`, never `./scripts/`.
 - `./scripts/run-tests.sh --db --integration --e2e --unit --load`
   (the DB endpoint resolves from the secret's `DATABASE_URL`; `PG*` env
   vars only override it).
