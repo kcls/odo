@@ -36,7 +36,7 @@ KUBECONFIG_PATH="/etc/rancher/k3s/k3s.yaml"
 NODE_MAJOR_VERSION="24"
 NVM_VERSION="v0.40.4"
 
-SEA_ORM_CLI_VERSION="2.0.0-rc.38"
+SEA_ORM_CLI_VERSION="2.0.4"
 
 LOCAL_REGISTRY_PORT="32000"       # host port; container listens on 5000
 LOCAL_REGISTRY_NAME="local-registry"
