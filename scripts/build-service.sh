@@ -56,9 +56,13 @@ while [[ $# -gt 0 ]]; do
             echo "  --help, -h             Show this help message"
             echo ""
             echo "Examples:"
-            echo "  $0 odo-auth odo-org    Build odo-auth and odo-org services"
+            echo "  $0 odo-auth odo-org    Build the odo-auth and odo-org services"
             echo "  $0 --all               Build all services"
             echo "  $0 --all-services      Build all Rust services"
+            echo ""
+            echo "Acts on the project whose service-map.yaml is at or above the"
+            echo "current directory (else this odo checkout); set ODO_PROJECT_ROOT"
+            echo "to choose one explicitly."
             exit 0
             ;;
         *)
@@ -68,10 +72,13 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Ensure we're in the project root
+# Work in the project root: this odo checkout, or an app checkout that
+# runs these scripts from $ODO_HOME (see lib/project.sh).
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+source "$SCRIPT_DIR/lib/project.sh"
+PROJECT_ROOT="$(resolve_project_root "$(cd "$SCRIPT_DIR/.." && pwd)")"
 cd "$PROJECT_ROOT"
+echo "Project: $PROJECT_ROOT"
 
 # Detect host architecture for default platform if not provided via CLI/env
 if [[ -z "$PLATFORM" ]]; then

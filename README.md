@@ -21,6 +21,23 @@ exposed by each Odo service.  OpenAPI specs are available at
 [openapi](openapi) and through each API end point, for example,
 `/api/v1/odo/auth/api-doc/openapi.json`.
 
+### Building and deploying an application
+
+An application needs no copy of Odo's build and deploy scripts. It
+keeps a `service-map.yaml` and `k8s/services/<service>/` in its own
+repository and runs the scripts from an Odo checkout:
+
+```bash
+cd ~/code/my-app            # any directory inside the app checkout
+$ODO_HOME/scripts/build-and-deploy-service.sh ui-my-app
+```
+
+`build-service.sh`, `deploy-service.sh`, and `build-and-deploy-service.sh`
+act on the nearest `service-map.yaml` at or above the current directory,
+falling back to this checkout; set `ODO_PROJECT_ROOT` to choose a project
+explicitly. Each run prints the project it resolved. See
+[scripts/lib/project.sh](scripts/lib/project.sh).
+
 ## Quick Install Guide for Developers
 
 Install PostgreSQL, [K3S](https://k3s.io/), Docker, dev tools, and initialize 
