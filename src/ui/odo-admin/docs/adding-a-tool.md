@@ -241,13 +241,8 @@ Backend changes: `./scripts/build-and-deploy-service.sh <service>` and wait
 ~20s. UI changes:
 
 ```bash
-./scripts/build-service.sh ui-odo-admin
-./scripts/deploy-service.sh ui-odo-admin --wait
+./scripts/build-and-deploy-service.sh ui-odo-admin --wait
 ```
-
-(The combo `build-and-deploy-service.sh ui-odo-admin` also works but doesn't
-accept `--wait` — it forwards the flag to the build step, which errors after
-the image already pushed.)
 
 No new envoy route is needed for a tool — the SPA is one app under
 `/odo/admin`, and its `/api/v1/odo/*` calls are already routed. New *backend*
