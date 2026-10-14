@@ -4,9 +4,12 @@
 #   - the programming language/framework of the service (rust, node, etc.)
 #
 # database (optional): the project's own database, for the shared database
-# scripts (common.sh load_db_config, run-db-tests.sh).
+# scripts (common.sh load_db_config, run-db-tests.sh, manage-database.sh).
 #   namespace, secret: the Kubernetes secret holding DATABASE_URL
 #   tests: glob of pgTAP test files under tests/db (default: *.sql)
+#   schemas: the application schemas manage-database.sh purge-all drops
+#   owns_server: true if the role is a server superuser that
+#     manage-database.sh setup creates (odo); default false
 #
 database:
   # The copy the services read. The installers and manage-secrets.sh also
@@ -15,6 +18,8 @@ database:
   secret: postgres-credentials
   # tests/db/seed/ holds helpers that tests include, not tests.
   tests: odo/*.sql
+  schemas: [notification, asset, auth, audit, authz, org, sqitch]
+  owns_server: true
 
 services:
 

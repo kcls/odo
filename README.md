@@ -43,8 +43,11 @@ An application with its own database adds a `database:` block to its
 `service-map.yaml` naming the Kubernetes secret that holds its
 `DATABASE_URL` (see this repo's [service-map.yaml](service-map.yaml)).
 `$ODO_HOME/scripts/run-db-tests.sh` then runs its pgTAP tests against
-it, and its own scripts can source `$ODO_HOME/scripts/common.sh` and
-call `load_db_config` for the same connection helpers.
+it, and `$ODO_HOME/scripts/manage-database.sh` manages its sqitch
+projects (`src/sqitch/core`, `src/sqitch/demo-data`) and fixtures
+(`tests/fixtures`); the block also lists the schemas `purge-all` drops.
+The app's own scripts can source `$ODO_HOME/scripts/common.sh` and call
+`load_db_config` for the same connection helpers.
 
 ## Quick Install Guide for Developers
 
