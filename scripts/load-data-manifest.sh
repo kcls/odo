@@ -42,7 +42,7 @@
 #   PGHOST/PGPORT/PGDATABASE/PGUSER/PGPASSWORD
 #                             Override the database connection (default: from
 #                             the postgres-credentials secret)
-#   NAMESPACE=name            Kubernetes namespace for secrets (default: odo-core)
+#   NAMESPACE=name            Kubernetes namespace for secrets (default: odo-pub)
 #
 # On a dev box: this leaves the account disabled when it finishes, which
 # is what the integration and e2e suites do not expect. Re-run
@@ -86,7 +86,7 @@ usage() {
     echo "                            run a fetched binary from another release"
     echo "  PGHOST/PGPORT/PGDATABASE/PGUSER/PGPASSWORD"
     echo "                            Override the database connection"
-    echo "  NAMESPACE=name            Kubernetes namespace for secrets (default: odo-core)"
+    echo "  NAMESPACE=name            Kubernetes namespace for secrets (default: odo-pub)"
     echo
     echo "Examples:"
     echo "  $0 ../current/src/registration/current-manifest.json"

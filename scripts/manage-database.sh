@@ -4,7 +4,7 @@
 #
 # Connection settings (in order of precedence):
 #   1. Environment variables: PGHOST, PGPORT, PGDATABASE, PGUSER, PGPASSWORD
-#   2. Kubernetes secret: postgres-credentials in odo-core namespace
+#   2. Kubernetes secret: postgres-credentials in odo-pub namespace
 #   3. Defaults: localhost:5432 (for host/port only)
 
 set -e
@@ -19,7 +19,7 @@ source "$SCRIPT_DIR/common.sh"
 # Default values
 COMMAND=${1:-help}
 DRY_RUN=${DRY_RUN:-false}
-NAMESPACE=${NAMESPACE:-odo-core}
+NAMESPACE=${NAMESPACE:-odo-pub}
 
 # Sqitch directories
 # Three trees under src/sqitch, deployed in this order:
@@ -77,7 +77,7 @@ usage() {
     echo "  PGUSER=username           Override database user (default: from secret)"
     echo "  PGPASSWORD=password       Override database password (default: from secret)"
     echo "  DRY_RUN=true              Show what would be done without making changes"
-    echo "  NAMESPACE=name            Kubernetes namespace for secrets (default: odo-core)"
+    echo "  NAMESPACE=name            Kubernetes namespace for secrets (default: odo-pub)"
     echo "  SQITCH_CORE_DIR=/path     Override core directory (default: $SQITCH_CORE_DIR)"
     echo "  SQITCH_DEMO_DIR=/path     Override demo-data directory (default: $SQITCH_DEMO_DIR)"
     echo "  TEST_DATA_DIR=/path       Override fixtures directory (default: $TEST_DATA_DIR)"

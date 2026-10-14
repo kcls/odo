@@ -72,14 +72,14 @@ resolve_pg_password() {
     # The shared resolver fills host/port/user/db/password from the
     # secret's DATABASE_URL; any PG* env vars the caller exported act as
     # overrides.
-    if ! init_pg_connection odo-core; then
+    if ! init_pg_connection; then
         echo -e "${RED}Error: could not read postgres password from k8s secrets.${NC}"
-        echo "Set PGPASSWORD manually or check that the odo-core postgres-credentials"
+        echo "Set PGPASSWORD manually or check that the $DB_SECRET_NAMESPACE $DB_SECRET_NAME"
         echo "secret exists and contains a DATABASE_URL."
         exit 1
     fi
 
-    echo "Connection resolved from odo-core/postgres-credentials"
+    echo "Connection resolved from $DB_SECRET_NAMESPACE/$DB_SECRET_NAME"
 }
 
 # ---------------------------------------------------------------------------

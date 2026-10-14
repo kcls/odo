@@ -33,7 +33,7 @@ usage() {
     echo "  PGDATABASE=dbname         Override database name (default: from secret)"
     echo "  PGUSER=username           Override database user (default: from secret)"
     echo "  PGPASSWORD=password       Override database password (default: from secret)"
-    echo "  NAMESPACE=name            Kubernetes namespace for secrets (default: odo-core)"
+    echo "  NAMESPACE=name            Kubernetes namespace for secrets (default: odo-pub)"
     echo
     echo "Examples:"
     echo "  $0 list john.doe"

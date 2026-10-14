@@ -70,9 +70,10 @@ templates, or fixtures.
   `set-service-env.sh` and `run-db-tests.sh` resolve the project the same
   way; the latter reads the project's `database:` block (secret, namespace,
   test glob) from its service-map.yaml.
-- `common.sh` defaults to odo's own database (`odo-core`/
-  `postgres-credentials`). Only scripts that call `load_db_config`
-  switch to a project's. Keep it that way:
+- `common.sh` defaults to odo's own database (`odo-pub`/
+  `postgres-credentials`, the copy the services read; the writers also
+  keep one in `odo-core` for odo-deploy). Only scripts that call
+  `load_db_config` switch to a project's. Keep it that way:
   `load-data-manifest.sh` runs from app checkouts but must always work
   on odo's database.
 - `./scripts/run-tests.sh --db --integration --e2e --unit --load`

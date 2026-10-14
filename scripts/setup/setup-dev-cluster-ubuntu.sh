@@ -79,8 +79,8 @@ require_cluster() {
         die "Cannot reach the k3s API server. Is k3s running?"
     fi
 
-    if ! kctl get secret postgres-credentials -n odo-core >/dev/null 2>&1; then
-        die "The odo-core/postgres-credentials secret is missing. Run ./scripts/setup/install-k3s-cluster-ubuntu.sh first."
+    if ! kctl get secret postgres-credentials -n odo-pub >/dev/null 2>&1; then
+        die "The odo-pub/postgres-credentials secret is missing. Run ./scripts/setup/install-k3s-cluster-ubuntu.sh first."
     fi
 
     # with_dev_env reaches kubectl and docker through `sg`, which needs the
@@ -93,11 +93,11 @@ require_cluster() {
     done
 
     local db_url
-    db_url="$(kctl get secret postgres-credentials -n odo-core \
+    db_url="$(kctl get secret postgres-credentials -n odo-pub \
         -o jsonpath='{.data.DATABASE_URL}' 2>/dev/null | base64 -d)"
 
     if ! parse_database_url "$db_url"; then
-        die "The DATABASE_URL in odo-core/postgres-credentials is not usable. Fix it with ./scripts/manage-secrets.sh update-db-url."
+        die "The DATABASE_URL in odo-pub/postgres-credentials is not usable. Fix it with ./scripts/manage-secrets.sh update-db-url."
     fi
 
     if is_loopback_host "$DB_HOST"; then
