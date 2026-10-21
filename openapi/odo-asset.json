@@ -187,6 +187,41 @@
         ]
       }
     },
+    "/api/v1/odo/asset/files/sign": {
+      "post": {
+        "tags": [
+          "asset"
+        ],
+        "operationId": "sign_urls",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignUrlsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Signed retrieval URLs, in request order. The caller must hold the read permission for every path, or the whole request is denied.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignUrlsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/odo/asset/files/{path}": {
       "get": {
         "tags": [
@@ -202,11 +237,52 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "description": "JWT, for clients that cannot set headers",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "expires",
+            "in": "query",
+            "description": "Signed URL: expiry (unix seconds)",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "uid",
+            "in": "query",
+            "description": "Signed URL: signing user",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "sig",
+            "in": "query",
+            "description": "Signed URL: signature",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
           "200": {
             "description": "File contents"
+          },
+          "206": {
+            "description": "Partial file contents"
           }
         },
         "security": [
@@ -486,6 +562,57 @@
       },
       "ListDirectoriesRequest": {
         "type": "object"
+      },
+      "SignUrlsRequest": {
+        "type": "object",
+        "required": [
+          "paths"
+        ],
+        "properties": {
+          "paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Relative file paths, as returned in `relative_path`."
+          }
+        }
+      },
+      "SignUrlsResponse": {
+        "type": "object",
+        "required": [
+          "urls"
+        ],
+        "properties": {
+          "urls": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SignedUrl"
+            }
+          }
+        }
+      },
+      "SignedUrl": {
+        "type": "object",
+        "required": [
+          "path",
+          "url",
+          "expires_at"
+        ],
+        "properties": {
+          "expires_at": {
+            "type": "string",
+            "description": "RFC3339 expiry."
+          },
+          "path": {
+            "type": "string",
+            "description": "The path as requested, for matching results to inputs."
+          },
+          "url": {
+            "type": "string",
+            "description": "Retrieval URL as an absolute path (no scheme or host); prefix it\nwith the API origin."
+          }
+        }
       },
       "UploadResponse": {
         "type": "object",

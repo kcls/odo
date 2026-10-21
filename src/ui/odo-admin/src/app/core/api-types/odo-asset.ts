@@ -84,6 +84,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/odo/asset/files/sign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["sign_urls"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/odo/asset/files/{path}": {
         parameters: {
             query?: never;
@@ -218,6 +234,24 @@ export interface components {
             files: components["schemas"]["FileMetadata"][];
         };
         ListDirectoriesRequest: Record<string, never>;
+        SignUrlsRequest: {
+            /** @description Relative file paths, as returned in `relative_path`. */
+            paths: string[];
+        };
+        SignUrlsResponse: {
+            urls: components["schemas"]["SignedUrl"][];
+        };
+        SignedUrl: {
+            /** @description RFC3339 expiry. */
+            expires_at: string;
+            /** @description The path as requested, for matching results to inputs. */
+            path: string;
+            /**
+             * @description Retrieval URL as an absolute path (no scheme or host); prefix it
+             *     with the API origin.
+             */
+            url: string;
+        };
         UploadResponse: {
             /**
              * @description Echo of the multipart `category` field ("photo" | "document" |
@@ -368,9 +402,42 @@ export interface operations {
             };
         };
     };
-    retrieve: {
+    sign_urls: {
         parameters: {
             query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignUrlsRequest"];
+            };
+        };
+        responses: {
+            /** @description Signed retrieval URLs, in request order. The caller must hold the read permission for every path, or the whole request is denied. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignUrlsResponse"];
+                };
+            };
+        };
+    };
+    retrieve: {
+        parameters: {
+            query?: {
+                /** @description JWT, for clients that cannot set headers */
+                token?: string;
+                /** @description Signed URL: expiry (unix seconds) */
+                expires?: number;
+                /** @description Signed URL: signing user */
+                uid?: number;
+                /** @description Signed URL: signature */
+                sig?: string;
+            };
             header?: never;
             path: {
                 /** @description Relative file path */
@@ -382,6 +449,13 @@ export interface operations {
         responses: {
             /** @description File contents */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Partial file contents */
+            206: {
                 headers: {
                     [name: string]: unknown;
                 };

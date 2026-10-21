@@ -9,6 +9,7 @@ use odo_client::context::RequestContext;
 use odo_client::error::{ApiResult, LocalError};
 use odo_entity::asset::directory as asset_directory;
 use odo_entity::asset::file_upload;
+use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
 use sea_orm::prelude::*;
 use sea_orm::{Condition, Set};
 use serde::{Deserialize, Serialize};
@@ -20,6 +21,7 @@ use tower_http::services::ServeFile;
 use tracing::{error, info, warn};
 
 use crate::AppState;
+use crate::signing::VerifyError;
 
 // --- Directory mapping & permissions ---
 //
@@ -87,22 +89,30 @@ async fn require_directory_access(
     access: Access,
 ) -> Result<(), LocalError> {
     let dirs = asset_directory::Entity::find().all(&state.db).await?;
+    match directory_perm(&dirs, target_path, access) {
+        Some(perm) => require_perm(state, perm).await,
+        // No configured directory covers this path; nothing to enforce.
+        None => Ok(()),
+    }
+}
 
-    let best = dirs
+/// The permission guarding `target_path`, if any directory covers it.
+fn directory_perm<'a>(
+    dirs: &'a [asset_directory::Model],
+    target_path: &str,
+    access: Access,
+) -> Option<&'a str> {
+    let dir = dirs
         .iter()
         .filter(|d| path_has_prefix(target_path, &d.path))
-        .max_by_key(|d| d.path.len());
-
-    let Some(dir) = best else {
-        // No configured directory covers this path; nothing to enforce.
-        return Ok(());
-    };
-
-    let perm = match access {
+        .max_by_key(|d| d.path.len())?;
+    Some(match access {
         Access::Read => &dir.read_perm,
         Access::Write => &dir.write_perm,
-    };
+    })
+}
 
+async fn require_perm(state: &AppState, perm: &str) -> Result<(), LocalError> {
     // Check at the caller's currently-selected org unit (from their JWT),
     // falling back to root (None) when the token carries no org unit.
     let org_unit = RequestContext::claims()
@@ -113,6 +123,18 @@ async fn require_directory_access(
         .auth_client
         .permission_required_uuid(perm, org_unit.as_ref())
         .await
+}
+
+/// Normalize a client-supplied relative path: keep only normal components,
+/// which drops `..`, `.`, and any root, so the result cannot escape the
+/// storage base. Signing and retrieval must agree on this form exactly.
+fn clean_relative_path(path: &str) -> String {
+    StdPath::new(path)
+        .components()
+        .filter(|c| matches!(c, std::path::Component::Normal(_)))
+        .collect::<PathBuf>()
+        .to_string_lossy()
+        .replace('\\', "/")
 }
 
 /// True when `prefix` matches `path` on whole path segments (a `current`
@@ -366,13 +388,31 @@ pub async fn upload(
 #[derive(Deserialize)]
 pub struct FileQueryParams {
     pub token: Option<String>,
+    /// Signed-URL parameters; see `sign_urls`.
+    pub expires: Option<i64>,
+    pub uid: Option<i64>,
+    pub sig: Option<String>,
+}
+
+fn unauthenticated(message: &str) -> Response {
+    (
+        StatusCode::UNAUTHORIZED,
+        Json(serde_json::json!({"code": "UNAUTHENTICATED", "message": message})),
+    )
+        .into_response()
 }
 
 #[utoipa::path(
     get,
     path = "/api/v1/odo/asset/files/{path}",
-    params(("path" = String, Path, description = "Relative file path")),
-    responses((status = 200, description = "File contents")),
+    params(
+        ("path" = String, Path, description = "Relative file path"),
+        ("token" = Option<String>, Query, description = "JWT, for clients that cannot set headers"),
+        ("expires" = Option<i64>, Query, description = "Signed URL: expiry (unix seconds)"),
+        ("uid" = Option<i64>, Query, description = "Signed URL: signing user"),
+        ("sig" = Option<String>, Query, description = "Signed URL: signature"),
+    ),
+    responses((status = 200, description = "File contents"), (status = 206, description = "Partial file contents")),
     security(("bearer" = [])),
     tag = "asset"
 )]
@@ -382,60 +422,64 @@ pub async fn retrieve(
     Query(params): Query<FileQueryParams>,
     req: Request,
 ) -> Response {
-    // Accept token from Authorization header or ?token= query param
-    let Some(token) = req
-        .headers()
-        .get("authorization")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.strip_prefix("Bearer "))
-        .map(|s| s.to_string())
-        .or(params.token)
-    else {
-        return (
-            StatusCode::UNAUTHORIZED,
-            Json(
-                serde_json::json!({"code": "UNAUTHENTICATED", "message": "Missing authorization"}),
-            ),
-        )
-            .into_response();
+    let rel_path = clean_relative_path(&path);
+    let full_path = PathBuf::from(&state.storage_base_path).join(&rel_path);
+
+    // A signed URL stands in for the JWT: its read permission was checked
+    // when it was issued.
+    let user_id = if let Some(sig) = params.sig.as_deref() {
+        let (Some(signer), Some(expires), Some(uid)) =
+            (state.signer.as_ref(), params.expires, params.uid)
+        else {
+            return unauthenticated("Invalid signature");
+        };
+        if let Err(e) = signer.verify(&rel_path, uid, expires, sig, Utc::now().timestamp()) {
+            warn!(user_id = uid, path = %path, reason = ?e, "Signed URL rejected");
+            return unauthenticated(match e {
+                VerifyError::Expired => "Signed URL expired",
+                VerifyError::BadSignature => "Invalid signature",
+            });
+        }
+        uid
+    } else {
+        // Accept token from Authorization header or ?token= query param
+        let Some(token) = req
+            .headers()
+            .get("authorization")
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.strip_prefix("Bearer "))
+            .map(|s| s.to_string())
+            .or(params.token)
+        else {
+            return unauthenticated("Missing authorization");
+        };
+
+        let Ok(claims) = state.tokens.verify(&token) else {
+            return unauthenticated("Invalid token");
+        };
+
+        let user_id = claims.user_id().unwrap_or(0);
+
+        // Enforce the read permission for the file's directory. This route
+        // runs outside the request_tracing/require_auth layers (it
+        // self-validates the token to support `?token=`), so establish a
+        // RequestContext from the verified token first — that's what lets
+        // `auth_client` forward the caller's JWT and lets
+        // `require_directory_access` read the org unit.
+        let ctx = RequestContext::generate().with_auth(token, claims);
+        if let Err(e) = ctx
+            .scope(require_directory_access(&state, &rel_path, Access::Read))
+            .await
+        {
+            warn!(user_id = user_id, path = %path, "Asset read denied");
+            return odo_client::error::ApiError(e).into_response();
+        }
+        user_id
     };
-
-    let Ok(claims) = state.tokens.verify(&token) else {
-        return (
-            StatusCode::UNAUTHORIZED,
-            Json(serde_json::json!({"code": "UNAUTHENTICATED", "message": "Invalid token"})),
-        )
-            .into_response();
-    };
-
-    let user_id = claims.user_id().unwrap_or(0);
-
-    // Prevent path traversal
-    let clean_path: PathBuf = StdPath::new(&path)
-        .components()
-        .filter(|c| matches!(c, std::path::Component::Normal(_)))
-        .collect();
-
-    let full_path = PathBuf::from(&state.storage_base_path).join(&clean_path);
 
     if !full_path.starts_with(&state.storage_base_path) {
         warn!(user_id = user_id, path = %path, "Path traversal attempt");
         return (StatusCode::BAD_REQUEST, "Invalid file path").into_response();
-    }
-
-    // Enforce the read permission for the file's directory. This route runs
-    // outside the request_tracing/require_auth layers (it self-validates the
-    // token to support `?token=`), so establish a RequestContext from the
-    // verified token first — that's what lets `auth_client` forward the
-    // caller's JWT and lets `require_directory_access` read the org unit.
-    let rel_path = clean_path.to_string_lossy().replace('\\', "/");
-    let ctx = RequestContext::generate().with_auth(token.clone(), claims.clone());
-    if let Err(e) = ctx
-        .scope(require_directory_access(&state, &rel_path, Access::Read))
-        .await
-    {
-        warn!(user_id = user_id, path = %path, "Asset read denied");
-        return odo_client::error::ApiError(e).into_response();
     }
 
     // Checked up front so that a directory is a 400 rather than a stream
@@ -459,7 +503,9 @@ pub async fn retrieve(
         .map(|e| format!(".{}", e.to_lowercase()))
         .unwrap_or_default();
     let content_type = get_mime_type(&ext);
-    let mime: Mime = content_type.parse().unwrap_or(mime::APPLICATION_OCTET_STREAM);
+    let mime: Mime = content_type
+        .parse()
+        .unwrap_or(mime::APPLICATION_OCTET_STREAM);
 
     // ServeFile streams the file and handles Range / If-Range (so video
     // can seek), Last-Modified / If-Modified-Since, and HEAD.
@@ -492,6 +538,128 @@ pub async fn retrieve(
     }
 
     resp
+}
+
+// ---------------------------------------------------------------------------
+// Sign
+// ---------------------------------------------------------------------------
+//
+// Issues short-lived retrieval URLs for `<img>`/`<video>`/download links, so
+// clients don't embed the session JWT in URLs (where it outlives its
+// rotation and leaks into logs and history). See `signing.rs`.
+//
+// The signed path is the one odo-asset serves. Envoy's legacy-prefix
+// rewrites (asset-migration-routes.yaml) change the path in flight, so a URL
+// signed for a legacy `incident-tracker/...` path never verifies: sign the
+// `current/...` path.
+
+const MAX_SIGN_PATHS: usize = 200;
+
+/// RFC 3986 unreserved characters stay literal; everything else in a
+/// segment is percent-encoded.
+const PATH_SEGMENT: &AsciiSet = &NON_ALPHANUMERIC
+    .remove(b'-')
+    .remove(b'_')
+    .remove(b'.')
+    .remove(b'~');
+
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
+pub struct SignUrlsRequest {
+    /// Relative file paths, as returned in `relative_path`.
+    pub paths: Vec<String>,
+}
+
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+pub struct SignedUrl {
+    /// The path as requested, for matching results to inputs.
+    pub path: String,
+    /// Retrieval URL as an absolute path (no scheme or host); prefix it
+    /// with the API origin.
+    pub url: String,
+    /// RFC3339 expiry.
+    pub expires_at: String,
+}
+
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+pub struct SignUrlsResponse {
+    pub urls: Vec<SignedUrl>,
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/odo/asset/files/sign",
+    request_body = SignUrlsRequest,
+    responses((status = 200, body = SignUrlsResponse, description = "Signed retrieval URLs, in request order. The caller must hold the read permission for every path, or the whole request is denied.")),
+    security(("bearer" = [])),
+    tag = "asset"
+)]
+pub async fn sign_urls(
+    State(state): State<Arc<AppState>>,
+    Json(params): Json<SignUrlsRequest>,
+) -> ApiResult<Json<SignUrlsResponse>> {
+    let user_id = RequestContext::user_id().ok_or(LocalError::unauthenticated())?;
+    let Some(signer) = state.signer.as_ref() else {
+        error!("files/sign called but ASSET_URL_SIGNING_KEY is not set");
+        return Err(LocalError::internal("URL signing is not configured").into());
+    };
+
+    if params.paths.len() > MAX_SIGN_PATHS {
+        return Err(LocalError::invalid_input(format!(
+            "at most {MAX_SIGN_PATHS} paths per request"
+        ))
+        .into());
+    }
+
+    let cleaned: Vec<String> = params
+        .paths
+        .iter()
+        .map(|p| clean_relative_path(p))
+        .collect();
+    if cleaned.iter().any(String::is_empty) {
+        return Err(LocalError::invalid_input("paths may not be empty").into());
+    }
+
+    // One registry fetch, and one auth round-trip per distinct permission
+    // rather than per path.
+    let dirs = asset_directory::Entity::find().all(&state.db).await?;
+    let mut perms: Vec<&str> = cleaned
+        .iter()
+        .filter_map(|p| directory_perm(&dirs, p, Access::Read))
+        .collect();
+    perms.sort_unstable();
+    perms.dedup();
+    for perm in perms {
+        require_perm(&state, perm).await?;
+    }
+
+    let now = Utc::now().timestamp();
+    let urls = params
+        .paths
+        .into_iter()
+        .zip(cleaned)
+        .map(|(path, rel_path)| {
+            let signed = signer.sign(&rel_path, user_id, now);
+            let encoded: Vec<String> = rel_path
+                .split('/')
+                .map(|seg| utf8_percent_encode(seg, PATH_SEGMENT).to_string())
+                .collect();
+            SignedUrl {
+                path,
+                url: format!(
+                    "/api/v1/odo/asset/files/{}?expires={}&uid={}&sig={}",
+                    encoded.join("/"),
+                    signed.expires,
+                    user_id,
+                    signed.sig
+                ),
+                expires_at: chrono::DateTime::from_timestamp(signed.expires, 0)
+                    .map(|t| t.to_rfc3339())
+                    .unwrap_or_default(),
+            }
+        })
+        .collect();
+
+    Ok(Json(SignUrlsResponse { urls }))
 }
 
 // ---------------------------------------------------------------------------
@@ -823,6 +991,23 @@ mod tests {
             .max_by_key(|p| p.len())
             .copied();
         assert_eq!(best, Some("current/patron"));
+    }
+
+    // --- clean_relative_path (shared by signing and retrieval) ---
+
+    #[test]
+    fn clean_path_drops_traversal_and_root() {
+        assert_eq!(
+            clean_relative_path("current/photos/a.jpg"),
+            "current/photos/a.jpg"
+        );
+        assert_eq!(
+            clean_relative_path("/current/./photos/a.jpg"),
+            "current/photos/a.jpg"
+        );
+        assert_eq!(clean_relative_path("../../etc/passwd"), "etc/passwd");
+        assert_eq!(clean_relative_path("current//photos/"), "current/photos");
+        assert_eq!(clean_relative_path(".."), "");
     }
 
     // --- is_allowed_extension ---
