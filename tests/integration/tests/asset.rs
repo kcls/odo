@@ -188,6 +188,42 @@ async fn upload_and_retrieve() {
 }
 
 #[tokio::test]
+async fn retrieve_large_file_streams_intact() {
+    let c = client();
+    let token = staff_token(&c).await;
+
+    // Several MB of non-repeating-ish bytes, spanning many stream chunks.
+    let content: Vec<u8> = (0..3 * 1024 * 1024 + 123)
+        .map(|i: u32| (i.wrapping_mul(2654435761) >> 24) as u8)
+        .collect();
+    let path = create_test_file("odo_test_retrieve_large.txt", &content);
+
+    let upload_resp = upload_file(&token, &path, "document", "e2e-file", None).await;
+    std::fs::remove_file(&path).ok();
+    assert_eq!(upload_resp.status(), 200);
+
+    let upload_data: serde_json::Value = upload_resp.json().await.unwrap();
+    let relative_path = upload_data["relative_path"].as_str().unwrap();
+
+    let retrieve_resp = c
+        .get(format!("{}/api/v1/odo/asset/files/{}", asset_base(), relative_path))
+        .headers(auth_header(&token))
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(retrieve_resp.status(), 200);
+    assert_eq!(
+        retrieve_resp.headers().get("content-length").unwrap(),
+        &content.len().to_string()
+    );
+
+    let body = retrieve_resp.bytes().await.unwrap();
+    assert_eq!(body.len(), content.len());
+    assert!(body.as_ref() == content.as_slice(), "streamed body differs");
+}
+
+#[tokio::test]
 async fn retrieve_via_query_token() {
     let c = client();
     let token = staff_token(&c).await;
