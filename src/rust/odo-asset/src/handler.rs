@@ -1,5 +1,6 @@
 use axum::Json;
 use axum::body::Body;
+use axum::extract::multipart::Field;
 use axum::extract::{Multipart, Path, Query, Request, State};
 use axum::http::{HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
@@ -15,8 +16,9 @@ use sea_orm::{Condition, Set};
 use serde::{Deserialize, Serialize};
 use std::path::{Path as StdPath, PathBuf};
 use std::sync::Arc;
+use tempfile::TempPath;
 use tokio::fs;
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncWriteExt, BufWriter};
 use tower_http::services::ServeFile;
 use tracing::{error, info, warn};
 
@@ -212,6 +214,65 @@ fn generate_file_id() -> String {
 
 // --- Upload ---
 
+/// Where uploads are streamed before they are validated, under the storage
+/// base so the final move is a same-filesystem rename. Never served.
+const STAGING_DIR: &str = ".staging";
+
+/// Copy buffer between the multipart stream and the staged file.
+const STAGING_BUF_BYTES: usize = 256 * 1024;
+
+/// An uploaded file on disk in the staging directory. Deleted when dropped,
+/// so every rejected or aborted upload (including a client disconnect,
+/// which drops the handler future) cleans up after itself.
+struct StagedUpload {
+    path: TempPath,
+    size: u64,
+}
+
+/// Stream a multipart file field to the staging directory, so memory use
+/// stays at one buffer regardless of the file's size. The field arrives
+/// before the metadata that decides its target directory and permission, so
+/// those checks happen after staging.
+async fn stage_upload(
+    storage_base: &str,
+    mut field: Field<'_>,
+) -> Result<StagedUpload, LocalError> {
+    let storage_err = |what: &str, e: std::io::Error| {
+        error!(error = %e, "{what}");
+        LocalError::internal(format!("Storage error: {e}"))
+    };
+
+    let staging = PathBuf::from(storage_base).join(STAGING_DIR);
+    fs::create_dir_all(&staging)
+        .await
+        .map_err(|e| storage_err("Failed to create staging directory", e))?;
+    let (file, path) = tempfile::Builder::new()
+        .prefix("upload-")
+        .tempfile_in(&staging)
+        .map_err(|e| storage_err("Failed to create staged file", e))?
+        .into_parts();
+
+    let mut writer = BufWriter::with_capacity(STAGING_BUF_BYTES, fs::File::from_std(file));
+    let mut size = 0u64;
+    while let Some(chunk) = field
+        .chunk()
+        .await
+        .map_err(|e| LocalError::invalid_input(format!("Failed to read file: {e}")))?
+    {
+        size += chunk.len() as u64;
+        writer
+            .write_all(&chunk)
+            .await
+            .map_err(|e| storage_err("Failed to write staged file", e))?;
+    }
+    writer
+        .shutdown()
+        .await
+        .map_err(|e| storage_err("Failed to write staged file", e))?;
+
+    Ok(StagedUpload { path, size })
+}
+
 #[derive(Serialize, utoipa::ToSchema)]
 pub struct UploadResponse {
     id: i32,
@@ -246,7 +307,7 @@ pub async fn upload(
 ) -> ApiResult<Json<UploadResponse>> {
     let user_id = RequestContext::user_id().ok_or(LocalError::unauthenticated())? as i32;
 
-    let mut file_data: Option<(String, Vec<u8>)> = None;
+    let mut file_data: Option<(String, StagedUpload)> = None;
     let mut category = String::from("document");
     let mut entity_type: Option<String> = None;
     let mut entity_id: Option<String> = None;
@@ -263,11 +324,8 @@ pub async fn upload(
                     .file_name()
                     .ok_or(LocalError::invalid_input("Missing filename"))?
                     .to_string();
-                let data = field
-                    .bytes()
-                    .await
-                    .map_err(|e| LocalError::invalid_input(format!("Failed to read file: {e}")))?;
-                file_data = Some((filename, data.to_vec()));
+                let staged = stage_upload(&state.storage_base_path, field).await?;
+                file_data = Some((filename, staged));
             }
             "category" => {
                 category = field
@@ -285,7 +343,7 @@ pub async fn upload(
         }
     }
 
-    let (original_name, data) =
+    let (original_name, staged) =
         file_data.ok_or(LocalError::invalid_input("Missing file in upload"))?;
 
     if !matches!(category.as_str(), "photo" | "document" | "video") {
@@ -330,19 +388,16 @@ pub async fn upload(
 
     let file_path = full_dir.join(&safe_name);
 
-    let mut file = fs::File::create(&file_path).await.map_err(|e| {
-        error!(error = %e, "Failed to create file");
+    fs::rename(&staged.path, &file_path).await.map_err(|e| {
+        error!(error = %e, path = %file_path.display(), "Failed to move upload into place");
         LocalError::internal(format!("Storage error: {e}"))
     })?;
-    file.write_all(&data).await.map_err(|e| {
-        error!(error = %e, "Failed to write file");
-        LocalError::internal(format!("Storage error: {e}"))
-    })?;
-    file.flush().await.ok();
+    // Moved: disarm the staged file's delete-on-drop.
+    let _ = staged.path.keep();
 
     let mime_type = get_mime_type(&ext).to_string();
     let relative_path = format!("{}/{}", target_dir, safe_name);
-    let file_size = data.len() as i32;
+    let file_size = staged.size as i32;
     let now = Utc::now();
 
     let record = file_upload::ActiveModel {
@@ -480,6 +535,11 @@ pub async fn retrieve(
     if !full_path.starts_with(&state.storage_base_path) {
         warn!(user_id = user_id, path = %path, "Path traversal attempt");
         return (StatusCode::BAD_REQUEST, "Invalid file path").into_response();
+    }
+    // In-flight uploads are not files yet; no asset.directory row guards
+    // the staging path, so it would otherwise be readable by any user.
+    if path_has_prefix(&rel_path, STAGING_DIR) {
+        return (StatusCode::NOT_FOUND, "File not found").into_response();
     }
 
     // Checked up front so that a directory is a 400 rather than a stream

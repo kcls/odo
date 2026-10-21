@@ -80,6 +80,69 @@ async fn upload_document() {
 }
 
 #[tokio::test]
+async fn upload_file_field_after_metadata() {
+    ensure_upload_fixtures().await;
+    let c = client();
+    let token = staff_token(&c).await;
+
+    // The file is staged before the metadata that routes it is known;
+    // the reverse field order must work too.
+    let content = b"metadata first";
+    let form = multipart::Form::new()
+        .text("category", "document")
+        .text("entity_type", "e2e-file")
+        .part(
+            "file",
+            multipart::Part::bytes(content.to_vec()).file_name("odo_test_meta_first.txt"),
+        );
+    let resp = c
+        .post(format!("{}/api/v1/odo/asset/upload", asset_base()))
+        .headers(auth_header(&token))
+        .multipart(form)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+    let data: serde_json::Value = resp.json().await.unwrap();
+    assert_eq!(data["size"].as_i64(), Some(content.len() as i64));
+
+    let body = c
+        .get(format!(
+            "{}/api/v1/odo/asset/files/{}",
+            asset_base(),
+            data["relative_path"].as_str().unwrap()
+        ))
+        .headers(auth_header(&token))
+        .send()
+        .await
+        .unwrap()
+        .bytes()
+        .await
+        .unwrap();
+    assert_eq!(body.as_ref(), content);
+}
+
+#[tokio::test]
+async fn retrieve_staging_dir_not_found() {
+    let c = client();
+    let token = staff_token(&c).await;
+
+    // Any upload creates the staging directory; it must still not be served.
+    let path = create_test_file("odo_test_staging.txt", b"x");
+    let resp = upload_file(&token, &path, "document", "e2e-file", None).await;
+    std::fs::remove_file(&path).ok();
+    assert_eq!(resp.status(), 200);
+
+    let resp = c
+        .get(format!("{}/api/v1/odo/asset/files/.staging", asset_base()))
+        .headers(auth_header(&token))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 404);
+}
+
+#[tokio::test]
 async fn upload_photo() {
     let c = client();
     let token = staff_token(&c).await;
@@ -204,6 +267,7 @@ async fn retrieve_large_file_streams_intact() {
 
     let upload_data: serde_json::Value = upload_resp.json().await.unwrap();
     let relative_path = upload_data["relative_path"].as_str().unwrap();
+    assert_eq!(upload_data["size"].as_i64(), Some(content.len() as i64));
 
     let retrieve_resp = c
         .get(format!("{}/api/v1/odo/asset/files/{}", asset_base(), relative_path))
