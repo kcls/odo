@@ -5,12 +5,13 @@ use axum::routing::{get, post};
 use odo_asset::AppState;
 use odo_asset::admin;
 use odo_asset::handler;
+use odo_asset::signing::UrlSigner;
 use odo_client::auth::TokenManager;
 use odo_service::health;
 use odo_service::middleware::{log_access, request_tracing, require_auth};
 use std::env;
 use std::sync::Arc;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 use utoipa::OpenApi;
 
 #[derive(OpenApi)]
@@ -21,6 +22,7 @@ use utoipa::OpenApi;
         handler::retrieve,
         handler::get_files,
         handler::delete_file,
+        handler::sign_urls,
         admin::list_directories,
         admin::create_directory,
         admin::delete_directory,
@@ -32,6 +34,9 @@ use utoipa::OpenApi;
         handler::FileMetadata,
         handler::DeleteFileRequest,
         handler::DeleteFileResponse,
+        handler::SignUrlsRequest,
+        handler::SignUrlsResponse,
+        handler::SignedUrl,
         admin::DirectoryRow,
         admin::ListDirectoriesRequest,
         admin::CreateDirectoryRequest,
@@ -67,11 +72,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and_then(|v| v.parse().ok())
         .unwrap_or(50);
 
+    let url_ttl_secs: i64 = env::var("ASSET_URL_TTL_SECONDS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .filter(|v| *v > 0)
+        .unwrap_or(3600);
+
+    // Optional so existing deployments without the secret keep running;
+    // they just can't issue signed URLs until it is provisioned.
+    let signer = match env::var("ASSET_URL_SIGNING_KEY")
+        .ok()
+        .filter(|k| !k.is_empty())
+    {
+        Some(key) if key.len() < 32 => {
+            error!("ASSET_URL_SIGNING_KEY must be at least 32 characters");
+            return Err("ASSET_URL_SIGNING_KEY too short".into());
+        }
+        Some(key) => Some(UrlSigner::new(key.into_bytes(), url_ttl_secs)),
+        None => {
+            warn!("ASSET_URL_SIGNING_KEY not set; signed file URLs are disabled");
+            None
+        }
+    };
+
     info!(
         svc = "odo-asset",
         version = env!("CARGO_PKG_VERSION"),
         storage_base_path = storage_base_path,
         max_upload_mb = max_upload_mb,
+        url_signing = signer.is_some(),
+        url_ttl_secs = url_ttl_secs,
         "starting"
     );
 
@@ -83,6 +113,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tokens: TokenManager::rsa_verifier(&jwt_public_key),
         storage_base_path,
         auth_client: odo_client::client::ServiceClient::new(auth_url).into(),
+        signer,
     });
 
     let app = Router::new()
@@ -94,6 +125,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // *before* the layer call.
         .route("/api/v1/odo/asset/files/get", post(handler::get_files))
         .route("/api/v1/odo/asset/files/delete", post(handler::delete_file))
+        .route("/api/v1/odo/asset/files/sign", post(handler::sign_urls))
         .route(
             "/api/v1/odo/asset/directory/list",
             post(admin::list_directories),
@@ -109,7 +141,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .layer(middleware::from_fn(log_access))
         .layer(middleware::from_fn_with_state(state.clone(), require_auth))
         .layer(middleware::from_fn(request_tracing))
-        // File retrieval handles its own auth (supports ?token= query param)
+        // File retrieval handles its own auth (?token= or a signed URL)
         .route("/api/v1/odo/asset/files/{*path}", get(handler::retrieve))
         .route(
             "/api/v1/odo/asset/api-doc/openapi.json",

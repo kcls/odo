@@ -946,3 +946,209 @@ async fn directory_upload_mapping_conflicts() {
         .unwrap();
     assert!(matches!(resp.status().as_u16(), 200 | 409));
 }
+
+// ---------------------------------------------------------------------------
+// files/sign (signed retrieval URLs)
+// ---------------------------------------------------------------------------
+
+async fn upload_and_sign(
+    c: &reqwest::Client,
+    token: &str,
+    name: &str,
+    content: &[u8],
+) -> (String, String) {
+    let path = create_test_file(name, content);
+    let upload_resp = upload_file(token, &path, "document", "e2e-file", None).await;
+    std::fs::remove_file(&path).ok();
+    assert_eq!(upload_resp.status(), 200);
+    let relative_path = upload_resp.json::<serde_json::Value>().await.unwrap()["relative_path"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let resp = c
+        .post(format!("{}/api/v1/odo/asset/files/sign", asset_base()))
+        .headers(auth_header(token))
+        .json(&serde_json::json!({"paths": [relative_path]}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+    let data: serde_json::Value = resp.json().await.unwrap();
+    let signed = &data["urls"][0];
+    assert_eq!(signed["path"].as_str(), Some(relative_path.as_str()));
+    assert!(signed["expires_at"].as_str().is_some_and(|s| !s.is_empty()));
+    (relative_path, signed["url"].as_str().unwrap().to_string())
+}
+
+#[tokio::test]
+async fn signed_url_retrieves_without_jwt() {
+    let c = client();
+    let token = staff_token(&c).await;
+    let content: Vec<u8> = (0..10_000u32).map(|i| (i % 251) as u8).collect();
+    let (_, url) = upload_and_sign(&c, &token, "odo_test_signed.txt", &content).await;
+
+    let resp = c
+        .get(format!("{}{}", asset_base(), url))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+    assert_eq!(resp.bytes().await.unwrap().as_ref(), content.as_slice());
+
+    // Range requests work on signed URLs too.
+    let resp = c
+        .get(format!("{}{}", asset_base(), url))
+        .header("Range", "bytes=100-199")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 206);
+    assert_eq!(resp.bytes().await.unwrap().as_ref(), &content[100..200]);
+}
+
+#[tokio::test]
+async fn signed_url_tampering_rejected() {
+    let c = client();
+    let token = staff_token(&c).await;
+    let (_, url_a) = upload_and_sign(&c, &token, "odo_test_signed_a.txt", b"file a").await;
+    let (path_b, _) = upload_and_sign(&c, &token, "odo_test_signed_b.txt", b"file b").await;
+
+    let (path_a, query) = url_a.split_once('?').unwrap();
+    let path_a = path_a.trim_start_matches("/api/v1/odo/asset/files/");
+    let param = |name: &str| {
+        query
+            .split('&')
+            .find_map(|kv| kv.strip_prefix(&format!("{name}=")))
+            .unwrap()
+            .to_string()
+    };
+    let (expires, uid, sig) = (param("expires"), param("uid"), param("sig"));
+    let mut flipped_sig = sig.clone();
+    let last = if flipped_sig.pop() == Some('0') {
+        '1'
+    } else {
+        '0'
+    };
+    flipped_sig.push(last);
+
+    for (label, path, expires, uid, sig) in [
+        (
+            "other file",
+            path_b.as_str(),
+            expires.clone(),
+            uid.clone(),
+            sig.clone(),
+        ),
+        (
+            "altered sig",
+            path_a,
+            expires.clone(),
+            uid.clone(),
+            flipped_sig,
+        ),
+        (
+            "altered uid",
+            path_a,
+            expires.clone(),
+            format!("{}1", uid),
+            sig.clone(),
+        ),
+        (
+            "extended expiry",
+            path_a,
+            (expires.parse::<i64>().unwrap() + 300).to_string(),
+            uid.clone(),
+            sig.clone(),
+        ),
+        ("expired", path_a, "1".to_string(), uid.clone(), sig.clone()),
+    ] {
+        let resp = c
+            .get(format!(
+                "{}/api/v1/odo/asset/files/{path}?expires={expires}&uid={uid}&sig={sig}",
+                asset_base()
+            ))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), 401, "{label} should be rejected");
+    }
+}
+
+#[tokio::test]
+async fn sign_requires_auth() {
+    let resp = client()
+        .post(format!("{}/api/v1/odo/asset/files/sign", asset_base()))
+        .json(&serde_json::json!({"paths": ["e2e-assets/files/x.txt"]}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 401);
+}
+
+#[tokio::test]
+async fn sign_rejects_empty_path() {
+    let c = client();
+    let token = staff_token(&c).await;
+    let resp = c
+        .post(format!("{}/api/v1/odo/asset/files/sign", asset_base()))
+        .headers(auth_header(&token))
+        .json(&serde_json::json!({"paths": ["e2e-assets/files/x.txt", ".."]}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 400);
+}
+
+#[tokio::test]
+async fn sign_denied_without_read_permission() {
+    let c = client();
+    let admin = odo_admin_token(&c).await;
+    let staff = staff_token(&c).await;
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let dir = format!("itest-sign-{nanos}");
+    let perm = format!("itest.sign.{nanos}.read");
+
+    let resp = c
+        .post(format!(
+            "{}/api/v1/odo/auth/authz/permission/create",
+            auth_base()
+        ))
+        .headers(auth_header(&admin))
+        .json(&serde_json::json!({"code": perm, "description": "itest sign perm"}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+    let resp = c
+        .post(dir_url("/create"))
+        .headers(auth_header(&admin))
+        .json(&serde_json::json!({"path": dir, "read_perm": perm, "write_perm": perm}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+
+    // One path the caller may read and one it may not: the whole request
+    // is denied.
+    let resp = c
+        .post(format!("{}/api/v1/odo/asset/files/sign", asset_base()))
+        .headers(auth_header(&staff))
+        .json(&serde_json::json!({"paths": ["e2e-assets/files/x.txt", format!("{dir}/x.jpg")]}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 403);
+
+    let resp = c
+        .post(dir_url("/delete"))
+        .headers(auth_header(&admin))
+        .json(&serde_json::json!({"path": dir}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+}
