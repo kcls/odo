@@ -15,6 +15,7 @@ use std::path::{Path as StdPath, PathBuf};
 use std::sync::Arc;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
+use tokio_util::io::ReaderStream;
 use tracing::{error, info, warn};
 
 use crate::AppState;
@@ -435,21 +436,32 @@ pub async fn retrieve(
         return odo_client::error::ApiError(e).into_response();
     }
 
-    let Ok(metadata) = fs::metadata(&full_path).await else {
-        return (StatusCode::NOT_FOUND, "File not found").into_response();
+    // Stream rather than read into memory: files run to MAX_UPLOAD_SIZE_MB,
+    // and a buffered copy would be held for the whole (possibly slow)
+    // transfer. Metadata comes from the open handle so Content-Length
+    // describes the file actually being streamed.
+    let file = match fs::File::open(&full_path).await {
+        Ok(f) => f,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            return (StatusCode::NOT_FOUND, "File not found").into_response();
+        }
+        Err(e) => {
+            error!(error = %e, "Failed to open file");
+            return (StatusCode::INTERNAL_SERVER_ERROR, "Failed to read file").into_response();
+        }
+    };
+
+    let metadata = match file.metadata().await {
+        Ok(m) => m,
+        Err(e) => {
+            error!(error = %e, "Failed to stat file");
+            return (StatusCode::INTERNAL_SERVER_ERROR, "Failed to read file").into_response();
+        }
     };
 
     if !metadata.is_file() {
         return (StatusCode::BAD_REQUEST, "Cannot serve directories").into_response();
     }
-
-    let contents = match fs::read(&full_path).await {
-        Ok(c) => c,
-        Err(e) => {
-            error!(error = %e, "Failed to read file");
-            return (StatusCode::INTERNAL_SERVER_ERROR, "Failed to read file").into_response();
-        }
-    };
 
     let ext = full_path
         .extension()
@@ -461,7 +473,7 @@ pub async fn retrieve(
     let mut builder = Response::builder()
         .status(StatusCode::OK)
         .header("Content-Type", content_type)
-        .header("Content-Length", contents.len().to_string());
+        .header("Content-Length", metadata.len().to_string());
 
     if content_type.starts_with("image/") || content_type == "application/pdf" {
         builder = builder.header("Cache-Control", "public, max-age=86400");
@@ -475,7 +487,7 @@ pub async fn retrieve(
         }
     }
 
-    match builder.body(Body::from(contents)) {
+    match builder.body(Body::from_stream(ReaderStream::new(file))) {
         Ok(resp) => resp,
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
