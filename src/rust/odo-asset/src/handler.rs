@@ -1,9 +1,10 @@
 use axum::Json;
 use axum::body::Body;
-use axum::extract::{Multipart, Path, Query, State};
-use axum::http::StatusCode;
+use axum::extract::{Multipart, Path, Query, Request, State};
+use axum::http::{HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use chrono::Utc;
+use mime::Mime;
 use odo_client::context::RequestContext;
 use odo_client::error::{ApiResult, LocalError};
 use odo_entity::asset::directory as asset_directory;
@@ -15,7 +16,7 @@ use std::path::{Path as StdPath, PathBuf};
 use std::sync::Arc;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
-use tokio_util::io::ReaderStream;
+use tower_http::services::ServeFile;
 use tracing::{error, info, warn};
 
 use crate::AppState;
@@ -379,10 +380,11 @@ pub async fn retrieve(
     State(state): State<Arc<AppState>>,
     Path(path): Path<String>,
     Query(params): Query<FileQueryParams>,
-    headers: axum::http::HeaderMap,
+    req: Request,
 ) -> Response {
     // Accept token from Authorization header or ?token= query param
-    let Some(token) = headers
+    let Some(token) = req
+        .headers()
         .get("authorization")
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.strip_prefix("Bearer "))
@@ -436,31 +438,19 @@ pub async fn retrieve(
         return odo_client::error::ApiError(e).into_response();
     }
 
-    // Stream rather than read into memory: files run to MAX_UPLOAD_SIZE_MB,
-    // and a buffered copy would be held for the whole (possibly slow)
-    // transfer. Metadata comes from the open handle so Content-Length
-    // describes the file actually being streamed.
-    let file = match fs::File::open(&full_path).await {
-        Ok(f) => f,
+    // Checked up front so that a directory is a 400 rather than a stream
+    // that fails mid-body, and unexpected I/O errors are logged; ServeFile
+    // folds every open failure into a bare 404.
+    match fs::metadata(&full_path).await {
+        Ok(m) if m.is_file() => {}
+        Ok(_) => return (StatusCode::BAD_REQUEST, "Cannot serve directories").into_response(),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
             return (StatusCode::NOT_FOUND, "File not found").into_response();
         }
         Err(e) => {
-            error!(error = %e, "Failed to open file");
-            return (StatusCode::INTERNAL_SERVER_ERROR, "Failed to read file").into_response();
-        }
-    };
-
-    let metadata = match file.metadata().await {
-        Ok(m) => m,
-        Err(e) => {
             error!(error = %e, "Failed to stat file");
             return (StatusCode::INTERNAL_SERVER_ERROR, "Failed to read file").into_response();
         }
-    };
-
-    if !metadata.is_file() {
-        return (StatusCode::BAD_REQUEST, "Cannot serve directories").into_response();
     }
 
     let ext = full_path
@@ -469,28 +459,39 @@ pub async fn retrieve(
         .map(|e| format!(".{}", e.to_lowercase()))
         .unwrap_or_default();
     let content_type = get_mime_type(&ext);
+    let mime: Mime = content_type.parse().unwrap_or(mime::APPLICATION_OCTET_STREAM);
 
-    let mut builder = Response::builder()
-        .status(StatusCode::OK)
-        .header("Content-Type", content_type)
-        .header("Content-Length", metadata.len().to_string());
+    // ServeFile streams the file and handles Range / If-Range (so video
+    // can seek), Last-Modified / If-Modified-Since, and HEAD.
+    let mut resp = match ServeFile::new_with_mime(&full_path, &mime)
+        .try_call(req)
+        .await
+    {
+        Ok(r) => r.map(Body::new),
+        Err(e) => {
+            error!(error = %e, "Failed to read file");
+            return (StatusCode::INTERNAL_SERVER_ERROR, "Failed to read file").into_response();
+        }
+    };
 
+    let headers = resp.headers_mut();
     if content_type.starts_with("image/") || content_type == "application/pdf" {
-        builder = builder.header("Cache-Control", "public, max-age=86400");
+        headers.insert(
+            header::CACHE_CONTROL,
+            HeaderValue::from_static("public, max-age=86400"),
+        );
     } else {
-        builder = builder.header("Cache-Control", "no-cache");
-        if let Some(filename) = full_path.file_name().and_then(|n| n.to_str()) {
-            builder = builder.header(
-                "Content-Disposition",
-                format!("attachment; filename=\"{}\"", filename),
-            );
+        headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"));
+        if let Some(disposition) = full_path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .and_then(|n| HeaderValue::from_str(&format!("attachment; filename=\"{n}\"")).ok())
+        {
+            headers.insert(header::CONTENT_DISPOSITION, disposition);
         }
     }
 
-    match builder.body(Body::from_stream(ReaderStream::new(file))) {
-        Ok(resp) => resp,
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
-    }
+    resp
 }
 
 // ---------------------------------------------------------------------------
