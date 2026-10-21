@@ -638,6 +638,14 @@ generate_jwt_secret() {
     echo "JWT secret generated"
 }
 
+generate_asset_signing_key() {
+    print_section "Generating asset URL signing key"
+
+    ./scripts/manage-secrets.sh update-asset-signing-key
+
+    echo "Asset URL signing key generated"
+}
+
 build_and_deploy_services() {
     print_section "Building and deploying all services (this will take a while)"
 
@@ -712,6 +720,7 @@ main() {
     deploy_demo_data
     deploy_test_data
     generate_jwt_secret
+    generate_asset_signing_key
     build_and_deploy_services
 
     print_post_install
