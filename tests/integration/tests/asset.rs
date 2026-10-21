@@ -224,6 +224,125 @@ async fn retrieve_large_file_streams_intact() {
 }
 
 #[tokio::test]
+async fn retrieve_range_requests() {
+    let c = client();
+    let token = staff_token(&c).await;
+
+    let content: Vec<u8> = (0..200_000u32).map(|i| (i % 251) as u8).collect();
+    let path = create_test_file("odo_test_retrieve_range.txt", &content);
+
+    let upload_resp = upload_file(&token, &path, "document", "e2e-file", None).await;
+    std::fs::remove_file(&path).ok();
+    assert_eq!(upload_resp.status(), 200);
+
+    let upload_data: serde_json::Value = upload_resp.json().await.unwrap();
+    let url = format!(
+        "{}/api/v1/odo/asset/files/{}",
+        asset_base(),
+        upload_data["relative_path"].as_str().unwrap()
+    );
+    let len = content.len();
+
+    // Full GET advertises range support.
+    let full = c.get(&url).headers(auth_header(&token)).send().await.unwrap();
+    assert_eq!(full.status(), 200);
+    assert_eq!(full.headers().get("accept-ranges").unwrap(), "bytes");
+
+    // Bounded range.
+    let resp = c
+        .get(&url)
+        .headers(auth_header(&token))
+        .header("Range", "bytes=100000-100999")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 206);
+    assert_eq!(
+        resp.headers().get("content-range").unwrap(),
+        &format!("bytes 100000-100999/{len}")
+    );
+    assert_eq!(resp.headers().get("content-type").unwrap(), "text/plain");
+    assert_eq!(resp.headers().get("cache-control").unwrap(), "no-cache");
+    assert_eq!(resp.bytes().await.unwrap().as_ref(), &content[100_000..101_000]);
+
+    // Suffix range.
+    let resp = c
+        .get(&url)
+        .headers(auth_header(&token))
+        .header("Range", "bytes=-50")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 206);
+    assert_eq!(resp.bytes().await.unwrap().as_ref(), &content[len - 50..]);
+
+    // Open-ended range.
+    let resp = c
+        .get(&url)
+        .headers(auth_header(&token))
+        .header("Range", format!("bytes={}-", len - 10))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 206);
+    assert_eq!(resp.bytes().await.unwrap().as_ref(), &content[len - 10..]);
+
+    // Past the end of the file.
+    let resp = c
+        .get(&url)
+        .headers(auth_header(&token))
+        .header("Range", format!("bytes={}-", len + 10))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 416);
+}
+
+#[tokio::test]
+async fn retrieve_range_requires_token() {
+    // Range handling must not bypass auth.
+    let resp = client()
+        .get(format!("{}/api/v1/odo/asset/files/some/file.txt", asset_base()))
+        .header("Range", "bytes=0-10")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 401);
+}
+
+#[tokio::test]
+async fn retrieve_head() {
+    let c = client();
+    let token = staff_token(&c).await;
+
+    let content = b"HEAD request test content";
+    let path = create_test_file("odo_test_retrieve_head.txt", content);
+
+    let upload_resp = upload_file(&token, &path, "document", "e2e-file", None).await;
+    std::fs::remove_file(&path).ok();
+    assert_eq!(upload_resp.status(), 200);
+
+    let upload_data: serde_json::Value = upload_resp.json().await.unwrap();
+    let resp = c
+        .head(format!(
+            "{}/api/v1/odo/asset/files/{}",
+            asset_base(),
+            upload_data["relative_path"].as_str().unwrap()
+        ))
+        .headers(auth_header(&token))
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), 200);
+    assert_eq!(
+        resp.headers().get("content-length").unwrap(),
+        &content.len().to_string()
+    );
+    assert_eq!(resp.headers().get("content-type").unwrap(), "text/plain");
+}
+
+#[tokio::test]
 async fn retrieve_via_query_token() {
     let c = client();
     let token = staff_token(&c).await;
