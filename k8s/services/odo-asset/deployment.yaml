@@ -64,6 +64,15 @@ spec:
             secretKeyRef:
               name: odo-jwt-secret
               key: JWT_PUBLIC_KEY
+        # HMAC key for signed file URLs (scripts/manage-secrets.sh
+        # update-asset-signing-key). Optional: without it the service runs
+        # but /files/sign is refused.
+        - name: ASSET_URL_SIGNING_KEY
+          valueFrom:
+            secretKeyRef:
+              name: odo-asset-secret
+              key: ASSET_URL_SIGNING_KEY
+              optional: true
         volumeMounts:
         - name: nfs-storage
           mountPath: /app/nfs

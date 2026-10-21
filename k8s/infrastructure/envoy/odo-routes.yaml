@@ -123,6 +123,9 @@ spec:
             type: Exact
             value: /api/v1/odo/asset/files/delete
         - path:
+            type: Exact
+            value: /api/v1/odo/asset/files/sign
+        - path:
             type: PathPrefix
             value: /api/v1/odo/asset/directory
       backendRefs:
@@ -131,10 +134,10 @@ spec:
           port: 8080
 ---
 # odo-asset: file retrieval. Not under odo-protected because the UI
-# uses <img src="...?token=..."> to render files, and envoy's
-# Authorization-header-only JWT check would reject that. odo-asset's
-# `retrieve` handler validates the token itself from either header or
-# `?token=` query param — defense-in-depth.
+# renders files with <img src="...">, which can't send an Authorization
+# header, so envoy's JWT check would reject it. odo-asset's `retrieve`
+# handler authenticates itself: a JWT from the header or `?token=`, or a
+# signed URL (`?expires=&uid=&sig=`) issued by /files/sign.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:

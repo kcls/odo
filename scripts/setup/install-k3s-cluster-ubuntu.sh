@@ -490,6 +490,14 @@ generate_jwt_secret() {
     echo "JWT secret generated"
 }
 
+generate_asset_signing_key() {
+    print_section "Generating asset URL signing key"
+
+    sudo env KUBECONFIG="$KUBECONFIG_PATH" ./scripts/manage-secrets.sh update-asset-signing-key
+
+    echo "Asset URL signing key generated"
+}
+
 print_post_install() {
     print_section "Cluster Setup Complete"
 
@@ -539,6 +547,7 @@ main() {
     install_envoy_gateway
     apply_namespaces_and_secrets
     generate_jwt_secret
+    generate_asset_signing_key
 
     print_post_install
 }

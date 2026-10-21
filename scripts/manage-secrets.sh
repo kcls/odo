@@ -26,6 +26,7 @@ usage() {
     echo "                  the service pods and the host tooling share;"
     echo "                  prompts when the url is omitted"
     echo "  update-jwt      Update JWT secret"
+    echo "  update-asset-signing-key  Generate the odo-asset signed-URL key"
     echo "  update-ghcr     Create or update GitHub Container Registry secret"
     echo "  update-smtp     Update SMTP notification settings"
     echo "  update-notify-service  Update the notify service account password"
@@ -315,6 +316,21 @@ update_jwt_secret() {
     echo -e "\n${YELLOW}Remember to:${NC}"
     echo "1. Restart all service pods to pick up the new secrets"
     echo "2. All existing tokens will become invalid"
+}
+
+# Function to (re)generate the odo-asset signed-URL HMAC key.
+# Rotating it invalidates outstanding signed URLs; they are short-lived,
+# so clients just re-sign.
+update_asset_signing_key() {
+    echo -e "${YELLOW}Updating asset URL signing key${NC}"
+
+    kubectl create secret generic odo-asset-secret \
+        --namespace=odo-pub \
+        --from-literal=ASSET_URL_SIGNING_KEY="$(generate_hex_secret)" \
+        --dry-run=client -o yaml | kubectl apply -f -
+    echo -e "${GREEN}  ✓ odo-asset-secret → odo-pub${NC}"
+
+    echo -e "\n${YELLOW}Restart odo-asset to pick up the new key.${NC}"
 }
 
 # Function to create GitHub Container Registry secret
@@ -626,6 +642,9 @@ case "$COMMAND" in
         ;;
     update-jwt)
         update_jwt_secret
+        ;;
+    update-asset-signing-key)
+        update_asset_signing_key
         ;;
     update-ghcr)
         create_ghcr_secret
