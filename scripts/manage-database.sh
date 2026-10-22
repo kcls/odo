@@ -417,9 +417,10 @@ purge_all_schemas() {
     # here that could recreate one.
     #
     # Dropping still needs ownership. The schemas are owned by the
-    # database owner, not by the service role the secret carries, so
-    # this generally wants PGUSER/PGPASSWORD overridden with an
-    # administrative account:
+    # database owner. Where the secret carries that owner (as odo's
+    # installers set it up), the secret's credentials are enough. Where
+    # it carries a separate pooled service role, override PGUSER/
+    # PGPASSWORD with an administrative account:
     #
     #   PGUSER=postgres PGPASSWORD=... PGHOST=<server> PGPORT=5432 \
     #       ./scripts/manage-database.sh purge-all
