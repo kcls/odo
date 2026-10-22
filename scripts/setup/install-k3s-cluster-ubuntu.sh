@@ -127,7 +127,7 @@ prompt_database_connection() {
     read -rp "PostgreSQL port [${ODO_DB_PORT:-$ODO_DB_PORT_DEFAULT}]: " DB_PORT
     DB_PORT="${DB_PORT:-${ODO_DB_PORT:-$ODO_DB_PORT_DEFAULT}}"
 
-    read -rp "Odo superuser role [${ODO_DB_USER:-$ODO_DB_USER_DEFAULT}]: " DB_USER
+    read -rp "Odo database role [${ODO_DB_USER:-$ODO_DB_USER_DEFAULT}]: " DB_USER
     DB_USER="${DB_USER:-${ODO_DB_USER:-$ODO_DB_USER_DEFAULT}}"
 
     read -rp "Odo database name [${ODO_DB_NAME:-$ODO_DB_NAME_DEFAULT}]: " DB_NAME
@@ -136,8 +136,8 @@ prompt_database_connection() {
     prompt_db_password DB_PASSWORD "$DB_USER" false
 
     echo
-    echo "That role must exist on the server and be a superuser; the"
-    echo "database itself is created later by the schema deploy."
+    echo "That role, and the database it owns, must exist on the server;"
+    echo "install-postgres-server-ubuntu.sh creates both."
 }
 
 # The secret is only as good as the endpoint in it, so prove it before the
@@ -162,7 +162,8 @@ verify_database_connection() {
     echo -e "${RED}Cannot connect to ${DB_HOST}:${DB_PORT} as '${DB_USER}'.${NC}"
     echo
     echo "The server needs:"
-    echo "  - a superuser role '${DB_USER}' with the password entered above"
+    echo "  - a role '${DB_USER}' with the password entered above, owning"
+    echo "    the '${DB_NAME}' database"
     echo "  - listen_addresses and a pg_hba.conf entry covering this host"
     echo "    and the cluster pod network (${K3S_POD_CIDR})"
     echo

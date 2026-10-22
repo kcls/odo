@@ -174,13 +174,13 @@ EOF
     read -rp "PostgreSQL port [5432]: " POSTGRES_PORT
     POSTGRES_PORT="${POSTGRES_PORT:-5432}"
 
-    read -rp "PostgreSQL superuser [odo]: " POSTGRES_USER
+    read -rp "PostgreSQL role [odo]: " POSTGRES_USER
     POSTGRES_USER="${POSTGRES_USER:-odo}"
 
     if [[ "$POSTGRES_INSTALL_LOCAL" != "true" ]]; then
         echo
-        echo "That role must already exist and be a superuser. The schema"
-        echo "deploy creates the 'odo' database."
+        echo "That role must already exist, along with an 'odo' database"
+        echo "it owns. It does not need to be a superuser."
     fi
 
     while true; do
@@ -480,23 +480,35 @@ EOF
 }
 
 create_postgres_role() {
-    print_section "Creating the '${POSTGRES_USER}' role"
+    print_section "Creating the '${POSTGRES_USER}' role and 'odo' database"
 
     # Homebrew's PostgreSQL makes the installing account the superuser;
-    # there is no `postgres` OS user to sudo to, so create the role here
-    # rather than leaving it to manage-database.sh.
+    # there is no `postgres` OS user to sudo to, so create the role and
+    # its database here rather than leaving them to manage-database.sh.
+    # The role is not a superuser: owning the database is enough, and
+    # NOSUPERUSER demotes one created by earlier versions of this script.
     local existing
     existing="$(psql -d postgres -tAc \
         "SELECT 1 FROM pg_roles WHERE rolname='${POSTGRES_USER}'" 2>/dev/null)"
 
     if [[ "$existing" == "1" ]]; then
         psql -d postgres -c \
-            "ALTER ROLE ${POSTGRES_USER} WITH SUPERUSER LOGIN PASSWORD '${POSTGRES_PASSWORD}'"
+            "ALTER ROLE ${POSTGRES_USER} WITH NOSUPERUSER LOGIN PASSWORD '${POSTGRES_PASSWORD}'"
         echo "Role '${POSTGRES_USER}' updated"
     else
         psql -d postgres -c \
-            "CREATE ROLE ${POSTGRES_USER} WITH SUPERUSER LOGIN PASSWORD '${POSTGRES_PASSWORD}'"
+            "CREATE ROLE ${POSTGRES_USER} WITH LOGIN PASSWORD '${POSTGRES_PASSWORD}'"
         echo "Role '${POSTGRES_USER}' created"
+    fi
+
+    existing="$(psql -d postgres -tAc \
+        "SELECT 1 FROM pg_database WHERE datname='odo'" 2>/dev/null)"
+
+    if [[ "$existing" == "1" ]]; then
+        echo "Database 'odo' already exists; leaving its owner as is"
+    else
+        psql -d postgres -c "CREATE DATABASE odo OWNER ${POSTGRES_USER}"
+        echo "Database 'odo' created, owned by '${POSTGRES_USER}'"
     fi
 }
 
@@ -523,6 +535,10 @@ install_pgtap() {
     # version serving this host, the extension lands in the other
     # installation and run-db-tests.sh will not find it.
     brew install pgtap
+
+    # pgtap is not a trusted extension, so the odo role cannot create it;
+    # run-db-tests.sh's CREATE EXTENSION IF NOT EXISTS then finds it here.
+    psql -d odo -c "CREATE EXTENSION IF NOT EXISTS pgtap"
 
     echo "pgTAP installed"
 }
@@ -574,7 +590,8 @@ verify_postgres_connection() {
     echo -e "${RED}Cannot connect to ${POSTGRES_HOST}:${POSTGRES_PORT} as '${POSTGRES_USER}'.${NC}"
     echo
     echo "The server needs:"
-    echo "  - a superuser role '${POSTGRES_USER}' with the password entered above"
+    echo "  - a role '${POSTGRES_USER}' with the password entered above,"
+    echo "    owning an 'odo' database"
     echo "  - listen_addresses and pg_hba.conf allowing this host and the"
     echo "    pods' source network (${DOCKER_DESKTOP_CIDR} for Docker Desktop)"
     exit 1

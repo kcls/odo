@@ -11,8 +11,10 @@
 #
 # The same `database:` block sets what differs between projects:
 #   schemas      the application schemas purge-all drops
-#   owns_server  true when the project's role is a server superuser that
-#                `setup` creates and `update-password` may reset (odo).
+#   owns_server  true when `setup` may create the project's role and the
+#                database it owns, and `update-password` may reset the
+#                role over the local peer connection (odo). The role is
+#                never a superuser; owning the database is enough.
 #                Otherwise the role and an empty database it owns are
 #                created on the server by hand, and the script only ever
 #                acts as that role.
@@ -143,7 +145,7 @@ execute_psql() {
         # Use sudo only for initial user creation on local database
         sudo -u postgres psql -d "$db" -c "$sql"
     else
-        # Use the superuser account credentials
+        # Use the project's role
         PGPASSWORD="$PGPASSWORD" psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$db" -c "$sql"
     fi
 }
@@ -192,7 +194,6 @@ schema_exists() {
     local schema=$1
     local result
 
-    # Use superuser account to check
     result=$(PGPASSWORD="$PGPASSWORD" psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" -tAc "SELECT 1 FROM pg_namespace WHERE nspname='$schema'" 2>/dev/null)
 
     [ "$result" == "1" ]
@@ -479,17 +480,11 @@ setup_database() {
 
     echo -e "\n${YELLOW}Setting up PostgreSQL database${NC}"
 
-    # First, test if we can connect with the superuser account
+    # First, test if the role already exists and can log in
     if test_maintenance_connection; then
-        echo -e "${GREEN}Successfully connected with existing superuser account${NC}"
-
-        # User already exists and we can connect - no sudo needed
-        # Just ensure password and superuser status are current
-        echo -e "${GREEN}Updating user password and ensuring SUPERUSER status${NC}"
-        execute_psql "ALTER USER $PGUSER WITH SUPERUSER PASSWORD '$PGPASSWORD';"
-
+        echo -e "${GREEN}Successfully connected as '$PGUSER'${NC}"
     else
-        echo -e "${YELLOW}Cannot connect with superuser account, checking if initial setup is needed...${NC}"
+        echo -e "${YELLOW}Cannot connect as '$PGUSER', checking if initial setup is needed...${NC}"
 
         # The role can only be created from here over a local peer
         # connection. PostgreSQL runs outside the cluster and DATABASE_URL
@@ -499,11 +494,12 @@ setup_database() {
         if [ "$PGHOST" != "localhost" ] && [ "$PGHOST" != "127.0.0.1" ]; then
             echo -e "${RED}Cannot log in to ${PGHOST}:${PGPORT} as '${PGUSER}'.${NC}"
             echo
-            echo "That role must exist on the database server and be a superuser."
-            echo "On Ubuntu, ./scripts/setup/install-postgres-server-ubuntu.sh"
-            echo "creates it; elsewhere, create it by hand:"
+            echo "That role, and a database it owns, must exist on the database"
+            echo "server. On Ubuntu, ./scripts/setup/install-postgres-server-ubuntu.sh"
+            echo "creates both; elsewhere, create them by hand:"
             echo
-            echo "  CREATE ROLE \"$PGUSER\" WITH SUPERUSER LOGIN PASSWORD '...';"
+            echo "  CREATE ROLE \"$PGUSER\" WITH LOGIN PASSWORD '...';"
+            echo "  CREATE DATABASE \"$PGDATABASE\" OWNER \"$PGUSER\";"
             echo
             echo "Then check the password in the $DB_SECRET_NAME secret"
             echo "matches (./scripts/manage-secrets.sh update-db-url)."
@@ -515,11 +511,11 @@ setup_database() {
 
         if user_exists "$PGUSER"; then
             echo -e "${BLUE}User '$PGUSER' exists but cannot connect${NC}"
-            echo -e "${GREEN}Updating user password and ensuring SUPERUSER status${NC}"
-            execute_psql "ALTER USER $PGUSER WITH SUPERUSER PASSWORD '$PGPASSWORD';" "postgres" "true"
+            echo -e "${GREEN}Updating user password${NC}"
+            execute_psql "ALTER USER $PGUSER WITH PASSWORD '$PGPASSWORD';" "postgres" "true"
         else
-            echo -e "${GREEN}Creating user '$PGUSER' as SUPERUSER${NC}"
-            execute_psql "CREATE USER $PGUSER WITH SUPERUSER PASSWORD '$PGPASSWORD';" "postgres" "true"
+            echo -e "${GREEN}Creating user '$PGUSER'${NC}"
+            execute_psql "CREATE USER $PGUSER WITH PASSWORD '$PGPASSWORD';" "postgres" "true"
         fi
 
         # Test connection again
@@ -529,15 +525,24 @@ setup_database() {
         fi
     fi
 
-    # From here on, we use the superuser account (no sudo needed)
-
     # Create database if doesn't exist
     if database_exists "$PGDATABASE"; then
         echo -e "${BLUE}Database '$PGDATABASE' already exists${NC}"
     else
         echo -e "${GREEN}Creating database '$PGDATABASE'${NC}"
-        execute_psql "CREATE DATABASE $PGDATABASE OWNER $PGUSER;"
+        # The role usually holds no CREATEDB, so on the database host the
+        # postgres account creates it; elsewhere this only succeeds if the
+        # role was granted CREATEDB.
+        if ! execute_psql "CREATE DATABASE $PGDATABASE OWNER $PGUSER;" "postgres" "true"; then
+            echo -e "${RED}Could not create database '$PGDATABASE'.${NC}"
+            echo
+            echo "Create it on the database server, owned by the role:"
+            echo "  CREATE DATABASE \"$PGDATABASE\" OWNER \"$PGUSER\";"
+            exit 1
+        fi
     fi
+
+    # From here on, everything runs as the role, which owns the database
 
     # Create sqitch schema
     echo -e "${GREEN}Setting up sqitch schema${NC}"
@@ -553,12 +558,13 @@ setup_database() {
         execute_psql "CREATE SCHEMA sqitch AUTHORIZATION $PGUSER;" "$PGDATABASE"
     fi
 
-    # Note: No GRANT statements needed since user is SUPERUSER
+    # No GRANT statements needed: the role owns the database and everything
+    # the deploy creates in it.
 
     echo -e "\n${GREEN}Database setup completed successfully!${NC}"
     echo -e "${YELLOW}Summary:${NC}"
     echo "  Database: $PGDATABASE"
-    echo "  User: $PGUSER (SUPERUSER)"
+    echo "  User: $PGUSER (database owner)"
     echo "  Sqitch schema: created and configured"
     echo
     echo -e "${BLUE}Next steps:${NC}"
@@ -594,8 +600,8 @@ update_password() {
     # First try to connect with existing credentials
     if test_connection; then
         echo -e "${GREEN}Successfully connected with existing credentials${NC}"
-        echo -e "${GREEN}Updating user password and ensuring SUPERUSER status${NC}"
-        execute_psql "ALTER USER $PGUSER WITH SUPERUSER PASSWORD '$PGPASSWORD';"
+        echo -e "${GREEN}Updating user password${NC}"
+        execute_psql "ALTER USER $PGUSER WITH PASSWORD '$PGPASSWORD';"
     else
         echo -e "${YELLOW}Cannot connect with current credentials${NC}"
         echo -e "${RED}If the user doesn't exist, run '$ME setup' first${NC}"
@@ -610,11 +616,11 @@ update_password() {
             exit 1
         fi
 
-        echo -e "${GREEN}Resetting user password and ensuring SUPERUSER status${NC}"
-        execute_psql "ALTER USER $PGUSER WITH SUPERUSER PASSWORD '$PGPASSWORD';" "postgres" "true"
+        echo -e "${GREEN}Resetting user password${NC}"
+        execute_psql "ALTER USER $PGUSER WITH PASSWORD '$PGPASSWORD';" "postgres" "true"
     fi
 
-    echo -e "\n${GREEN}Password updated and SUPERUSER status ensured!${NC}"
+    echo -e "\n${GREEN}Password updated!${NC}"
     echo -e "${YELLOW}Note: The password was retrieved from the Kubernetes secret${NC}"
 }
 

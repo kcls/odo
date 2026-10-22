@@ -240,8 +240,8 @@ setup_database() {
     print_section "Creating the odo database"
 
     # Resolves the endpoint from the postgres-credentials secret. The
-    # superuser role already exists (the PostgreSQL installer created it),
-    # so this only creates the database and the sqitch schema.
+    # role and its database already exist (the PostgreSQL installer
+    # created them), so this only creates the sqitch schema.
     with_dev_env ./scripts/manage-database.sh setup
 
     echo "Database and sqitch schema ready"

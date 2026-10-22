@@ -3,8 +3,9 @@
 #
 # Odo runs PostgreSQL OUTSIDE the Kubernetes cluster. This script installs
 # the server from the PGDG apt repo, opens it to the cluster, and creates
-# the superuser role the platform connects as. It is usable for production
-# as well as development: it touches nothing but PostgreSQL.
+# the role the platform connects as along with the database it owns. It is
+# usable for production as well as development: it touches nothing but
+# PostgreSQL.
 #
 # Skip this script entirely if you already have a PostgreSQL server - point
 # the cluster installer at it instead.
@@ -55,7 +56,7 @@ prompt_settings() {
     read -rp "PostgreSQL port [${ODO_DB_PORT_DEFAULT}]: " DB_PORT
     DB_PORT="${DB_PORT:-$ODO_DB_PORT_DEFAULT}"
 
-    read -rp "Odo superuser role [${ODO_DB_USER_DEFAULT}]: " DB_USER
+    read -rp "Odo database role [${ODO_DB_USER_DEFAULT}]: " DB_USER
     DB_USER="${DB_USER:-$ODO_DB_USER_DEFAULT}"
 
     read -rp "Odo database name [${ODO_DB_NAME_DEFAULT}]: " DB_NAME
@@ -76,8 +77,8 @@ confirm() {
     echo
     echo -e "${YELLOW}About to install PostgreSQL on this host and configure it for Odo:${NC}"
     echo "  address:  ${DB_HOST}:${DB_PORT}"
-    echo "  role:     ${DB_USER} (SUPERUSER)"
-    echo "  database: ${DB_NAME} (created later by the schema deploy)"
+    echo "  role:     ${DB_USER}"
+    echo "  database: ${DB_NAME} (owned by ${DB_USER})"
     echo "  clients:  ${DB_CLIENT_CIDRS}"
     if [[ "$WITH_PGTAP" == "true" ]]; then
         echo "  pgtap:    yes (--with-pgtap)"
@@ -145,6 +146,7 @@ install_postgres() {
 
     configure_postgres_access
     create_odo_role
+    create_odo_database
 }
 
 configure_postgres_access() {
@@ -199,11 +201,16 @@ EOF
 }
 
 create_odo_role() {
-    print_section "Creating the '${DB_USER}' superuser role"
+    print_section "Creating the '${DB_USER}' role"
 
     # Created here, over the local peer connection, rather than left to
     # manage-database.sh: the tooling reaches this server over TCP as
     # ${DB_USER}, so the role has to exist before it can do anything.
+    #
+    # Not a superuser: owning the database is enough for the schema deploy
+    # (pg_trgm and pgcrypto are trusted extensions) and for the services.
+    # NOSUPERUSER is explicit so a re-run also demotes a role created by
+    # earlier versions of this script.
     local escaped="${DB_PASSWORD//\'/\'\'}"
     local exists
     exists="$(sudo -u postgres psql -tAc \
@@ -211,13 +218,32 @@ create_odo_role() {
 
     if [[ "$exists" == "1" ]]; then
         sudo -u postgres psql -c \
-            "ALTER ROLE \"${DB_USER}\" WITH SUPERUSER LOGIN PASSWORD '${escaped}'" > /dev/null
+            "ALTER ROLE \"${DB_USER}\" WITH NOSUPERUSER LOGIN PASSWORD '${escaped}'" > /dev/null
         echo "Role '${DB_USER}' updated"
     else
         sudo -u postgres psql -c \
-            "CREATE ROLE \"${DB_USER}\" WITH SUPERUSER LOGIN PASSWORD '${escaped}'" > /dev/null
+            "CREATE ROLE \"${DB_USER}\" WITH LOGIN PASSWORD '${escaped}'" > /dev/null
         echo "Role '${DB_USER}' created"
     fi
+}
+
+create_odo_database() {
+    print_section "Creating the '${DB_NAME}' database"
+
+    # Created here because ${DB_USER} holds no CREATEDB; the schema deploy
+    # then runs entirely as the database owner.
+    local exists
+    exists="$(sudo -u postgres psql -tAc \
+        "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'" 2>/dev/null)"
+
+    if [[ "$exists" == "1" ]]; then
+        echo "Database '${DB_NAME}' already exists; leaving its owner as is"
+        return
+    fi
+
+    sudo -u postgres psql -c \
+        "CREATE DATABASE \"${DB_NAME}\" OWNER \"${DB_USER}\"" > /dev/null
+    echo "Database '${DB_NAME}' created, owned by '${DB_USER}'"
 }
 
 install_pgtap() {
@@ -231,7 +257,12 @@ install_pgtap() {
     # is installed on the development host by setup-dev-cluster-ubuntu.sh.
     sudo apt-get install -y "postgresql-${POSTGRES_VERSION}-pgtap"
 
-    echo "pgtap available to PostgreSQL ${POSTGRES_VERSION}"
+    # pgtap is not a trusted extension, so ${DB_USER} cannot create it;
+    # run-db-tests.sh's CREATE EXTENSION IF NOT EXISTS then finds it here.
+    sudo -u postgres psql -d "$DB_NAME" -c \
+        "CREATE EXTENSION IF NOT EXISTS pgtap" > /dev/null
+
+    echo "pgtap available to PostgreSQL ${POSTGRES_VERSION}, created in '${DB_NAME}'"
 }
 
 verify_postgres() {
@@ -259,8 +290,8 @@ print_post_install() {
     echo -e "${GREEN}PostgreSQL ${POSTGRES_VERSION} is installed and open to the cluster.${NC}"
     echo
     echo "  address:  ${DB_HOST}:${DB_PORT}"
-    echo "  role:     ${DB_USER} (SUPERUSER)"
-    echo "  database: ${DB_NAME} (created by the schema deploy)"
+    echo "  role:     ${DB_USER}"
+    echo "  database: ${DB_NAME} (owned by ${DB_USER})"
     echo "  config:   /etc/postgresql/${POSTGRES_VERSION}/main"
     echo "  clients:  ${DB_CLIENT_CIDRS}"
     echo
@@ -305,7 +336,7 @@ usage() {
     echo
     echo "Installs a PostgreSQL server on this Ubuntu host and configures it"
     echo "for Odo: the PGDG apt repo, listen_addresses, a pg_hba.conf block"
-    echo "for the cluster, and the odo superuser role."
+    echo "for the cluster, and the odo role and the database it owns."
     echo
     echo "Odo runs PostgreSQL outside the Kubernetes cluster. Skip this"
     echo "script if you already have a server - the cluster installer asks"
