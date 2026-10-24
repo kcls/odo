@@ -7,7 +7,6 @@
 # scripts (common.sh load_db_config, run-db-tests.sh, manage-database.sh).
 #   namespace, secret: the Kubernetes secret holding DATABASE_URL
 #   tests: glob of pgTAP test files under tests/db (default: *.sql)
-#   schemas: the application schemas manage-database.sh purge-all drops
 #   owns_server: true if manage-database.sh setup creates the role and
 #     the database it owns (odo); default false
 #
@@ -18,7 +17,6 @@ database:
   secret: postgres-credentials
   # tests/db/seed/ holds helpers that tests include, not tests.
   tests: odo/*.sql
-  schemas: [notification, asset, auth, audit, authz, org, sqitch]
   owns_server: true
 
 services:

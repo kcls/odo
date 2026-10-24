@@ -69,10 +69,10 @@ templates, or fixtures.
   reach sibling scripts via `$SCRIPT_DIR`, never `./scripts/`.
   `set-service-env.sh`, `run-db-tests.sh` and `manage-database.sh`
   resolve the project the same way; the latter two read the project's
-  `database:` block (secret, namespace, test glob, purge schemas,
-  `owns_server`) from its service-map.yaml. Only odo `owns_server`: app
-  roles are created by hand, so `setup` refuses for them and
-  `update-password` only changes the role's own password.
+  `database:` block (secret, namespace, test glob, `owns_server`)
+  from its service-map.yaml. Only odo `owns_server`: app roles are
+  created by hand, so `setup` refuses for them and `update-password`
+  only changes the role's own password.
 - `manage-database.sh purge-all`'s prompt ("Type 'purge' to confirm")
   and its "Purge cancelled." are matched by odo-deploy's
   `reset-site-data.sh`; change them together.

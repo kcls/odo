@@ -10,7 +10,6 @@
 #   3. Defaults: localhost:5432 (for host/port only)
 #
 # The same `database:` block sets what differs between projects:
-#   schemas      the application schemas purge-all drops
 #   owns_server  true when `setup` may create the project's role and the
 #                database it owns, and `update-password` may reset the
 #                role over the local peer connection (odo). The role is
@@ -44,7 +43,6 @@ load_db_config "$PROJECT_ROOT" || exit 1
 
 SERVICE_MAP="$PROJECT_ROOT/service-map.yaml"
 OWNS_SERVER="$(yq eval '.database.owns_server // false' "$SERVICE_MAP")"
-mapfile -t SCHEMAS < <(yq eval '.database.schemas // [] | .[]' "$SERVICE_MAP")
 
 # How to refer to this script in messages: a wrapper in an app checkout
 # that hands off here sets ODO_INVOKED_AS to its own name.
@@ -393,19 +391,26 @@ reset_demo_data() {
 }
 
 purge_all_schemas() {
-    local schemas=("${SCHEMAS[@]}")
-    if [ ${#schemas[@]} -eq 0 ]; then
-        echo -e "${RED}No database.schemas in $SERVICE_MAP; nothing to purge.${NC}" >&2
+    # Every schema in the database except public and the system ones
+    # (names starting pg_ are reserved: pg_catalog, pg_toast, pg_temp_N,
+    # ...). pg_namespace rather than information_schema.schemata: the
+    # latter hides schemas the role has no privilege on, which would
+    # leave them behind silently instead of failing the ownership check.
+    local app_schema="nspname NOT IN ('public', 'information_schema')
+        AND nspname !~ '^pg_'"
+    # Quoted by the server, ready to splice into DROP SCHEMA below.
+    local schemas
+    if ! schemas=$(PGPASSWORD="$PGPASSWORD" psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" \
+        -d "$PGDATABASE" -tAc \
+        "SELECT string_agg(quote_ident(nspname), ', ' ORDER BY nspname)
+           FROM pg_namespace WHERE $app_schema"); then
+        echo -e "${RED}Could not list the schemas in database '${PGDATABASE}'.${NC}" >&2
         return 1
     fi
-    # The names land in SQL below; accept plain identifiers only.
-    local schema
-    for schema in "${schemas[@]}"; do
-        if [[ ! "$schema" =~ ^[a-z_][a-z0-9_]*$ ]]; then
-            echo -e "${RED}Unsupported schema name in database.schemas: '$schema'${NC}" >&2
-            return 1
-        fi
-    done
+    if [ -z "$schemas" ]; then
+        echo -e "${GREEN}No application schemas in database '${PGDATABASE}'; nothing to purge.${NC}"
+        return
+    fi
 
     echo -e "\n${RED}WARNING: This will drop all application schemas in database '${PGDATABASE}'.${NC}"
     echo -e "${RED}Everything in them is lost, including the sqitch registry.${NC}"
@@ -430,7 +435,7 @@ purge_all_schemas() {
 
     # odo-deploy's reset-site-data.sh answers this prompt and checks for
     # "cancelled" in the output: keep both wordings in step with it.
-    echo -e "${RED}Schemas that will be dropped: ${schemas[*]}${NC}"
+    echo -e "${RED}Schemas that will be dropped: ${schemas}${NC}"
     read -r -p "Type 'purge' to confirm: " confirmation
 
     if [[ "$confirmation" != "purge" ]]; then
@@ -438,17 +443,14 @@ purge_all_schemas() {
         return
     fi
 
-    # Check ownership before dropping anything: a partial purge leaves a
-    # database that neither deploys nor reverts, and the bare
-    # "must be owner of schema" error does not say what to do about it.
-    local array_sql
-    array_sql="ARRAY['$(IFS=,; echo "${schemas[*]}" | sed "s/,/','/g")']"
+    # Check ownership up front for a message that says what to do: the
+    # bare "must be owner of schema" error does not.
     local not_owned
     not_owned=$(PGPASSWORD="$PGPASSWORD" psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" \
         -d "$PGDATABASE" -tAc \
         "SELECT string_agg(nspname, ', ' ORDER BY nspname)
            FROM pg_namespace
-          WHERE nspname = ANY($array_sql)
+          WHERE $app_schema
             AND pg_get_userbyid(nspowner) <> current_user
             AND NOT pg_has_role(current_user, nspowner, 'MEMBER')" 2>/dev/null)
 
@@ -459,11 +461,11 @@ purge_all_schemas() {
         return 1
     fi
 
+    # One statement, so one transaction: a partial purge would leave a
+    # database that neither deploys nor reverts. It drops exactly the
+    # list confirmed above, not whatever exists by the time it runs.
     echo -e "${YELLOW}Dropping application schemas...${NC}"
-    for schema in "${schemas[@]}"; do
-        echo -e "${BLUE}Dropping schema '$schema'${NC}"
-        execute_psql "DROP SCHEMA IF EXISTS \"$schema\" CASCADE;" "$PGDATABASE"
-    done
+    execute_psql "DROP SCHEMA $schemas CASCADE;" "$PGDATABASE"
 
     echo -e "${GREEN}All application schemas dropped. Run '$ME deploy' to rebuild.${NC}"
 }

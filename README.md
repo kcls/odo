@@ -45,7 +45,7 @@ An application with its own database adds a `database:` block to its
 `$ODO_HOME/scripts/run-db-tests.sh` then runs its pgTAP tests against
 it, and `$ODO_HOME/scripts/manage-database.sh` manages its sqitch
 projects (`src/sqitch/core`, `src/sqitch/demo-data`) and fixtures
-(`tests/fixtures`); the block also lists the schemas `purge-all` drops.
+(`tests/fixtures`).
 The app's own scripts can source `$ODO_HOME/scripts/common.sh` and call
 `load_db_config` for the same connection helpers.
 
