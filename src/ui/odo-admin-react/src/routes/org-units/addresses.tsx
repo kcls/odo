@@ -10,7 +10,7 @@ import { DialogClose, DialogFooter, DialogHeader, DialogTitle } from "@/componen
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { FacetSection, type FacetEditing } from "./facet-section"
+import { FacetSection, type FacetEditing } from "@/components/facet-section"
 
 const ADDRESS_TYPES = ["physical", "mailing"] as const
 type AddressType = (typeof ADDRESS_TYPES)[number]

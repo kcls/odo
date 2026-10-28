@@ -12,7 +12,7 @@ import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useFormatters } from "@/lib/format"
-import { FacetSection, type FacetEditing } from "./facet-section"
+import { FacetSection, type FacetEditing } from "@/components/facet-section"
 
 const DAYS = [0, 1, 2, 3, 4, 5, 6]
 

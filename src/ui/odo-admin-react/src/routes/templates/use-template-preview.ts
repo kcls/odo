@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react"
 
 import { describeError } from "@/api/errors"
 import { templatesApi, type PreviewResponse } from "@/api/notify"
-import { parseSampleData } from "./sample-data"
+import { parseJsonText } from "@/lib/json-text"
 
 export type PreviewState = {
   preview: PreviewResponse | null
@@ -29,7 +29,7 @@ export function useTemplatePreview({ subject, body, bodyHtml, sampleData }: Prev
     lastNonce.current = nonce
     const timer = setTimeout(
       async () => {
-        const sample = parseSampleData(sampleData)
+        const sample = parseJsonText(sampleData)
         if (!sample.ok) {
           setState({ preview: null, error: { kind: "json" }, rendering: false })
           return

@@ -22,7 +22,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { loadNamespaces } from "@/i18n"
 import { requireIdParam } from "@/lib/loader"
 import type { RouteHandle } from "@/lib/route-handle"
-import { formatSampleData, parseSampleData } from "./sample-data"
+import { formatJsonText, parseJsonText } from "@/lib/json-text"
 import { useTemplatePreview } from "./use-template-preview"
 
 export async function loader({ params }: LoaderFunctionArgs) {
@@ -69,7 +69,7 @@ function draftOf(template: TemplateRow | null): Draft {
     subject: template?.subject_template ?? "",
     body: template?.body_template ?? "",
     bodyHtml: template?.body_template_html ?? "",
-    sampleData: formatSampleData(template?.sample_data),
+    sampleData: formatJsonText(template?.sample_data),
   }
 }
 
@@ -94,7 +94,7 @@ function Editor({ template, canWrite }: { template: TemplateRow | null; canWrite
 
   const dirty = canWrite && !sameDraft(draft, saved)
   const set = <K extends keyof Draft>(key: K) => (value: Draft[K]) => setDraft((d) => ({ ...d, [key]: value }))
-  const sampleOk = parseSampleData(draft.sampleData).ok
+  const sampleOk = parseJsonText(draft.sampleData).ok
   const canSave =
     canWrite && !pending && draft.code.trim() && draft.name.trim() && draft.subject.trim() && draft.body.trim()
 
@@ -114,7 +114,7 @@ function Editor({ template, canWrite }: { template: TemplateRow | null; canWrite
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
-    const sample = parseSampleData(draft.sampleData)
+    const sample = parseJsonText(draft.sampleData)
     if (!sample.ok || !canSave) return
     setPending(true)
     setCodeError(null)

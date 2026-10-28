@@ -5,18 +5,20 @@ import { toast } from "sonner"
 
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import { DataTable, type Column } from "@/components/data-table/data-table"
+import { DisabledReason } from "@/components/disabled-reason"
 import { Section } from "@/components/section"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { useReportError } from "@/hooks/use-report-error"
 
-/** What a facet's form edits: a new row, or an existing one. */
+/** What a section's form edits: a new row, or an existing one. */
 export type FacetEditing<T> = { mode: "create" } | { mode: "edit"; row: T }
 
 /**
- * One of a unit's facets (addresses, closures, hours): a titled table
- * with create, edit, and delete. The caller supplies the columns, the
- * form, and the per-row text; this owns the dialogs and their state.
+ * A bounded list of a subject's parts (a unit's addresses, an IdP's
+ * service providers): a titled table with create, edit, and delete. The
+ * caller supplies the columns, the form, and the per-row text; this owns
+ * the dialogs and their state.
  */
 export function FacetSection<T extends { id: number }>({
   title,
@@ -33,6 +35,7 @@ export function FacetSection<T extends { id: number }>({
   deleteBody,
   deletedMessage,
   onDelete,
+  deleteBlockedReason = () => null,
   onChanged,
   renderForm,
 }: {
@@ -51,6 +54,8 @@ export function FacetSection<T extends { id: number }>({
   deleteBody: (row: T) => string
   deletedMessage: (row: T) => string
   onDelete: (row: T) => Promise<unknown>
+  /** Why a row can't be deleted right now, or null when it can. */
+  deleteBlockedReason?: (row: T) => string | null
   onChanged: () => void
   /** Rendered inside the dialog; call `done` after a successful save. */
   renderForm: (editing: FacetEditing<T>, done: () => void) => ReactNode
@@ -87,9 +92,11 @@ export function FacetSection<T extends { id: number }>({
               >
                 <PencilIcon />
               </Button>
-              <Button variant="ghost" size="icon-sm" aria-label={deleteLabel(row)} onClick={() => setDeleting(row)}>
-                <Trash2Icon />
-              </Button>
+              <DeleteButton
+                label={deleteLabel(row)}
+                blockedReason={deleteBlockedReason(row)}
+                onClick={() => setDeleting(row)}
+              />
             </div>
           ),
         },
@@ -133,5 +140,30 @@ export function FacetSection<T extends { id: number }>({
         }}
       />
     </Section>
+  )
+}
+
+function DeleteButton({
+  label,
+  blockedReason,
+  onClick,
+}: {
+  label: string
+  blockedReason: string | null
+  onClick: () => void
+}) {
+  if (blockedReason) {
+    return (
+      <DisabledReason label={label} reason={blockedReason}>
+        <Button variant="ghost" size="icon-sm" disabled aria-hidden="true" tabIndex={-1}>
+          <Trash2Icon />
+        </Button>
+      </DisabledReason>
+    )
+  }
+  return (
+    <Button variant="ghost" size="icon-sm" aria-label={label} onClick={onClick}>
+      <Trash2Icon />
+    </Button>
   )
 }
