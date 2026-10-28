@@ -1,0 +1,113 @@
+{
+  "title": "Users",
+  "subtitle": "Search for a user to view their account and manage their roles.",
+  "search": "Name, username, or email",
+  "prompt": "Enter a name, username, or email to search.",
+  "noMatches": "No users match.",
+  "moreMatches": "Showing the first {{count, number}} matches. Refine the search to narrow them down.",
+  "columns": {
+    "name": "Name",
+    "username": "Username",
+    "email": "Email",
+    "status": "Status"
+  },
+  "detail": {
+    "back": "Users",
+    "edit": "Edit",
+    "markDeleted": "Mark deleted",
+    "restore": "Restore",
+    "account": "Account",
+    "facts": {
+      "name": "Name",
+      "created": "Created",
+      "lastLogin": "Last login",
+      "deleted": "Deleted",
+      "passwordLogin": "Password login"
+    },
+    "passwordYes": "Yes",
+    "passwordNo": "No (SSO only)",
+    "failedAttempts_one": "{{count}} failed attempt",
+    "failedAttempts_other": "{{count}} failed attempts",
+    "locked": "Locked",
+    "saml": "SAML",
+    "samlNone": "No SAML identity linked.",
+    "samlIdentities": "Identities",
+    "samlAttributes": "Attributes",
+    "sessions": "Recent sessions",
+    "sessionsCount": "Recent sessions ({{count, number}})",
+    "sessionsNone": "This user has no recorded sessions.",
+    "sessionColumns": {
+      "started": "Started",
+      "lastActivity": "Last activity",
+      "expires": "Expires",
+      "method": "Method",
+      "orgUnit": "Org unit",
+      "ip": "IP",
+      "client": "Client",
+      "status": "Status"
+    }
+  },
+  "status": {
+    "active": "Active",
+    "deleted": "Deleted",
+    "sessionActive": "Active"
+  },
+  "edit": {
+    "title": "Edit user",
+    "description": "Only local accounts can be edited here; SAML accounts come from the identity provider.",
+    "firstName": "First name",
+    "middleName": "Middle name",
+    "familyName": "Family name",
+    "saved": "Saved {{name}}"
+  },
+  "delete": {
+    "title": "Mark account deleted?",
+    "body": "{{name}} will be marked deleted and blocked from signing in. This can be undone.",
+    "done": "Marked {{name}} deleted",
+    "restored": "Restored {{name}}"
+  },
+  "roles": {
+    "title": "Roles",
+    "titleCount": "Roles ({{count, number}})",
+    "description": "Roles granted to this user at org units. SAML-managed assignments come from the identity provider and can't be removed here.",
+    "none": "No role assignments.",
+    "columns": {
+      "role": "Role",
+      "orgUnit": "Org unit",
+      "source": "Source",
+      "added": "Added"
+    },
+    "sourceSaml": "SAML",
+    "sourceManual": "Manual",
+    "assign": "Assign role",
+    "role": "Role",
+    "rolePlaceholder": "Choose a role",
+    "roleSearch": "Search roles",
+    "orgUnit": "Org unit",
+    "orgUnitPlaceholder": "Choose an org unit",
+    "orgUnitSearch": "Search org units",
+    "assignSubmit": "Assign",
+    "assigned": "Assigned {{role}} at {{orgUnit}}",
+    "pickersFailed": "Could not load the role and org unit lists.",
+    "forbiddenAssign": "You do not have permission to assign roles at that org unit.",
+    "forbiddenRemove": "You do not have permission to remove roles at that org unit.",
+    "removeLabel": "Remove {{role}} at {{orgUnit}}",
+    "removeTitle": "Remove role assignment?",
+    "removeBody": "{{role}} at {{orgUnit}} will be removed from {{name}}.",
+    "removed": "Removed {{role}} at {{orgUnit}}"
+  },
+  "effective": {
+    "title": "Effective permissions",
+    "description": "What this user can do and where, combined across all of their role assignments.",
+    "none": "This user has no permissions.",
+    "failed": "Could not load the effective permissions.",
+    "columns": {
+      "permission": "Permission",
+      "scope": "Scope"
+    },
+    "global": "All org units",
+    "unitAndBelow": "{{unit}} and below",
+    "more": "+{{count, number}} more",
+    "less": "Show less"
+  }
+}

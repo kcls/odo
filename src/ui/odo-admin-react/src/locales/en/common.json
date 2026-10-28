@@ -1,0 +1,121 @@
+{
+  "app": {
+    "name": "Odo Admin"
+  },
+  "nav": {
+    "main": "Main",
+    "home": "Home",
+    "toggleSidebar": "Toggle sidebar"
+  },
+  "tools": {
+    "users": {
+      "label": "Users",
+      "description": "Search user accounts and manage their roles, SAML identities, and sessions."
+    },
+    "roles": {
+      "label": "Roles",
+      "description": "Manage roles and the permissions granted to them."
+    },
+    "permissions": {
+      "label": "Permissions",
+      "description": "Manage the permission codes available for role grants."
+    },
+    "orgUnitTypes": {
+      "label": "Org unit types",
+      "description": "Manage the categories of org units (system, region, branch, …) and what each may contain."
+    }
+  },
+  "user": {
+    "menu": "Account menu",
+    "theme": "Theme",
+    "themes": {
+      "light": "Light",
+      "slate": "Slate",
+      "dark": "Dark",
+      "system": "System"
+    },
+    "language": "Interface language",
+    "signOut": "Sign out"
+  },
+  "uiLanguages": {
+    "en": "English",
+    "en-XA": "Pseudo (accented)",
+    "ar-XB": "Pseudo (right-to-left)"
+  },
+  "breadcrumb": "Breadcrumb",
+  "a11y": {
+    "close": "Close",
+    "sidebar": "Sidebar",
+    "sidebarDescription": "Displays the mobile sidebar.",
+    "toggleSidebar": "Toggle sidebar"
+  },
+  "actions": {
+    "cancel": "Cancel",
+    "save": "Save",
+    "edit": "Edit",
+    "delete": "Delete",
+    "remove": "Remove",
+    "search": "Search"
+  },
+  "table": {
+    "pagination": "Pagination",
+    "rowsPerPage": "Rows per page",
+    "range": "{{start, number}}–{{end, number}} of {{total, number}}",
+    "firstPage": "First page",
+    "previousPage": "Previous page",
+    "nextPage": "Next page",
+    "lastPage": "Last page",
+    "sortAscending": "Sort ascending",
+    "sortDescending": "Sort descending"
+  },
+  "combobox": {
+    "noMatches": "No matches."
+  },
+  "none": "—",
+  "errors": {
+    "notFoundTitle": "Not found",
+    "notFoundBody": "That page or item does not exist. It may have been deleted.",
+    "genericTitle": "Something went wrong",
+    "genericBody": "The page could not be loaded. Try again in a moment.",
+    "backHome": "Back to home",
+    "unexpected": "An unexpected error occurred.",
+    "status": {
+      "badRequest": "The request was invalid. Check your input and try again.",
+      "unauthorized": "Your session has expired. Please sign in again.",
+      "forbidden": "You don't have permission to do that.",
+      "notFound": "That item no longer exists. It may have been changed by someone else.",
+      "conflict": "That change conflicts with the current state. Refresh and try again.",
+      "server": "Something went wrong on the server. Please try again.",
+      "other": "The request could not be completed."
+    },
+    "codes": {
+      "NOT_LOCAL_ACCOUNT": "This account is managed by the identity provider and can't be edited here.",
+      "SAML_MANAGED": "This item is managed by SAML and can't be changed here.",
+      "PERMISSION_IN_USE": "This permission is granted to one or more roles; revoke the grants first.",
+      "ROLE_ASSIGNED": "This role is assigned to users; remove the assignments first.",
+      "ROLE_SAML_MAPPED": "This role is referenced by SAML attribute mappings; remove those first.",
+      "ATTRIBUTE_IN_USE": "Role mappings reference this attribute; remove them first.",
+      "ATTRIBUTE_HAS_VALUES": "Captured user attribute values reference this attribute.",
+      "IDP_IN_USE": "This identity provider is referenced by service providers or sessions.",
+      "IDP_HAS_IDENTITIES": "Users have SAML identities from this IdP; it can't be deleted.",
+      "SP_IN_USE": "This service provider is referenced by pending authentication requests.",
+      "TYPE_IN_USE": "Active org units use this type; change them first.",
+      "TYPE_HAS_CHILDREN": "Other unit types list this type as their parent.",
+      "UNIT_HAS_CHILDREN": "This unit has active child units; move or delete them first.",
+      "UNIT_IS_ROOT": "The root org unit cannot be deleted.",
+      "PERMISSION_CODE_TAKEN": "A permission with this code already exists.",
+      "ROLE_CODE_TAKEN": "A role with this code already exists.",
+      "PERMISSION_ALREADY_GRANTED": "This role already has that permission.",
+      "ALREADY_ASSIGNED": "The user already has this role at this org unit.",
+      "ENTITY_ID_TAKEN": "A config with this entity ID already exists.",
+      "ATTRIBUTE_EXISTS": "This IdP already tracks this attribute key with the same normalizer.",
+      "MAPPING_EXISTS": "This attribute value is already mapped to this role.",
+      "TEMPLATE_CODE_TAKEN": "A template with this code already exists.",
+      "EMAIL_GROUP_CODE_TAKEN": "An email group with this code already exists.",
+      "EMAIL_ALREADY_IN_GROUP": "This email address is already a member of the group.",
+      "UNIT_CODE_TAKEN": "An org unit with this code already exists.",
+      "UNIT_LABEL_TAKEN": "An org unit with this label already exists.",
+      "TYPE_LABEL_TAKEN": "A unit type with this label already exists."
+    }
+  }
+}

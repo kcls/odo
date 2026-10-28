@@ -1,0 +1,20 @@
+{
+  "title": "Odo Admin",
+  "subtitle": "Sign in to manage the platform.",
+  "username": "Username",
+  "password": "Password",
+  "submit": "Sign in",
+  "ssoButton": "Sign in with {{label}}",
+  "showLocal": "Sign in with username and password",
+  "or": "or",
+  "completingSso": "Completing sign-in…",
+  "sessionExpired": "Your session has expired. Please sign in again.",
+  "errors": {
+    "credentials": "Sign-in failed. Check your username and password.",
+    "generic": "Sign-in failed. Please try again.",
+    "no_roles": "SSO authentication succeeded, but your account has not been granted application access. Please contact your administrator.",
+    "saml_auth_failed": "SSO authentication failed. Please try again or use username and password.",
+    "saml_no_token": "SSO authentication completed but no session token was received. Please try again.",
+    "saml_token_invalid": "SSO authentication token was invalid. Please try again."
+  }
+}
