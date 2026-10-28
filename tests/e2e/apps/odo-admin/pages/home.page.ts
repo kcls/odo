@@ -2,10 +2,10 @@ import { Page, Locator, expect } from '@playwright/test';
 import { AdminBasePage } from './base.page';
 
 /**
- * Home (landing) page object: the tool grid + the shell nav.
+ * Home (landing) page object: the tool cards and the sidebar.
  *
- * Both the grid cards and the sidenav links are driven by the same
- * permission-filtered tool list, so tests can assert on either.
+ * Both are driven by the same permission-filtered tool registry, so tests
+ * can assert on either.
  */
 export class AdminHomePage extends AdminBasePage {
   constructor(page: Page) {
@@ -20,27 +20,36 @@ export class AdminHomePage extends AdminBasePage {
     return this.page.getByRole('heading', { name: 'Administration' });
   }
 
-  /** Home-grid tool cards. */
+  /** Home tool cards: links in the page's list of tools. */
   toolCards(): Locator {
-    return this.page.locator('.home-card');
+    return this.page.getByRole('main').getByRole('listitem');
   }
 
   /**
-   * A specific tool's card, matched by its exact title (labels overlap as
-   * substrings — "Roles" vs "User Roles" — so match the title element exactly).
+   * A tool's card. Its link's name is the label then the description, and
+   * labels overlap ("Org units" / "Org unit types"), so anchor at the start
+   * and require the label to end there.
    */
   toolCard(label: string): Locator {
     return this.page
-      .locator('.home-card')
-      .filter({ has: this.page.getByText(label, { exact: true }) });
+      .getByRole('main')
+      .getByRole('link', { name: new RegExp(`^${escapeRegExp(label)}(?![a-z])`, 'i') });
   }
 
-  /** Sidenav link by exact accessible name (excludes the fixed Home link). */
+  /** The sidebar's links (Home plus one per visible tool). */
+  navLinks(): Locator {
+    return this.page.getByRole('list', { name: 'Main' }).getByRole('link');
+  }
+
   navLink(label: string): Locator {
-    return this.page.getByRole('link', { name: label, exact: true });
+    return this.page.getByRole('list', { name: 'Main' }).getByRole('link', { name: label, exact: true });
   }
 
   async expectLoaded(): Promise<void> {
     await expect(this.heading()).toBeVisible();
   }
+}
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

@@ -128,8 +128,12 @@
       repoint `scripts/generate-openapi.sh`, CI, CLAUDE.md, and the k8s
       probes (now `/odo/admin/`, which no longer redirects)
 - [x] Rewrite `docs/adding-a-tool.md` for this app
-- [ ] **Overhaul the e2e tests** (`tests/e2e/apps/odo-admin`) against
-      roles and accessible names
+- [x] **Overhaul the e2e tests** (`tests/e2e/apps/odo-admin`) against
+      roles and accessible names: smoke for every tool, permission
+      gating, server sorting, deep links and back/forward, the post-login
+      redirect, effective permissions, assigning and removing a role, the
+      template preview and unsaved-changes guard, org unit child
+      navigation. 23 pass against the dev server at `/odo/admin/`.
 - [ ] Deploy (`./scripts/build-and-deploy-service.sh ui-odo-admin --wait`)
       and run the e2e suite against the cluster
       (`cd tests/e2e && BASE_URL=http://localhost:30080 npm run test:odo-admin`)
