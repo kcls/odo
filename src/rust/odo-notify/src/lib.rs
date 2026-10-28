@@ -1,3 +1,4 @@
+pub mod delivery_admin;
 pub mod email_group;
 pub mod enqueue;
 pub mod inbox;
