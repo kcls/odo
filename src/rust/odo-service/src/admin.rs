@@ -238,6 +238,18 @@ pub fn contains_ci<C: ColumnTrait>(column: C, term: &str) -> Expr {
     column.ilike(format!("%{}%", escape_like(term)))
 }
 
+/// For update requests that pair an optional field with a `clear_<field>`
+/// flag (a null field means "unchanged", so clearing needs saying
+/// explicitly): refuse a request that does both.
+pub fn check_clear(field: &str, value_given: bool, clear: bool) -> Result<(), LocalError> {
+    if value_given && clear {
+        return Err(LocalError::invalid_input(format!(
+            "give {field} or clear_{field}, not both"
+        )));
+    }
+    Ok(())
+}
+
 /// Escape LIKE/ILIKE wildcards so `term` matches literally (backslash is
 /// Postgres's default escape character).
 pub fn escape_like(term: &str) -> String {
@@ -283,7 +295,15 @@ pub fn map_unique_violation(
 
 #[cfg(test)]
 mod tests {
-    use super::escape_like;
+    use super::{check_clear, escape_like};
+
+    #[test]
+    fn check_clear_refuses_a_value_and_a_clear_together() {
+        assert!(check_clear("parent", true, true).is_err());
+        assert!(check_clear("parent", true, false).is_ok());
+        assert!(check_clear("parent", false, true).is_ok());
+        assert!(check_clear("parent", false, false).is_ok());
+    }
 
     #[test]
     fn escape_like_matches_wildcards_literally() {

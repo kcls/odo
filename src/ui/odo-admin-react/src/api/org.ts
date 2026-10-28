@@ -163,7 +163,7 @@ export const orgAdminApi = {
   createUnitType(params: S["CreateUnitTypeRequest"]): Promise<UnitType> {
     return apiPost(`${ORG_ADMIN}/unit-type/create`, params)
   },
-  /** A null or omitted `parent` leaves it unchanged; it cannot be cleared. */
+  /** A null or omitted `parent` leaves it unchanged; `clear_parent` removes it. */
   updateUnitType(id: number, params: Omit<S["UpdateUnitTypeRequest"], "id">): Promise<UnitType> {
     return apiPost(`${ORG_ADMIN}/unit-type/update`, { id, ...params })
   },

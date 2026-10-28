@@ -64,16 +64,10 @@ function IdpForm({ idp, onDone }: { idp: IdpRow | null; onDone: (idp: IdpRow) =>
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
 
-  // Null means "unchanged" to the API, so neither can be cleared once
-  // set; the form requires a value instead of offering a blank that
-  // would silently do nothing.
-  const hoursPermanent = idp?.session_lifetime_hours != null
-  const mappingPermanent = idp?.attribute_mapping != null
-
   const hoursNumber = Number(hours)
-  const hoursValid = hours.trim() === "" ? !hoursPermanent : Number.isInteger(hoursNumber) && hoursNumber >= 1
+  const hoursValid = hours.trim() === "" || (Number.isInteger(hoursNumber) && hoursNumber >= 1)
   const parsedMapping = parseJsonText(mapping)
-  const mappingValid = parsedMapping.ok && (!mappingPermanent || parsedMapping.value !== undefined)
+  const mappingValid = parsedMapping.ok
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
@@ -93,7 +87,15 @@ function IdpForm({ idp, onDone }: { idp: IdpRow | null; onDone: (idp: IdpRow) =>
       ...(parsedMapping.value !== undefined ? { attribute_mapping: parsedMapping.value } : {}),
     }
     try {
-      const saved = idp ? await samlApi.updateIdp(idp.id, fields) : await samlApi.createIdp(fields)
+      const saved = idp
+        ? await samlApi.updateIdp(idp.id, {
+            ...fields,
+            // Blank means "remove" here, but "unchanged" to the API, which
+            // takes an explicit flag; only send it when there is a value.
+            clear_session_lifetime_hours: hours.trim() === "" && idp.session_lifetime_hours != null,
+            clear_attribute_mapping: parsedMapping.value === undefined && idp.attribute_mapping != null,
+          })
+        : await samlApi.createIdp(fields)
       toast.success(t(idp ? "idpForm.saved" : "idpForm.created", { name: saved.name }))
       onDone(saved)
     } catch (err) {
@@ -147,7 +149,6 @@ function IdpForm({ idp, onDone }: { idp: IdpRow | null; onDone: (idp: IdpRow) =>
             min={1}
             step={1}
             className="w-28"
-            required={hoursPermanent}
             value={hours}
             aria-invalid={!hoursValid}
             onChange={(e) => setHours(e.target.value)}
@@ -155,9 +156,7 @@ function IdpForm({ idp, onDone }: { idp: IdpRow | null; onDone: (idp: IdpRow) =>
           {!hoursValid && hours.trim() !== "" ? (
             <FieldError>{t("idpForm.invalidHours")}</FieldError>
           ) : (
-            <FieldDescription>
-              {hoursPermanent ? t("idpForm.sessionLifetimePermanent") : t("idpForm.sessionLifetimeHint")}
-            </FieldDescription>
+            <FieldDescription>{t("idpForm.sessionLifetimeHint")}</FieldDescription>
           )}
         </Field>
         <Field orientation="horizontal">
@@ -182,15 +181,14 @@ function IdpForm({ idp, onDone }: { idp: IdpRow | null; onDone: (idp: IdpRow) =>
             id="idp-mapping"
             className="min-h-28 font-mono text-xs"
             spellCheck={false}
-            required={mappingPermanent}
             value={mapping}
             aria-invalid={!mappingValid}
             onChange={(e) => setMapping(e.target.value)}
           />
-          {!parsedMapping.ok ? (
-            <FieldError>{t("idpForm.invalidJson")}</FieldError>
+          {parsedMapping.ok ? (
+            <FieldDescription>{t("idpForm.attributeMappingHint")}</FieldDescription>
           ) : (
-            mappingPermanent && <FieldDescription>{t("idpForm.attributeMappingPermanent")}</FieldDescription>
+            <FieldError>{t("idpForm.invalidJson")}</FieldError>
           )}
         </Field>
         {error && <FieldError>{error}</FieldError>}

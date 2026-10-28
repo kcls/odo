@@ -429,3 +429,46 @@ async fn unit_type_search_ignores_case() {
     let labels: Vec<&str> = page["rows"].as_array().unwrap().iter().map(|r| r["label"].as_str().unwrap()).collect();
     assert!(labels.contains(&label.as_str()), "{label} not in {labels:?}");
 }
+
+#[tokio::test]
+async fn unit_type_parent_can_be_cleared() {
+    let c = client();
+    let token = odo_admin_token(&c).await;
+    let create = |body: serde_json::Value| post_json(&c, &token, "/unit-type/create", body);
+
+    let resp = create(json!({"label": unique("clear-parent-p")})).await;
+    assert_eq!(resp.status(), 200);
+    let parent: serde_json::Value = resp.json().await.unwrap();
+    let resp = create(json!({"label": unique("clear-parent-c"), "parent": parent["id"]})).await;
+    assert_eq!(resp.status(), 200);
+    let child: serde_json::Value = resp.json().await.unwrap();
+    assert_eq!(child["parent"], parent["id"]);
+
+    // A parent and a clear together contradict each other.
+    let resp = post_json(
+        &c,
+        &token,
+        "/unit-type/update",
+        json!({"id": child["id"], "parent": parent["id"], "clear_parent": true}),
+    )
+    .await;
+    assert_eq!(resp.status(), 400);
+
+    // A null parent still means "unchanged"...
+    let resp = post_json(&c, &token, "/unit-type/update", json!({"id": child["id"], "parent": null})).await;
+    assert_eq!(resp.status(), 200);
+    let same: serde_json::Value = resp.json().await.unwrap();
+    assert_eq!(same["parent"], parent["id"]);
+
+    // ...and clear_parent removes it.
+    let resp = post_json(&c, &token, "/unit-type/update", json!({"id": child["id"], "clear_parent": true})).await;
+    assert_eq!(resp.status(), 200);
+    let cleared: serde_json::Value = resp.json().await.unwrap();
+    assert!(cleared["parent"].is_null());
+    assert!(cleared["parent_label"].is_null());
+
+    for t in [&child, &parent] {
+        let resp = post_json(&c, &token, "/unit-type/delete", json!({"id": t["id"]})).await;
+        assert_eq!(resp.status(), 200);
+    }
+}

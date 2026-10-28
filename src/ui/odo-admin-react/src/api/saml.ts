@@ -32,7 +32,7 @@ export const samlApi = {
   createIdp(params: S["CreateIdpRequest"]): Promise<IdpRow> {
     return apiPost(`${BASE}/idp/create`, params)
   },
-  /** Null fields are unchanged, so session lifetime and attribute mapping can't be cleared. */
+  /** Null fields are unchanged; the `clear_*` flags remove session lifetime or attribute mapping. */
   updateIdp(id: number, params: Omit<S["UpdateIdpRequest"], "id">): Promise<IdpRow> {
     return apiPost(`${BASE}/idp/update`, { id, ...params })
   },
@@ -46,7 +46,7 @@ export const samlApi = {
   createSp(params: S["CreateSpRequest"]): Promise<SpRow> {
     return apiPost(`${BASE}/sp/create`, params)
   },
-  /** A null `idp` is unchanged: an SP can move to another IdP but not be unlinked. */
+  /** A null `idp` is unchanged; `clear_idp` unlinks the SP. */
   updateSp(id: number, params: Omit<S["UpdateSpRequest"], "id">): Promise<SpRow> {
     return apiPost(`${BASE}/sp/update`, { id, ...params })
   },

@@ -263,3 +263,90 @@ async fn sp_create_validation() {
     .await;
     assert_eq!(resp.status(), 400);
 }
+
+#[tokio::test]
+async fn idp_session_lifetime_and_mapping_can_be_cleared() {
+    let c = client();
+    let token = odo_admin_token(&c).await;
+    let resp = post_json(
+        &c,
+        &token,
+        "/idp/create",
+        json!({
+            "name": "Clear Test IdP",
+            "entity_id": unique("idp-clear"),
+            "session_lifetime_hours": 8,
+            "attribute_mapping": {"email": "mail"},
+        }),
+    )
+    .await;
+    assert_eq!(resp.status(), 200);
+    let idp: serde_json::Value = resp.json().await.unwrap();
+    let id = &idp["id"];
+
+    for both in [
+        json!({"id": id, "session_lifetime_hours": 4, "clear_session_lifetime_hours": true}),
+        json!({"id": id, "attribute_mapping": {}, "clear_attribute_mapping": true}),
+    ] {
+        let resp = post_json(&c, &token, "/idp/update", both).await;
+        assert_eq!(resp.status(), 400, "value and clear together");
+    }
+
+    let resp = post_json(
+        &c,
+        &token,
+        "/idp/update",
+        json!({"id": id, "clear_session_lifetime_hours": true, "clear_attribute_mapping": true}),
+    )
+    .await;
+    assert_eq!(resp.status(), 200);
+    let cleared: serde_json::Value = resp.json().await.unwrap();
+    assert!(cleared["session_lifetime_hours"].is_null());
+    assert!(cleared["attribute_mapping"].is_null());
+    assert_eq!(cleared["name"], "Clear Test IdP", "other fields untouched");
+
+    let resp = post_json(&c, &token, "/idp/delete", json!({"id": id})).await;
+    assert_eq!(resp.status(), 200);
+}
+
+#[tokio::test]
+async fn sp_can_be_unlinked_from_its_idp() {
+    let c = client();
+    let token = odo_admin_token(&c).await;
+    let resp = post_json(
+        &c,
+        &token,
+        "/idp/create",
+        json!({"name": "Unlink Test IdP", "entity_id": unique("idp-unlink")}),
+    )
+    .await;
+    assert_eq!(resp.status(), 200);
+    let idp: serde_json::Value = resp.json().await.unwrap();
+    let resp = post_json(
+        &c,
+        &token,
+        "/sp/create",
+        json!({
+            "entity_id": unique("sp-unlink"),
+            "acs_url": "https://sp.example.com/acs",
+            "idp": idp["id"],
+        }),
+    )
+    .await;
+    assert_eq!(resp.status(), 200);
+    let sp: serde_json::Value = resp.json().await.unwrap();
+
+    let resp = post_json(&c, &token, "/sp/update", json!({"id": sp["id"], "idp": idp["id"], "clear_idp": true})).await;
+    assert_eq!(resp.status(), 400, "idp and clear_idp together");
+
+    let resp = post_json(&c, &token, "/sp/update", json!({"id": sp["id"], "clear_idp": true})).await;
+    assert_eq!(resp.status(), 200);
+    let unlinked: serde_json::Value = resp.json().await.unwrap();
+    assert!(unlinked["idp"].is_null());
+    assert!(unlinked["idp_name"].is_null());
+
+    let resp = post_json(&c, &token, "/sp/delete", json!({"id": sp["id"]})).await;
+    assert_eq!(resp.status(), 200);
+    let resp = post_json(&c, &token, "/idp/delete", json!({"id": idp["id"]})).await;
+    assert_eq!(resp.status(), 200);
+}

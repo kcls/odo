@@ -780,10 +780,15 @@ export interface components {
         UpdateUnitTypeRequest: {
             can_have_patrons?: boolean | null;
             can_have_staff?: boolean | null;
+            /** @description Remove the parent type. Not allowed together with `parent`. */
+            clear_parent?: boolean;
             /** Format: int32 */
             id: number;
             label?: string | null;
-            /** Format: int32 */
+            /**
+             * Format: int32
+             * @description A null or absent parent leaves it unchanged; see `clear_parent`.
+             */
             parent?: number | null;
         };
     };

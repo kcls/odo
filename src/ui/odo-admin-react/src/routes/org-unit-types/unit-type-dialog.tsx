@@ -15,7 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
@@ -72,10 +72,7 @@ function UnitTypeForm({
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
 
-  // The API can't clear a parent (null means unchanged), so don't offer
-  // "None" to a type that has one. A type can't be its own parent;
-  // deeper cycles are refused server-side.
-  const parentPermanent = existing?.parent != null
+  // A type can't be its own parent; deeper cycles are refused server-side.
   const parentOptions = unitTypes.filter((u) => u.id !== existing?.id)
 
   const submit = async (e: FormEvent) => {
@@ -83,16 +80,23 @@ function UnitTypeForm({
     setPending(true)
     setLabelError(null)
     setError(null)
-    const params = {
+    const fields = {
       label: label.trim(),
       can_have_staff: canHaveStaff,
       can_have_patrons: canHavePatrons,
-      parent: parent === NO_PARENT ? null : Number(parent),
     }
+    const parentId = parent === NO_PARENT ? null : Number(parent)
     try {
       const saved = existing
-        ? await orgAdminApi.updateUnitType(existing.id, params)
-        : await orgAdminApi.createUnitType(params)
+        ? await orgAdminApi.updateUnitType(existing.id, {
+            ...fields,
+            // A null parent means "unchanged" to the API; removing one is
+            // its own flag.
+            ...(parentId !== null
+              ? { parent: parentId }
+              : { clear_parent: existing.parent != null }),
+          })
+        : await orgAdminApi.createUnitType({ ...fields, parent: parentId })
       toast.success(t(existing ? "dialog.updated" : "dialog.created", { label: saved.label }))
       onDone()
     } catch (err) {
@@ -130,7 +134,7 @@ function UnitTypeForm({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {!parentPermanent && <SelectItem value={NO_PARENT}>{t("dialog.noParent")}</SelectItem>}
+              <SelectItem value={NO_PARENT}>{t("dialog.noParent")}</SelectItem>
               {parentOptions.map((u) => (
                 <SelectItem key={u.id} value={String(u.id)}>
                   {u.label}
@@ -138,7 +142,6 @@ function UnitTypeForm({
               ))}
             </SelectContent>
           </Select>
-          {parentPermanent && <FieldDescription>{t("dialog.parentPermanent")}</FieldDescription>}
         </Field>
         <Field orientation="horizontal">
           <Checkbox

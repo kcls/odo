@@ -1363,14 +1363,28 @@ export interface components {
         };
         UpdateIdpRequest: {
             allow_idp_initiated?: boolean | null;
+            /** @description A null or absent value leaves it unchanged; see the clear flag. */
             attribute_mapping?: unknown;
+            /**
+             * @description Remove the attribute mapping. Not allowed together with
+             *     `attribute_mapping`.
+             */
+            clear_attribute_mapping?: boolean;
+            /**
+             * @description Remove the session lifetime (use the default). Not allowed together
+             *     with `session_lifetime_hours`.
+             */
+            clear_session_lifetime_hours?: boolean;
             entity_id?: string | null;
             /** Format: int32 */
             id: number;
             is_active?: boolean | null;
             metadata_url?: string | null;
             name?: string | null;
-            /** Format: int32 */
+            /**
+             * Format: int32
+             * @description A null or absent value leaves it unchanged; see the clear flag.
+             */
             session_lifetime_hours?: number | null;
             slo_url?: string | null;
             sso_url?: string | null;
@@ -1393,10 +1407,15 @@ export interface components {
         UpdateSpRequest: {
             acs_url?: string | null;
             callback_url?: string | null;
+            /** @description Unlink the SP from its IdP. Not allowed together with `idp`. */
+            clear_idp?: boolean;
             entity_id?: string | null;
             /** Format: int32 */
             id: number;
-            /** Format: int32 */
+            /**
+             * Format: int32
+             * @description A null or absent idp leaves it unchanged; see `clear_idp`.
+             */
             idp?: number | null;
             idp_x509_cert?: string | null;
             is_active?: boolean | null;
