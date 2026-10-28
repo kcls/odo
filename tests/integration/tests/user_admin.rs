@@ -391,3 +391,191 @@ async fn short_password_is_refused_without_creating_the_account() {
     let resp = create("long-enough-1").await.unwrap();
     assert_eq!(resp.status(), 200, "create after refusal: {:?}", resp.text().await);
 }
+
+// ---------------------------------------------------------------------------
+// user/set-password
+// ---------------------------------------------------------------------------
+
+fn set_password_url() -> String {
+    format!("{}/api/v1/odo/auth/user/set-password", auth_base())
+}
+
+/// A fresh local account that may log in (the login-only e2e-test-role at
+/// the root), with `password`. Returns (id, username).
+async fn create_login_user(c: &reqwest::Client, admin: &str, tag: &str, password: &str) -> (i64, String) {
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let username = format!("itest-{tag}-{nanos}");
+    let resp = c
+        .post(create_url())
+        .headers(auth_header(admin))
+        .json(&json!({
+            "username": username,
+            "email": format!("{username}@odo.example.org"),
+            "password": password,
+        }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+    let id = resp.json::<serde_json::Value>().await.unwrap()["id"].as_i64().unwrap();
+
+    for (path, body) in [
+        ("role/create", json!({"code": "e2e-test-role", "label": "E2E login-only role"})),
+        ("role-permission/create", json!({"role": "e2e-test-role", "perm": "odo.auth.session", "min_depth": 0})),
+    ] {
+        let resp = c
+            .post(format!("{}/api/v1/odo/auth/authz/{path}", auth_base()))
+            .headers(auth_header(admin))
+            .json(&body)
+            .send()
+            .await
+            .unwrap();
+        assert!(resp.status() == 200 || resp.status() == 409, "{path}: {}", resp.status());
+    }
+    let root = root_org_id(c, admin).await;
+    let resp = c
+        .post(format!("{}/api/v1/odo/auth/authz/user-role/create", auth_base()))
+        .headers(auth_header(admin))
+        .json(&json!({"usr": id, "role": "e2e-test-role", "org_unit": root}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+    (id, username)
+}
+
+async fn login_status(c: &reqwest::Client, username: &str, password: &str) -> reqwest::StatusCode {
+    c.post(format!("{}/api/v1/odo/auth/login", auth_base()))
+        .json(&json!({"username": username, "password": password}))
+        .send()
+        .await
+        .unwrap()
+        .status()
+}
+
+async fn set_password(c: &reqwest::Client, token: &str, body: serde_json::Value) -> reqwest::Response {
+    c.post(set_password_url())
+        .headers(auth_header(token))
+        .json(&body)
+        .send()
+        .await
+        .unwrap()
+}
+
+#[tokio::test]
+async fn set_password_requires_write_permission() {
+    let c = client();
+    let staff = staff_token(&c).await;
+    let resp = set_password(&c, &staff, json!({"id": 1, "password": "long-enough-1"})).await;
+    assert_eq!(resp.status(), 403);
+}
+
+#[tokio::test]
+async fn set_password_refuses_short_and_unknown() {
+    let c = client();
+    let admin = odo_admin_token(&c).await;
+    let resp = set_password(&c, &admin, json!({"id": 1, "password": "short"})).await;
+    assert_eq!(resp.status(), 400);
+    let resp = set_password(&c, &admin, json!({"id": i32::MAX, "password": "long-enough-1"})).await;
+    assert_eq!(resp.status(), 404);
+}
+
+#[tokio::test]
+async fn set_password_replaces_it_and_ends_sessions() {
+    let c = client();
+    let admin = odo_admin_token(&c).await;
+    let (id, username) = create_login_user(&c, &admin, "setpw", "first-password-1").await;
+    // Logging in opens a session the reset must end.
+    assert_eq!(login_status(&c, &username, "first-password-1").await, 200);
+
+    let resp = set_password(&c, &admin, json!({"id": id, "password": "second-password-2"})).await;
+    assert_eq!(resp.status(), 200);
+    let result: serde_json::Value = resp.json().await.unwrap();
+    assert_eq!(result["success"], true);
+    assert!(result["sessions_revoked"].as_u64().unwrap() >= 1, "{result}");
+
+    assert_eq!(login_status(&c, &username, "first-password-1").await, 401, "old password");
+    assert_eq!(login_status(&c, &username, "second-password-2").await, 200, "new password");
+
+    // A deleted account must be restored first.
+    let resp = c
+        .post(update_url())
+        .headers(auth_header(&admin))
+        .json(&json!({"id": id, "deleted": true}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+    let resp = set_password(&c, &admin, json!({"id": id, "password": "third-password-3"})).await;
+    assert_eq!(resp.status(), 409);
+    let err: serde_json::Value = resp.json().await.unwrap();
+    assert_eq!(err["code"], "ACCOUNT_DELETED");
+}
+
+#[tokio::test]
+async fn set_password_gives_a_passwordless_account_one() {
+    let c = client();
+    let admin = odo_admin_token(&c).await;
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let username = format!("itest-nopw-{nanos}");
+    // A local account created without a password can't log in...
+    let resp = c
+        .post(create_url())
+        .headers(auth_header(&admin))
+        .json(&json!({"username": username, "email": format!("{username}@odo.example.org")}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+    let id = resp.json::<serde_json::Value>().await.unwrap()["id"].clone();
+
+    // ...until it's given one.
+    let resp = set_password(&c, &admin, json!({"id": id, "password": "brand-new-pw-1"})).await;
+    assert_eq!(resp.status(), 200);
+    let detail = c
+        .post(detail_url())
+        .headers(auth_header(&admin))
+        .json(&json!({"id": id}))
+        .send()
+        .await
+        .unwrap()
+        .json::<serde_json::Value>()
+        .await
+        .unwrap();
+    assert!(detail["local_account"].is_object(), "now has a local account: {detail}");
+}
+
+#[tokio::test]
+async fn set_password_refused_for_saml_accounts() {
+    let c = client();
+    let admin = odo_admin_token(&c).await;
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let username = format!("itest-samlpw-{nanos}");
+    let resp = c
+        .post(create_url())
+        .headers(auth_header(&admin))
+        .json(&json!({
+            "username": username,
+            "email": format!("{username}@odo.example.org"),
+            "auth_method": "saml",
+        }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+    let id = resp.json::<serde_json::Value>().await.unwrap()["id"].clone();
+
+    let resp = set_password(&c, &admin, json!({"id": id, "password": "long-enough-1"})).await;
+    assert_eq!(resp.status(), 409);
+    let err: serde_json::Value = resp.json().await.unwrap();
+    assert_eq!(err["code"], "NOT_LOCAL_ACCOUNT");
+}

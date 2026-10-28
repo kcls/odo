@@ -11,10 +11,19 @@ export type NewUserForm = {
   confirmPassword: string
 }
 
-export type NewUserProblem = "usernameSpaces" | "passwordShort" | "passwordMismatch"
+export type PasswordProblem = "passwordShort" | "passwordMismatch"
+export type NewUserProblem = "usernameSpaces" | PasswordProblem
 
 /** The server's minimum (odo-auth create_user). */
 export const MIN_PASSWORD_LENGTH = 8
+
+/** A new password and its confirmation, as the server and people need them. */
+export function passwordProblems(password: string, confirm: string): Set<PasswordProblem> {
+  const problems = new Set<PasswordProblem>()
+  if (password.length < MIN_PASSWORD_LENGTH) problems.add("passwordShort")
+  if (password !== confirm) problems.add("passwordMismatch")
+  return problems
+}
 
 /**
  * Problems the server would reject, checked before sending. The
@@ -26,8 +35,7 @@ export function newUserProblems(form: NewUserForm): Set<NewUserProblem> {
   const problems = new Set<NewUserProblem>()
   if (/\s/.test(form.username.trim())) problems.add("usernameSpaces")
   if (form.authMethod === "local") {
-    if (form.password.length < MIN_PASSWORD_LENGTH) problems.add("passwordShort")
-    if (form.password !== form.confirmPassword) problems.add("passwordMismatch")
+    for (const p of passwordProblems(form.password, form.confirmPassword)) problems.add(p)
   }
   return problems
 }

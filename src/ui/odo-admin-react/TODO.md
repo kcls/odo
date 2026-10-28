@@ -45,15 +45,15 @@
 - [x] **Create user accounts** from the Users page ("New user", gated
       on `odo.auth.user.write`): password sign-in or pre-provisioned
       SAML, then straight to the new user's page to assign roles. Local
-      accounts require a password (8+ characters, confirmed), because
-      nothing can set one later; SAML accounts never send one. No pinned
-      uuids from the UI (that's for fixtures and registration).
-- [ ] **Set or reset a local user's password.** odo-auth has no
-      endpoint for it, so a forgotten password, or an account created
-      without one (only possible via the API), needs SQL. Needs an
-      admin endpoint behind `odo.auth.user.write` (hashing with
-      `auth.hash_password`, clearing `locked_until` and failed attempts),
-      then a "Set password" action on the user's page.
+      accounts get a password (8+ characters, confirmed) at creation;
+      SAML accounts never send one. No pinned uuids from the UI (that's
+      for fixtures and registration).
+- [x] **Set or reset a local user's password**: "Set password" on the
+      user's page, backed by odo-auth `user/set-password`
+      (`odo.auth.user.write`). It gives a passwordless account one, clears
+      any lockout, and ends the user's sessions (sparing the caller's
+      own when resetting your own). Refused for SAML accounts and
+      deleted ones.
 - [x] **Notifications page**: outcome tiles (delivered, failed, skipped,
       queued) for a time range and channel, each linking to those
       deliveries; per-recipient activity (totals, failures, last sent,
