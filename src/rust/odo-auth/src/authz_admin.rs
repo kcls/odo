@@ -12,7 +12,7 @@ use odo_client::context::RequestContext;
 use odo_client::error::{ApiResult, LocalError};
 use odo_entity::authz::{permission, role, role_permission, saml_attr_role_map, usr_role_org_map};
 use odo_service::admin::{
-    Page, Paginated, Sort, clean_code, clean_optional, clean_required, clean_search,
+    Page, Paginated, Sort, clean_code, clean_optional, clean_required, clean_search, contains_ci,
     map_unique_violation,
 };
 use sea_orm::prelude::*;
@@ -207,8 +207,8 @@ pub async fn list_permissions(
     if let Some(search) = clean_search(params.search.as_deref()) {
         condition = condition.add(
             Condition::any()
-                .add(permission::Column::Code.contains(&search))
-                .add(permission::Column::Description.contains(&search)),
+                .add(contains_ci(permission::Column::Code, &search))
+                .add(contains_ci(permission::Column::Description, &search)),
         );
     }
 
@@ -402,8 +402,8 @@ pub async fn list_roles(
     if let Some(search) = clean_search(params.search.as_deref()) {
         condition = condition.add(
             Condition::any()
-                .add(role::Column::Code.contains(&search))
-                .add(role::Column::Label.contains(&search)),
+                .add(contains_ci(role::Column::Code, &search))
+                .add(contains_ci(role::Column::Label, &search)),
         );
     }
 

@@ -313,3 +313,25 @@ async fn member_crud_lifecycle() {
         .unwrap();
     assert_eq!(resp.status(), 404);
 }
+
+#[tokio::test]
+async fn list_search_ignores_case() {
+    let c = client();
+    let token = odo_admin_token(&c).await;
+    let code = unique_code("case");
+    create_group(&c, &token, &code).await;
+
+    for search in [code.to_uppercase(), format!("TEST GROUP {}", code.to_uppercase())] {
+        let resp = c
+            .post(base("/list"))
+            .headers(auth_header(&token))
+            .json(&json!({"search": search}))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), 200);
+        let page: serde_json::Value = resp.json().await.unwrap();
+        assert_eq!(page["total"], 1, "search {search:?}");
+        assert_eq!(page["rows"][0]["code"], code);
+    }
+}

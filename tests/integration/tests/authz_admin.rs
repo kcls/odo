@@ -384,3 +384,48 @@ async fn grant_validation() {
     .await;
     assert_eq!(resp.status(), 400);
 }
+
+#[tokio::test]
+async fn permission_and_role_search_ignore_case() {
+    let c = client();
+    let token = odo_admin_token(&c).await;
+    let codes = |data: serde_json::Value| -> Vec<String> {
+        data["rows"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|r| r["code"].as_str().unwrap().to_string())
+            .collect()
+    };
+
+    let resp = post_json(&c, &token, "/permission/list", json!({"search": "ODO.AUTH.ROLE", "limit": 200})).await;
+    assert_eq!(resp.status(), 200);
+    assert!(codes(resp.json().await.unwrap()).contains(&"odo.auth.role.read".to_string()));
+
+    // By label ("ODO Administrator") and by code, in the other case.
+    for search in ["odo administrator", "ODO-ADMIN"] {
+        let resp = post_json(&c, &token, "/role/list", json!({"search": search, "limit": 200})).await;
+        assert_eq!(resp.status(), 200);
+        assert!(
+            codes(resp.json().await.unwrap()).contains(&"odo-admin".to_string()),
+            "role search {search:?}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn search_matches_wildcard_characters_literally() {
+    let c = client();
+    let token = odo_admin_token(&c).await;
+    // As LIKE patterns, "%" matched everything and "_" any one character
+    // ("auth_role" matched "auth.role"); now they are literal text.
+    for search in ["%", "auth_role"] {
+        let resp = post_json(&c, &token, "/permission/list", json!({"search": search, "limit": 200})).await;
+        assert_eq!(resp.status(), 200);
+        let page: serde_json::Value = resp.json().await.unwrap();
+        for row in page["rows"].as_array().unwrap() {
+            let text = format!("{} {}", row["code"], row["description"]).to_lowercase();
+            assert!(text.contains(search), "{search:?} matched {text}");
+        }
+    }
+}

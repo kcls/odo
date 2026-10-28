@@ -7,6 +7,7 @@
 //! code rather than imitation.
 
 use odo_client::error::Error as LocalError;
+use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, DbErr, Order, SqlErr};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -214,11 +215,35 @@ pub fn clean_optional(value: Option<&str>) -> Option<String> {
         .map(String::from)
 }
 
-/// Normalize a search term: trimmed, `None` if empty. Callers pair the
-/// result with SeaORM's `Column::contains` (case-insensitive ILIKE on
-/// Postgres for text columns).
+/// Normalize a search term: trimmed, `None` if empty. Pair the result
+/// with [`contains_ci`], not SeaORM's `Column::contains`, which emits a
+/// case-sensitive `LIKE`.
 pub fn clean_search(value: Option<&str>) -> Option<String> {
     clean_optional(value)
+}
+
+/// Case-insensitive substring match for a search box: `column ILIKE
+/// '%term%'`, with any `%`, `_`, or `\` in the term matched literally.
+///
+/// ```ignore
+/// if let Some(search) = clean_search(params.search.as_deref()) {
+///     condition = condition.add(
+///         Condition::any()
+///             .add(contains_ci(Column::Code, &search))
+///             .add(contains_ci(Column::Label, &search)),
+///     );
+/// }
+/// ```
+pub fn contains_ci<C: ColumnTrait>(column: C, term: &str) -> Expr {
+    column.ilike(format!("%{}%", escape_like(term)))
+}
+
+/// Escape LIKE/ILIKE wildcards so `term` matches literally (backslash is
+/// Postgres's default escape character).
+pub fn escape_like(term: &str) -> String {
+    term.replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_")
 }
 
 /// Plausible email address: trimmed, non-empty local and domain parts,
@@ -254,4 +279,17 @@ pub fn map_unique_violation(
         return LocalError::conflict(code, field, message);
     }
     LocalError::internal(e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::escape_like;
+
+    #[test]
+    fn escape_like_matches_wildcards_literally() {
+        assert_eq!(escape_like("ada"), "ada");
+        assert_eq!(escape_like("100%"), "100\\%");
+        assert_eq!(escape_like("a_b"), "a\\_b");
+        assert_eq!(escape_like("c:\\x"), "c:\\\\x");
+    }
 }

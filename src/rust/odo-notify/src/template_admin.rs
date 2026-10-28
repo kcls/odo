@@ -15,7 +15,7 @@ use odo_client::error::{ApiResult, LocalError};
 use odo_entity::notification::template;
 use odo_entity::org::unit;
 use odo_service::admin::{
-    Page, Paginated, Sort, clean_code, clean_optional, clean_required, clean_search,
+    Page, Paginated, Sort, clean_code, clean_optional, clean_required, clean_search, contains_ci,
     map_unique_violation,
 };
 use odo_service::template::{render, render_text};
@@ -175,8 +175,8 @@ pub async fn list_templates(
     if let Some(search) = clean_search(params.search.as_deref()) {
         condition = condition.add(
             Condition::any()
-                .add(template::Column::Code.contains(&search))
-                .add(template::Column::Name.contains(&search)),
+                .add(contains_ci(template::Column::Code, &search))
+                .add(contains_ci(template::Column::Name, &search)),
         );
     }
 

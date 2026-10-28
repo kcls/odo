@@ -220,3 +220,29 @@ async fn preview_escapes_only_the_html_body() {
         "<p>Dear O&#x27;Brien &amp; &lt;Sons&gt;</p>"
     );
 }
+
+#[tokio::test]
+async fn list_search_ignores_case() {
+    let c = client();
+    let token = odo_admin_token(&c).await;
+    let code = unique_code("case");
+    let resp = post_json(
+        &c,
+        &token,
+        "/create",
+        json!({
+            "code": code,
+            "name": "Mixed Case Name",
+            "subject_template": "Subject",
+            "body_template": "Body",
+        }),
+    )
+    .await;
+    assert_eq!(resp.status(), 200);
+
+    let resp = post_json(&c, &token, "/list", json!({"search": code.to_uppercase()})).await;
+    assert_eq!(resp.status(), 200);
+    let page: serde_json::Value = resp.json().await.unwrap();
+    assert_eq!(page["total"], 1);
+    assert_eq!(page["rows"][0]["code"], code);
+}

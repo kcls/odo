@@ -74,15 +74,12 @@
 
 ## Known issues found while porting
 
-- [ ] **Admin searches are case-sensitive.** `odo_service::admin::clean_search`
-      says to pair it with SeaORM's `Column::contains`, "case-insensitive
-      ILIKE on Postgres", but `contains` emits a plain `LIKE`, so
-      "incident" doesn't find "Incident" in the permission, role,
-      template, email group, unit type, and SAML mapping searches (10
-      call sites). Fix centrally: an `ilike`-based helper in odo-service
-      that also escapes `%`/`_` (as `delivery_admin::contains_pattern`
-      does), used by every caller, and correct the doc comment.
-
+- [x] **Admin searches were case-sensitive.** `clean_search`'s doc said
+      SeaORM's `Column::contains` was a case-insensitive ILIKE; it's a
+      plain `LIKE`. odo-service adds `admin::contains_ci` (escaped ILIKE)
+      and `escape_like`, now used by the permission, role, template,
+      email group, and unit type searches; SAML mapping and delivery
+      search share the escaping instead of their own copies.
 - [ ] **odo-auth `create_user` inserts the account before validating
       the password**, outside a transaction, so a password under 8
       characters returns an error but leaves a passwordless account

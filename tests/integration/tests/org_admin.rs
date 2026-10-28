@@ -414,3 +414,18 @@ async fn org_children_staff_denied() {
     .await;
     assert_eq!(resp.status(), 403);
 }
+
+#[tokio::test]
+async fn unit_type_search_ignores_case() {
+    let c = client();
+    let token = odo_admin_token(&c).await;
+    let resp = post_json(&c, &token, "/unit-type/list", json!({})).await;
+    let all: serde_json::Value = resp.json().await.unwrap();
+    let label = all["rows"][0]["label"].as_str().expect("seeded unit types").to_string();
+
+    let resp = post_json(&c, &token, "/unit-type/list", json!({"search": label.to_uppercase()})).await;
+    assert_eq!(resp.status(), 200);
+    let page: serde_json::Value = resp.json().await.unwrap();
+    let labels: Vec<&str> = page["rows"].as_array().unwrap().iter().map(|r| r["label"].as_str().unwrap()).collect();
+    assert!(labels.contains(&label.as_str()), "{label} not in {labels:?}");
+}

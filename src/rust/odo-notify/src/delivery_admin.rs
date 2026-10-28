@@ -19,9 +19,8 @@ use odo_client::context::RequestContext;
 use odo_client::error::{ApiResult, LocalError};
 use odo_entity::auth::usr;
 use odo_entity::notification::{delivery, email_group, event};
-use odo_service::admin::{Page, Paginated, Sort, SortDir, clean_search};
+use odo_service::admin::{Page, Paginated, Sort, SortDir, clean_search, contains_ci};
 use sea_orm::prelude::*;
-use sea_orm::sea_query::extension::postgres::PgExpr;
 use sea_orm::{Condition, DbBackend, Order, QueryOrder, QuerySelect, Statement};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -268,10 +267,7 @@ pub async fn list_deliveries(
         condition = condition.add(delivery::Column::CreatedAt.lt(until));
     }
     if let Some(search) = clean_search(params.search.as_deref()) {
-        // Column::contains is a case-sensitive LIKE; subjects are searched
-        // the way people type them.
-        condition = condition
-            .add(Expr::col(delivery::Column::TitleRendered).ilike(contains_pattern(&search)));
+        condition = condition.add(contains_ci(delivery::Column::TitleRendered, &search));
     }
 
     let total = delivery::Entity::find()
@@ -586,17 +582,6 @@ fn check_allowed(field: &str, value: &str, allowed: &[&str]) -> Result<(), Local
     }
 }
 
-/// An ILIKE pattern matching `term` anywhere, with LIKE's wildcards in
-/// the term itself matched literally (backslash is Postgres's default
-/// escape character).
-fn contains_pattern(term: &str) -> String {
-    let escaped = term
-        .replace('\\', "\\\\")
-        .replace('%', "\\%")
-        .replace('_', "\\_");
-    format!("%{escaped}%")
-}
-
 /// The addresses under `key` in a delivery's `channel_metadata`, as the
 /// processor records them (`successful_emails` / `failed_emails`).
 fn metadata_addresses(metadata: Option<&serde_json::Value>, key: &str) -> Vec<String> {
@@ -734,14 +719,6 @@ mod tests {
             metadata_addresses(Some(&json!({"failed_emails": ["a@x", 7]})), "failed_emails"),
             vec!["a@x".to_string()]
         );
-    }
-
-    #[test]
-    fn contains_pattern_escapes_like_wildcards() {
-        assert_eq!(contains_pattern("ada"), "%ada%");
-        assert_eq!(contains_pattern("100%"), "%100\\%%");
-        assert_eq!(contains_pattern("a_b"), "%a\\_b%");
-        assert_eq!(contains_pattern("c:\\x"), "%c:\\\\x%");
     }
 
     #[test]
