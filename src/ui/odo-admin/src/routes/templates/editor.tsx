@@ -1,7 +1,7 @@
 import { Loader2Icon, RefreshCwIcon, Trash2Icon, TriangleAlertIcon } from "lucide-react"
 import { useEffect, useRef, useState, type FormEvent } from "react"
 import { useTranslation } from "react-i18next"
-import { data, useBlocker, useLoaderData, useNavigate, type LoaderFunctionArgs } from "react-router"
+import { useBlocker, useLoaderData, useNavigate, type LoaderFunctionArgs } from "react-router"
 import { toast } from "sonner"
 
 import { ApiRequestError } from "@/api/client"
@@ -20,7 +20,7 @@ import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLab
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { loadNamespaces } from "@/i18n"
-import { requireIdParam } from "@/lib/loader"
+import { orNotFound, requireIdParam } from "@/lib/loader"
 import type { RouteHandle } from "@/lib/route-handle"
 import { formatJsonText, parseJsonText } from "@/lib/json-text"
 import { useTemplatePreview } from "./use-template-preview"
@@ -29,11 +29,10 @@ export async function loader({ params }: LoaderFunctionArgs) {
   // The "new" route has no :templateId.
   const id = params.templateId === undefined ? null : requireIdParam(params.templateId)
   const [template, perms] = await Promise.all([
-    id === null ? null : templatesApi.find(id),
+    id === null ? null : orNotFound(templatesApi.get(id)),
     checkPerms({ canWrite: PERMS.TEMPLATE_WRITE }),
     loadNamespaces("templates"),
   ])
-  if (template === undefined) throw data("Template not found", { status: 404 })
   return { template, ...perms }
 }
 

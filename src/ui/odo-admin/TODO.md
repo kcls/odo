@@ -88,12 +88,9 @@
       text, HTML bodies with escaped values, and text-only email as the
       verbatim text escaped whole with line breaks kept. The preview
       endpoint matches. `render` is unchanged for existing callers.
-- [ ] Template lookup by id pages through the whole list: odo-notify
-      has no `template/get`. The Angular editor asked for
-      `limit: 1000`, which the server clamps to 200, so templates past
-      the 200th couldn't be opened there. Fine at today's counts; a get
-      endpoint would be better.
-
+- [x] Template lookup by id paged through the whole list (odo-notify
+      had no `template/get`, and the Angular editor's `limit: 1000` was
+      clamped to 200). Fixed: `template/get`, which the editor uses.
 - [ ] `UserAccountRow` (user/detail) lacks `second_given_name`, so the
       edit dialog can't show the middle name. The Angular dialog
       always sent `second_given_name: ""`, which clears it on every
@@ -134,7 +131,7 @@
       redirect, effective permissions, assigning and removing a role, the
       template preview and unsaved-changes guard, org unit child
       navigation. 23 pass against the dev server at `/odo/admin/`.
-- [ ] Deploy (`./scripts/build-and-deploy-service.sh ui-odo-admin --wait`)
+- [x] Deploy (`./scripts/build-and-deploy-service.sh ui-odo-admin --wait`)
       and run the e2e suite against the cluster
       (`cd tests/e2e && BASE_URL=http://localhost:30080 npm run test:odo-admin`)
 - [ ] Serving at a base path other than `/odo/admin` is checked by hand

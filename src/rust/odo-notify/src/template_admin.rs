@@ -212,6 +212,27 @@ pub async fn list_templates(
 
 #[utoipa::path(
     post,
+    path = "/api/v1/odo/notify/template/get",
+    request_body = TemplateIdRequest,
+    responses((status = 200, body = TemplateRow, description = "One template (404 if deleted)")),
+    security(("bearer" = [])),
+    tag = "template-admin"
+)]
+pub async fn get_template(
+    State(state): State<Arc<AppState>>,
+    Json(params): Json<TemplateIdRequest>,
+) -> ApiResult<Json<TemplateRow>> {
+    RequestContext::user_id().ok_or(LocalError::unauthenticated())?;
+    state
+        .auth_client
+        .permission_required(READ_PERM, None)
+        .await?;
+
+    Ok(Json(find_template(&state.db, params.id).await?.into()))
+}
+
+#[utoipa::path(
+    post,
     path = "/api/v1/odo/notify/template/create",
     request_body = CreateTemplateRequest,
     responses((status = 200, body = TemplateRow, description = "Newly-created template")),
