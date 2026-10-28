@@ -44,6 +44,24 @@ impl Recipient {
     }
 }
 
+/// A delivery's body for its channel. Email is always sent as HTML: the
+/// template's HTML variant, with variables escaped; or, for a text-only
+/// template, the text rendered verbatim and then escaped as a whole, with
+/// its line breaks kept. In-app bodies are plain text, displayed as such.
+fn render_body(
+    channel: &str,
+    body_template: &str,
+    body_template_html: Option<&str>,
+    vars: &serde_json::Value,
+) -> Result<String, odo_service::template::RenderError> {
+    use odo_service::template::{render, render_text, text_to_html};
+    match body_template_html.filter(|html| !html.trim().is_empty()) {
+        Some(html) if channel == "email" => render(html, vars),
+        _ if channel == "email" => render_text(body_template, vars).map(|t| text_to_html(&t)),
+        _ => render_text(body_template, vars),
+    }
+}
+
 /// A recipient with its reference resolved to a database id.
 enum ResolvedRecipient<'a> {
     User(i32, &'a [String]),
@@ -233,9 +251,10 @@ pub async fn enqueue(
             params.template_code
         )))?;
 
-    // Render subject
+    // The subject is plain text everywhere it goes (an email Subject
+    // header, an in-app title), so it is not HTML-escaped.
     let title_rendered =
-        odo_service::template::render(&tmpl.subject_template, &params.template_variables)
+        odo_service::template::render_text(&tmpl.subject_template, &params.template_variables)
             .map_err(|e| LocalError::internal(format!("Template render error: {e}")))?;
 
     // Validate action_url
@@ -288,17 +307,13 @@ pub async fn enqueue(
 
     for recipient in &recipients {
         for channel in recipient.channels() {
-            let body_template = if channel == "email" {
-                tmpl.body_template_html
-                    .as_deref()
-                    .unwrap_or(&tmpl.body_template)
-            } else {
-                &tmpl.body_template
-            };
-
-            let body_rendered =
-                odo_service::template::render(body_template, &params.template_variables)
-                    .map_err(|e| LocalError::internal(format!("Template render error: {e}")))?;
+            let body_rendered = render_body(
+                channel,
+                &tmpl.body_template,
+                tmpl.body_template_html.as_deref(),
+                &params.template_variables,
+            )
+            .map_err(|e| LocalError::internal(format!("Template render error: {e}")))?;
 
             let (recipient_user, recipient_email_group) = match recipient {
                 ResolvedRecipient::User(id, _) => (Some(*id), None),
@@ -400,4 +415,42 @@ async fn get_event_deliveries(
             recipient_email_group: d.recipient_email_group,
         })
         .collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::render_body;
+    use serde_json::json;
+
+    const TEXT: &str = "Hi {{name}}\nSee you";
+    const HTML: &str = "<p>Hi {{name}}</p>";
+
+    #[test]
+    fn email_uses_the_html_variant_with_escaped_values() {
+        let vars = json!({"name": "O'Brien & <Sons>"});
+        let body = render_body("email", TEXT, Some(HTML), &vars).unwrap();
+        assert_eq!(body, "<p>Hi O&#x27;Brien &amp; &lt;Sons&gt;</p>");
+    }
+
+    #[test]
+    fn text_only_email_is_escaped_whole_with_line_breaks() {
+        // Template text and values alike: nothing in a text template is markup.
+        let vars = json!({"name": "<b>Ann</b>"});
+        let body = render_body("email", TEXT, None, &vars).unwrap();
+        assert_eq!(body, "Hi &lt;b&gt;Ann&lt;/b&gt;<br>\nSee you");
+    }
+
+    #[test]
+    fn a_blank_html_variant_counts_as_none() {
+        let vars = json!({"name": "Ann"});
+        let body = render_body("email", TEXT, Some("  "), &vars).unwrap();
+        assert_eq!(body, "Hi Ann<br>\nSee you");
+    }
+
+    #[test]
+    fn in_app_bodies_are_plain_text_verbatim() {
+        let vars = json!({"name": "O'Brien & Sons"});
+        let body = render_body("in_app", TEXT, Some(HTML), &vars).unwrap();
+        assert_eq!(body, "Hi O'Brien & Sons\nSee you");
+    }
 }

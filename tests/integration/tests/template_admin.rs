@@ -192,3 +192,31 @@ async fn preview_renders_and_validates() {
     let err: serde_json::Value = resp.json().await.unwrap();
     assert!(err["message"].as_str().unwrap().contains("body_template"));
 }
+
+#[tokio::test]
+async fn preview_escapes_only_the_html_body() {
+    let c = client();
+    let token = odo_admin_token(&c).await;
+    let resp = post_json(
+        &c,
+        &token,
+        "/preview",
+        json!({
+            "subject_template": "Re: {{name}}",
+            "body_template": "Dear {{name}}",
+            "body_template_html": "<p>Dear {{name}}</p>",
+            "variables": {"name": "O'Brien & <Sons>"}
+        }),
+    )
+    .await;
+    assert_eq!(resp.status(), 200);
+    let preview: serde_json::Value = resp.json().await.unwrap();
+    // Subject and plain body are text: shown verbatim.
+    assert_eq!(preview["subject"], "Re: O'Brien & <Sons>");
+    assert_eq!(preview["body"], "Dear O'Brien & <Sons>");
+    // The HTML body escapes values so they can't inject markup.
+    assert_eq!(
+        preview["body_html"],
+        "<p>Dear O&#x27;Brien &amp; &lt;Sons&gt;</p>"
+    );
+}

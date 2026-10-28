@@ -564,3 +564,83 @@ async fn enqueue_dedup() {
     assert_eq!(data2["is_duplicate"], true);
     assert_eq!(data2["event_id"], data1["event_id"]);
 }
+
+// --- Rendering: text stays text, HTML stays safe ---
+
+/// A text-only template (no HTML variant) whose values need escaping.
+async fn ensure_text_only_template(c: &reqwest::Client, token: &str) -> &'static str {
+    const CODE: &str = "itest-text-only-template";
+    let resp = c
+        .post(format!(
+            "{}/api/v1/odo/notify/template/create",
+            notify_base()
+        ))
+        .headers(auth_header(token))
+        .json(&json!({
+            "code": CODE,
+            "name": "Text-only rendering test",
+            "subject_template": "Re: {{name}}",
+            "body_template": "Dear {{name}}\nSecond line",
+        }))
+        .send()
+        .await
+        .unwrap();
+    assert!(
+        resp.status() == 200 || resp.status() == 409,
+        "template ensure failed"
+    );
+    CODE
+}
+
+async fn delivery_detail(
+    c: &reqwest::Client,
+    token: &str,
+    id: &serde_json::Value,
+) -> serde_json::Value {
+    let resp = c
+        .post(format!("{}/api/v1/odo/notify/delivery/get", notify_base()))
+        .headers(auth_header(token))
+        .json(&json!({"id": id}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+    resp.json().await.unwrap()
+}
+
+#[tokio::test]
+async fn enqueue_renders_subjects_and_in_app_bodies_as_text() {
+    let c = client();
+    let token = odo_admin_token(&c).await;
+    let template = ensure_text_only_template(&c, &token).await;
+    let resp = c
+        .post(format!("{}/api/v1/odo/notify/enqueue", notify_base()))
+        .headers(auth_header(&token))
+        .json(&json!({
+            "recipients": [{"type": "user", "user_id": staff_id(&c).await, "channels": ["email", "in_app"]}],
+            "template_code": template,
+            "template_variables": {"name": "O'Brien & <Sons>"},
+            "source_service": "integration-tests",
+        }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+    let data: serde_json::Value = resp.json().await.unwrap();
+    let deliveries = data["deliveries"].as_array().unwrap();
+    let by_channel =
+        |ch: &str| deliveries.iter().find(|d| d["channel"] == ch).unwrap()["id"].clone();
+
+    // Email: a verbatim subject; the text body escaped whole, line breaks kept.
+    let email = delivery_detail(&c, &token, &by_channel("email")).await;
+    assert_eq!(email["delivery"]["subject"], "Re: O'Brien & <Sons>");
+    assert_eq!(
+        email["body"],
+        "Dear O&#x27;Brien &amp; &lt;Sons&gt;<br>\nSecond line"
+    );
+
+    // In-app: title and body are plain text, verbatim.
+    let in_app = delivery_detail(&c, &token, &by_channel("in_app")).await;
+    assert_eq!(in_app["delivery"]["subject"], "Re: O'Brien & <Sons>");
+    assert_eq!(in_app["body"], "Dear O'Brien & <Sons>\nSecond line");
+}

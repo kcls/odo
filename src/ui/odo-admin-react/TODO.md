@@ -91,15 +91,12 @@
       scripts) can still hit it. Fix: validate before inserting, or wrap
       the insert and password write in one transaction.
 
-- [ ] **Emails escape HTML in subjects and plain-text bodies.**
-      `odo_service::template::render` uses Handlebars' default HTML
-      escaping, and odo-notify's enqueue path renders subjects and
-      plain bodies with it, so a variable like `O'Brien` or `Smith &
-      Sons` arrives as `O&#x27;Brien` / `Smith &amp; Sons`. Only the
-      HTML body should escape. Fix in odo-service: a non-escaping
-      renderer (`hbs.register_escape_fn(handlebars::no_escape)`) for
-      subject and text bodies, with tests; the preview endpoint shares
-      it, so the admin preview will follow.
+- [x] **Emails escaped HTML in subjects and plain-text bodies.** Fixed:
+      odo-service adds `template::render_text` (no escaping) and
+      `text_to_html`; odo-notify renders subjects and in-app bodies as
+      text, HTML bodies with escaped values, and text-only email as the
+      verbatim text escaped whole with line breaks kept. The preview
+      endpoint matches. `render` is unchanged for existing callers.
 - [ ] Template lookup by id pages through the whole list: odo-notify
       has no `template/get`. The Angular editor asked for
       `limit: 1000`, which the server clamps to 200, so templates past
