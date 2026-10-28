@@ -20,6 +20,10 @@
       "label": "Permissions",
       "description": "Manage the permission codes available for role grants."
     },
+    "templates": {
+      "label": "Email templates",
+      "description": "Edit and preview notification templates for email and in-app messages."
+    },
     "orgUnits": {
       "label": "Org units",
       "description": "Manage the organizational tree and each unit's addresses, closures, and hours."
