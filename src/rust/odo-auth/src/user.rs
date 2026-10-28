@@ -55,7 +55,7 @@ impl From<usr::Model> for UserResponse {
             second_given_name: u.second_given_name,
             family_name: u.family_name,
             display_name: u.display_name,
-            status: u.status.map(|s| format!("{s:?}").to_lowercase()),
+            status: u.status,
             deleted_at: u.deleted_at.map(|d| d.to_rfc3339()),
             working_org_units: None,
             working_org_unit_uuids: None,

@@ -102,11 +102,10 @@
       always sent `second_given_name: ""`, which clears it on every
       save. The React dialog leaves middle name out until the backend
       returns it.
-- [ ] odo-auth `UserResponse` (user/search, user/get) Debug-formats
-      the status (`format!("{s:?}")` on a String), so it arrives as
-      `"\"active\""`. The Users list shows it verbatim, as Angular did.
-      The fix is one line in `src/rust/odo-auth/src/user.rs`, but check
-      consumers (kcls/current) for reliance on the quoted form first.
+- [x] odo-auth `UserResponse` (user/search, user/get) Debug-formatted
+      the status, so it arrived as `"\"active\""`. Fixed: the stored value
+      is returned as is. Nothing depended on the quoted form; kcls/current
+      compares `status === 'active'`, which had been false for everyone.
 - [x] Picker lists were silently capped at 50: admin list endpoints
       default to 50 rows (max 200), and the Angular app's "all roles" and
       "all permissions" pickers never passed a limit. The React pickers

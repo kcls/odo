@@ -189,3 +189,33 @@ async fn get_deleted_user_with_deleted_flagged() {
     assert!(data["deleted_at"].as_str().is_some(), "deleted user must carry deleted_at");
     assert!(data["uuid"].as_str().is_some_and(|s| !s.is_empty()));
 }
+
+#[tokio::test]
+async fn status_is_the_plain_stored_value() {
+    let c = client();
+    let token = odo_admin_token(&c).await;
+
+    // It was Debug-formatted, so it arrived as "\"active\"".
+    let resp = c
+        .post(format!("{}/api/v1/odo/auth/user/get", auth_base()))
+        .headers(auth_header(&token))
+        .json(&json!({}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+    let me: serde_json::Value = resp.json().await.unwrap();
+    assert_eq!(me["status"], "active", "user/get");
+
+    let resp = c
+        .post(format!("{}/api/v1/odo/auth/user/search", auth_base()))
+        .headers(auth_header(&token))
+        .json(&json!({"keywords": me["username"]}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+    let found: Vec<serde_json::Value> = resp.json().await.unwrap();
+    assert!(!found.is_empty());
+    assert!(found.iter().all(|u| u["status"] == "active"), "user/search: {found:?}");
+}
