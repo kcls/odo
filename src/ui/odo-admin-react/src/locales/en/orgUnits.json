@@ -1,0 +1,131 @@
+{
+  "title": "Org units",
+  "subtitle": "The organizational tree. Roles, permissions, and app data are all scoped to these units.",
+  "new": "New unit",
+  "search": "Filter by label or code",
+  "columns": {
+    "unit": "Unit",
+    "code": "Code",
+    "type": "Type",
+    "timezone": "Timezone"
+  },
+  "noMatches": "No units match.",
+  "detail": {
+    "back": "Org units",
+    "edit": "Edit",
+    "addChild": "Add child unit",
+    "delete": "Delete unit",
+    "deleteRoot": "The root unit can't be deleted.",
+    "deleteHasChildren_one": "It has {{count, number}} child unit; move or delete it first.",
+    "deleteHasChildren_other": "It has {{count, number}} child units; move or delete them first.",
+    "parent": "Parent: {{label}}"
+  },
+  "delete": {
+    "title": "Delete org unit?",
+    "body": "{{label}} will be deactivated. Existing records that reference it are kept.",
+    "done": "Deleted {{label}}"
+  },
+  "unit": {
+    "createTitle": "New org unit",
+    "editTitle": "Edit org unit",
+    "label": "Label",
+    "code": "Code",
+    "parent": "Parent",
+    "parentPlaceholder": "Choose a parent unit",
+    "parentSearch": "Search units",
+    "rootFixed": "The root unit can't be moved.",
+    "type": "Type",
+    "typePlaceholder": "Choose a type",
+    "timezone": "Timezone",
+    "timezoneNone": "None",
+    "timezonePlaceholder": "No timezone",
+    "timezoneSearch": "Search timezones",
+    "created": "Created {{label}}",
+    "updated": "Saved {{label}}"
+  },
+  "children": {
+    "title": "Child units",
+    "titleCount": "Child units ({{count, number}})"
+  },
+  "addresses": {
+    "title": "Addresses",
+    "description": "Physical and mailing addresses for this unit.",
+    "new": "New address",
+    "none": "No addresses.",
+    "columns": {
+      "label": "Label",
+      "type": "Type",
+      "address": "Address"
+    },
+    "types": {
+      "physical": "Physical",
+      "mailing": "Mailing"
+    },
+    "editLabel": "Edit {{label}}",
+    "deleteLabel": "Delete {{label}}",
+    "createTitle": "New address",
+    "editTitle": "Edit address",
+    "label": "Label",
+    "labelPlaceholder": "e.g. Main entrance",
+    "labelTaken": "This unit already has an address with that label.",
+    "type": "Type",
+    "line1": "Address line 1",
+    "line2": "Address line 2",
+    "city": "City",
+    "stateProvince": "State or province",
+    "postalCode": "Postal code",
+    "saved": "Saved {{label}}",
+    "deleteTitle": "Delete address?",
+    "deleteBody": "{{label}} will be deleted.",
+    "deleted": "Deleted {{label}}"
+  },
+  "closures": {
+    "title": "Closures",
+    "description": "Dates this unit is closed, newest first.",
+    "new": "New closure",
+    "none": "No closures.",
+    "columns": {
+      "date": "Date",
+      "reason": "Reason",
+      "type": "Type"
+    },
+    "emergency": "Emergency",
+    "past": "Past",
+    "editLabel": "Edit closure on {{date}}",
+    "deleteLabel": "Delete closure on {{date}}",
+    "createTitle": "New closure",
+    "editTitle": "Edit closure",
+    "date": "Date",
+    "reason": "Reason",
+    "isEmergency": "Emergency closure",
+    "saved": "Saved the closure on {{date}}",
+    "deleteTitle": "Delete closure?",
+    "deleteBody": "The closure on {{date}} ({{reason}}) will be deleted.",
+    "deleted": "Deleted the closure on {{date}}"
+  },
+  "hours": {
+    "title": "Operating hours",
+    "description": "Weekly open hours for this unit.",
+    "new": "New hours",
+    "none": "No operating hours.",
+    "columns": {
+      "day": "Day",
+      "hours": "Hours"
+    },
+    "closed": "Closed",
+    "range": "{{open}} – {{close}}",
+    "editLabel": "Edit {{day}} hours",
+    "deleteLabel": "Delete {{day}} hours",
+    "createTitle": "New hours",
+    "editTitle": "Edit hours",
+    "day": "Day",
+    "isClosed": "Closed all day",
+    "open": "Opens",
+    "close": "Closes",
+    "closeAfterOpen": "Closing time must be after opening time.",
+    "saved": "Saved {{day}} hours",
+    "deleteTitle": "Delete hours?",
+    "deleteBody": "The {{day}} hours will be deleted.",
+    "deleted": "Deleted {{day}} hours"
+  }
+}

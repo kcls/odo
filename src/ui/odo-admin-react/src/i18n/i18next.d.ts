@@ -3,6 +3,7 @@ import "i18next"
 import type common from "@/locales/en/common.json"
 import type home from "@/locales/en/home.json"
 import type login from "@/locales/en/login.json"
+import type orgUnits from "@/locales/en/orgUnits.json"
 import type permissions from "@/locales/en/permissions.json"
 import type roles from "@/locales/en/roles.json"
 import type unitTypes from "@/locales/en/unitTypes.json"
@@ -17,6 +18,7 @@ declare module "i18next" {
       common: typeof common
       home: typeof home
       login: typeof login
+      orgUnits: typeof orgUnits
       permissions: typeof permissions
       roles: typeof roles
       unitTypes: typeof unitTypes

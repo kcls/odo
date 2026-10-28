@@ -20,6 +20,10 @@
       "label": "Permissions",
       "description": "Manage the permission codes available for role grants."
     },
+    "orgUnits": {
+      "label": "Org units",
+      "description": "Manage the organizational tree and each unit's addresses, closures, and hours."
+    },
     "orgUnitTypes": {
       "label": "Org unit types",
       "description": "Manage the categories of org units (system, region, branch, …) and what each may contain."

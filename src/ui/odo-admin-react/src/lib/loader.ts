@@ -1,4 +1,4 @@
-import { data, redirect, type MiddlewareFunction } from "react-router"
+import { data, redirect, type MiddlewareFunction, type ShouldRevalidateFunctionArgs } from "react-router"
 
 import { ApiRequestError } from "@/api/client"
 import { session } from "@/auth/session"
@@ -68,4 +68,20 @@ export function requirePerm(perm: string): MiddlewareFunction {
  */
 export function safeRedirectTarget(value: string | null): string {
   return value && value.startsWith("/") && !value.startsWith("//") && !value.startsWith("/\\") ? value : "/"
+}
+
+/**
+ * For routes whose search params are client-side view state (a filter
+ * over data already loaded): skip re-running loaders when only the query
+ * string changed. Explicit revalidation still runs them.
+ */
+export function skipSearchOnlyChanges({
+  currentUrl,
+  nextUrl,
+  defaultShouldRevalidate,
+}: ShouldRevalidateFunctionArgs): boolean {
+  if (currentUrl.pathname === nextUrl.pathname && currentUrl.search !== nextUrl.search) {
+    return false
+  }
+  return defaultShouldRevalidate
 }

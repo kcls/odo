@@ -1,4 +1,4 @@
-import { KeyRoundIcon, ShapesIcon, ShieldIcon, UsersIcon, type LucideIcon } from "lucide-react"
+import { KeyRoundIcon, NetworkIcon, ShapesIcon, ShieldIcon, UsersIcon, type LucideIcon } from "lucide-react"
 import type { RouteObject } from "react-router"
 
 import { session } from "@/auth/session"
@@ -20,7 +20,7 @@ export type AdminTool = {
   children: RouteObject[]
 }
 
-export type ToolId = "users" | "roles" | "permissions" | "orgUnitTypes"
+export type ToolId = "users" | "roles" | "permissions" | "orgUnits" | "orgUnitTypes"
 
 /** In no particular order; the nav and home page sort by label. */
 export const ADMIN_TOOLS: AdminTool[] = [
@@ -50,6 +50,16 @@ export const ADMIN_TOOLS: AdminTool[] = [
     icon: KeyRoundIcon,
     readPerm: PERMS.ROLE_READ,
     children: [{ index: true, lazy: () => import("@/routes/permissions") }],
+  },
+  {
+    id: "orgUnits",
+    path: "org-units",
+    icon: NetworkIcon,
+    readPerm: PERMS.ORG_UNIT_READ,
+    children: [
+      { index: true, lazy: () => import("@/routes/org-units") },
+      { path: ":unitId", lazy: () => import("@/routes/org-units/detail") },
+    ],
   },
   {
     id: "orgUnitTypes",
