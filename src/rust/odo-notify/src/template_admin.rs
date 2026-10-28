@@ -18,6 +18,7 @@ use odo_service::admin::{
     Page, Paginated, Sort, clean_code, clean_optional, clean_required, clean_search,
     map_unique_violation,
 };
+use odo_service::template::{render, render_text};
 use sea_orm::prelude::*;
 use sea_orm::{Condition, Order, QueryOrder, QuerySelect, Set};
 use serde::{Deserialize, Serialize};
@@ -400,20 +401,25 @@ pub async fn preview_template(
 
     let vars = params.variables.unwrap_or(serde_json::json!({}));
 
-    let render = |field: &str, text: &Option<String>| -> Result<Option<String>, LocalError> {
-        match text {
-            Some(t) => Ok(Some(
-                odo_service::template::render(t, &vars)
-                    .map_err(|e| LocalError::invalid_input(format!("{field}: {e}")))?,
-            )),
-            None => Ok(None),
-        }
-    };
+    // Rendered as each part is sent (see enqueue::render_body): subject
+    // and plain body as text, the HTML body with its variables escaped.
+    let preview =
+        |field: &str, text: Option<String>, html: bool| -> Result<Option<String>, LocalError> {
+            let Some(text) = text else { return Ok(None) };
+            let rendered = if html {
+                render(&text, &vars)
+            } else {
+                render_text(&text, &vars)
+            };
+            rendered
+                .map(Some)
+                .map_err(|e| LocalError::invalid_input(format!("{field}: {e}")))
+        };
 
     Ok(Json(PreviewResponse {
-        subject: render("subject_template", &params.subject_template)?,
-        body: render("body_template", &params.body_template)?,
-        body_html: render("body_template_html", &params.body_template_html)?,
+        subject: preview("subject_template", params.subject_template, false)?,
+        body: preview("body_template", params.body_template, false)?,
+        body_html: preview("body_template_html", params.body_template_html, true)?,
     }))
 }
 
@@ -450,7 +456,7 @@ async fn root_org_unit(db: &DatabaseConnection) -> Result<i32, LocalError> {
 /// Compile-check a handlebars template against sample variables; render
 /// errors surface as 400s naming the offending field.
 fn validate_template(field: &str, text: &str, vars: &serde_json::Value) -> Result<(), LocalError> {
-    odo_service::template::render(text, vars)
+    render(text, vars)
         .map(|_| ())
         .map_err(|e| LocalError::invalid_input(format!("{field}: {e}")))
 }
