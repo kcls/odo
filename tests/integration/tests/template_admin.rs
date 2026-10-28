@@ -246,3 +246,37 @@ async fn list_search_ignores_case() {
     assert_eq!(page["total"], 1);
     assert_eq!(page["rows"][0]["code"], code);
 }
+
+#[tokio::test]
+async fn get_returns_one_template() {
+    let c = client();
+    let token = odo_admin_token(&c).await;
+    let code = unique_code("get");
+    let resp = post_json(
+        &c,
+        &token,
+        "/create",
+        json!({"code": code, "name": "Get me", "subject_template": "S", "body_template": "B"}),
+    )
+    .await;
+    assert_eq!(resp.status(), 200);
+    let created: serde_json::Value = resp.json().await.unwrap();
+
+    let resp = post_json(&c, &token, "/get", json!({"id": created["id"]})).await;
+    assert_eq!(resp.status(), 200);
+    let got: serde_json::Value = resp.json().await.unwrap();
+    assert_eq!(got["code"], code);
+    assert_eq!(got["name"], "Get me");
+
+    // Deleted templates are gone, as are unknown ones.
+    let resp = post_json(&c, &token, "/delete", json!({"id": created["id"]})).await;
+    assert_eq!(resp.status(), 200);
+    let resp = post_json(&c, &token, "/get", json!({"id": created["id"]})).await;
+    assert_eq!(resp.status(), 404);
+    let resp = post_json(&c, &token, "/get", json!({"id": i32::MAX})).await;
+    assert_eq!(resp.status(), 404);
+
+    let staff = staff_token(&c).await;
+    let resp = post_json(&c, &staff, "/get", json!({"id": 1})).await;
+    assert_eq!(resp.status(), 403);
+}

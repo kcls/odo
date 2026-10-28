@@ -3,7 +3,6 @@
  * templates and email groups.
  */
 import { apiPost } from "./client"
-import { fetchAllPages } from "./paging"
 import type { components } from "./types/odo-notify"
 
 type S = components["schemas"]
@@ -19,13 +18,9 @@ export const templatesApi = {
   listPage(params: Partial<S["ListTemplatesRequest"]>): Promise<TemplatePage> {
     return apiPost(`${TEMPLATE}/list`, params)
   },
-  /**
-   * One template by id. There's no get endpoint, so this pages through
-   * the list; template counts are small. Undefined when there's none.
-   */
-  async find(id: number): Promise<TemplateRow | undefined> {
-    const all = await fetchAllPages((page) => templatesApi.listPage(page))
-    return all.find((t) => t.id === id)
+  /** One template by id; 404 if it's deleted or never existed. */
+  get(id: number): Promise<TemplateRow> {
+    return apiPost(`${TEMPLATE}/get`, { id } satisfies S["TemplateIdRequest"])
   },
   create(params: S["CreateTemplateRequest"]): Promise<TemplateRow> {
     return apiPost(`${TEMPLATE}/create`, params)

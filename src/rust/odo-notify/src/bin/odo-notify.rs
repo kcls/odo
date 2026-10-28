@@ -29,6 +29,7 @@ use utoipa::OpenApi;
         email_group::update_email_group_member,
         email_group::delete_email_group_member,
         template_admin::list_templates,
+        template_admin::get_template,
         template_admin::create_template,
         template_admin::update_template,
         template_admin::delete_template,
@@ -200,6 +201,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route(
             "/api/v1/odo/notify/template/list",
             post(template_admin::list_templates),
+        )
+        .route(
+            "/api/v1/odo/notify/template/get",
+            post(template_admin::get_template),
         )
         .route(
             "/api/v1/odo/notify/template/create",

@@ -308,6 +308,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/odo/notify/template/get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["get_template"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/odo/notify/template/list": {
         parameters: {
             query?: never;
@@ -1284,6 +1300,30 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SuccessResponse"];
+                };
+            };
+        };
+    };
+    get_template: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TemplateIdRequest"];
+            };
+        };
+        responses: {
+            /** @description One template (404 if deleted) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateRow"];
                 };
             };
         };

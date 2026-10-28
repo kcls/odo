@@ -654,6 +654,41 @@
         ]
       }
     },
+    "/api/v1/odo/notify/template/get": {
+      "post": {
+        "tags": [
+          "template-admin"
+        ],
+        "operationId": "get_template",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TemplateIdRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "One template (404 if deleted)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateRow"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/odo/notify/template/list": {
       "post": {
         "tags": [
