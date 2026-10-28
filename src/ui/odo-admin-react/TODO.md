@@ -80,14 +80,11 @@
       and `escape_like`, now used by the permission, role, template,
       email group, and unit type searches; SAML mapping and delivery
       search share the escaping instead of their own copies.
-- [ ] **odo-auth `create_user` inserts the account before validating
-      the password**, outside a transaction, so a password under 8
-      characters returns an error but leaves a passwordless account
-      behind, and retrying fails with `USERNAME_TAKEN`. The UI checks
-      the length first, but API callers (registration manifests,
-      scripts) can still hit it. Fix: validate before inserting, or wrap
-      the insert and password write in one transaction.
-
+- [x] **odo-auth `create_user` inserted the account before validating
+      the password**, so a short one left a passwordless account behind
+      and a retry got `USERNAME_TAKEN`. Fixed: the password is checked
+      before any write, and the account and its password are written in
+      one transaction.
 - [x] **Emails escaped HTML in subjects and plain-text bodies.** Fixed:
       odo-service adds `template::render_text` (no escaping) and
       `text_to_html`; odo-notify renders subjects and in-app bodies as
