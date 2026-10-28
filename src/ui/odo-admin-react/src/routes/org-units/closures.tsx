@@ -11,7 +11,7 @@ import { DialogClose, DialogFooter, DialogHeader, DialogTitle } from "@/componen
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { useFormatters } from "@/lib/format"
-import { FacetSection, type FacetEditing } from "./facet-section"
+import { FacetSection, type FacetEditing } from "@/components/facet-section"
 
 /** Today's local calendar date as "YYYY-MM-DD", to compare with closure dates. */
 function todayYmd(): string {
