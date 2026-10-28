@@ -12,7 +12,7 @@ use serde_json::{Value, json};
 
 const TEMPLATE: &str = "itest-delivery-template";
 const STATUSES: &[&str] = &["pending", "processing", "delivered", "failed", "skipped"];
-const ENDPOINTS: &[&str] = &["/list", "/get", "/summary", "/recipients"];
+const ENDPOINTS: &[&str] = &["/list", "/get", "/summary", "/recipients", "/retry"];
 
 fn base(path: &str) -> String {
     format!("{}/api/v1/odo/notify/delivery{}", notify_base(), path)
@@ -404,4 +404,81 @@ async fn recipients_ignore_an_unknown_sort_key() {
     )
     .await;
     assert_eq!(resp.status(), 200);
+}
+
+// --- retry ---
+
+#[tokio::test]
+async fn retry_refuses_unknown_and_unfinished_deliveries() {
+    let c = client();
+    let (token, _, delivery_id) = enqueue_to_new_group(&c).await;
+
+    let resp = post(&c, &token, "/retry", json!({"id": i64::MAX})).await;
+    assert_eq!(resp.status(), 404);
+
+    // Just queued: pending (or being sent), so there's nothing to retry yet.
+    let status = post_ok(&c, &token, "/get", json!({"id": delivery_id})).await["delivery"]["status"].clone();
+    if status == "pending" || status == "processing" {
+        let resp = post(&c, &token, "/retry", json!({"id": delivery_id})).await;
+        assert_eq!(resp.status(), 409);
+        let err: Value = resp.json().await.unwrap();
+        assert_eq!(err["code"], "DELIVERY_NOT_RETRYABLE");
+    }
+}
+
+#[tokio::test]
+async fn retry_refuses_in_app_deliveries() {
+    let c = client();
+    let (token, _, _) = enqueue_to_new_group(&c).await;
+    let resp = c
+        .post(format!("{}/api/v1/odo/notify/enqueue", notify_base()))
+        .headers(auth_header(&token))
+        .json(&json!({
+            "recipients": [{"type": "user", "user_id": staff_id(&c).await, "channels": ["in_app"]}],
+            "template_code": TEMPLATE,
+            "template_variables": {"name": "Staff"},
+        }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+    let id = resp.json::<Value>().await.unwrap()["deliveries"][0]["id"].clone();
+    let resp = post(&c, &token, "/retry", json!({"id": id})).await;
+    assert_eq!(resp.status(), 409, "in-app deliveries are delivered on enqueue");
+}
+
+#[tokio::test]
+async fn retry_requeues_a_skipped_delivery() {
+    let c = client();
+    let token = odo_admin_token(&c).await;
+    let (_, group, delivery_id) = enqueue_to_new_group(&c).await;
+    // Switch the group off: the processor skips its deliveries (terminal).
+    let resp = c
+        .post(format!("{}/api/v1/odo/notify/email-group/update", notify_base()))
+        .headers(auth_header(&token))
+        .json(&json!({"id": group["id"], "is_active": false}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+
+    // The processor polls every ~10s; give it a few cycles.
+    let mut status = Value::Null;
+    for _ in 0..30 {
+        status = post_ok(&c, &token, "/get", json!({"id": delivery_id})).await["delivery"]["status"].clone();
+        if status == "skipped" {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+    }
+    assert_eq!(status, "skipped", "the processor skipped the inactive group's delivery");
+
+    let row = post_ok(&c, &token, "/retry", json!({"id": delivery_id})).await;
+    assert_eq!(row["id"], delivery_id);
+    // Queued again with a clean slate (unless a worker already re-claimed it).
+    assert!(["pending", "processing", "skipped"].contains(&row["status"].as_str().unwrap()));
+    assert_eq!(row["retry_count"], 0);
+    if row["status"] == "pending" {
+        assert!(row["error_code"].is_null(), "old error cleared: {row}");
+    }
 }

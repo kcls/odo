@@ -38,6 +38,7 @@ use utoipa::OpenApi;
         delivery_admin::get_delivery,
         delivery_admin::delivery_summary,
         delivery_admin::list_recipient_activity,
+        delivery_admin::retry_delivery,
     ),
     components(schemas(
         inbox::ListRequest,
@@ -88,7 +89,7 @@ use utoipa::OpenApi;
         (name = "enqueue", description = "Send notifications"),
         (name = "email-group", description = "Email group administration"),
         (name = "template-admin", description = "Notification template administration"),
-        (name = "delivery-admin", description = "Notification delivery history (read-only)"),
+        (name = "delivery-admin", description = "Notification delivery history, and retrying failed deliveries"),
     ),
     security(("bearer" = []))
 )]
@@ -237,6 +238,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route(
             "/api/v1/odo/notify/delivery/recipients",
             post(delivery_admin::list_recipient_activity),
+        )
+        .route(
+            "/api/v1/odo/notify/delivery/retry",
+            post(delivery_admin::retry_delivery),
         )
         .layer(middleware::from_fn(log_access))
         .layer(middleware::from_fn_with_state(state.clone(), require_auth))

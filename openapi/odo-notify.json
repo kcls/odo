@@ -114,6 +114,41 @@
         ]
       }
     },
+    "/api/v1/odo/notify/delivery/retry": {
+      "post": {
+        "tags": [
+          "delivery-admin"
+        ],
+        "operationId": "retry_delivery",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeliveryIdRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The delivery, queued to send again",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryRow"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/odo/notify/delivery/summary": {
       "post": {
         "tags": [
@@ -2283,7 +2318,7 @@
     },
     {
       "name": "delivery-admin",
-      "description": "Notification delivery history (read-only)"
+      "description": "Notification delivery history, and retrying failed deliveries"
     }
   ]
 }
