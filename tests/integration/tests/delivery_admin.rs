@@ -12,7 +12,7 @@ use serde_json::{Value, json};
 
 const TEMPLATE: &str = "itest-delivery-template";
 const STATUSES: &[&str] = &["pending", "processing", "delivered", "failed", "skipped"];
-const ENDPOINTS: &[&str] = &["/list", "/get", "/summary", "/recipients", "/retry"];
+const ENDPOINTS: &[&str] = &["/list", "/get", "/summary", "/recipients", "/daily", "/retry"];
 
 fn base(path: &str) -> String {
     format!("{}/api/v1/odo/notify/delivery{}", notify_base(), path)
@@ -404,6 +404,44 @@ async fn recipients_ignore_an_unknown_sort_key() {
     )
     .await;
     assert_eq!(resp.status(), 200);
+}
+
+// --- daily ---
+
+#[tokio::test]
+async fn daily_has_every_day_and_counts_today() {
+    let c = client();
+    let (token, _, _) = enqueue_to_new_group(&c).await;
+    let since = (chrono::Utc::now() - chrono::Duration::days(6)).to_rfc3339();
+
+    let daily = post_ok(&c, &token, "/daily", json!({"since": since, "channel": "email", "timezone": "UTC"})).await;
+    assert_eq!(daily["timezone"], "UTC");
+    let days = daily["days"].as_array().unwrap();
+    // Six days back through today, quiet days included.
+    assert!((7..=8).contains(&days.len()), "got {} days", days.len());
+    let dates: Vec<&str> = days.iter().map(|d| d["day"].as_str().unwrap()).collect();
+    assert!(dates.windows(2).all(|w| w[0] < w[1]), "oldest first: {dates:?}");
+    let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
+    let last = days.last().unwrap();
+    assert_eq!(last["day"], today);
+    let total: i64 = ["delivered", "failed", "skipped", "queued"].iter().map(|k| last[*k].as_i64().unwrap()).sum();
+    assert!(total >= 1, "today counts the delivery just queued");
+}
+
+#[tokio::test]
+async fn daily_rejects_bad_input() {
+    let c = client();
+    let token = odo_admin_token(&c).await;
+    let now = chrono::Utc::now();
+    for body in [
+        json!({"timezone": "Mars/Olympus_Mons"}),
+        json!({"channel": "sms"}),
+        json!({"since": (now - chrono::Duration::days(400)).to_rfc3339()}),
+        json!({"since": now.to_rfc3339(), "until": (now - chrono::Duration::days(1)).to_rfc3339()}),
+    ] {
+        let resp = post(&c, &token, "/daily", body.clone()).await;
+        assert_eq!(resp.status(), 400, "{body}");
+    }
 }
 
 // --- retry ---

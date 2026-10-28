@@ -52,6 +52,11 @@ export function useFormatters() {
       const [y, m, d] = ymd.split("-").map(Number)
       return new Intl.DateTimeFormat(lng, { dateStyle: "medium" }).format(new Date(y, m - 1, d))
     },
+    /** A date-only value, short, e.g. "Oct 28", for chart axes. */
+    calendarDateShort: (ymd: string) => {
+      const [y, m, d] = ymd.split("-").map(Number)
+      return new Intl.DateTimeFormat(lng, { month: "short", day: "numeric" }).format(new Date(y, m - 1, d))
+    },
     /** A time of day ("17:30:00"), e.g. "5:30 PM". */
     timeOfDay: (hms: string) => {
       const [h, min] = hms.split(":").map(Number)

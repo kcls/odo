@@ -38,6 +38,8 @@ const CHANNELS: &[&str] = &["email", "in_app"];
 
 /// The window summary and recipient views use when the caller gives none.
 const DEFAULT_WINDOW_DAYS: i64 = 7;
+/// The longest window the daily view will bucket.
+const MAX_DAILY_DAYS: i64 = 366;
 /// Statuses a retry may move back to pending: terminal, and not delivered.
 const RETRYABLE: &[&str] = &["failed", "skipped"];
 
@@ -201,6 +203,40 @@ pub struct DeliveryWindowRequest {
     until: Option<DateTime<FixedOffset>>,
     #[serde(default)]
     channel: Option<String>,
+}
+
+/// One day's deliveries, by outcome.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct DailyCounts {
+    pub day: chrono::NaiveDate,
+    pub delivered: i64,
+    pub failed: i64,
+    pub skipped: i64,
+    /// Pending or processing.
+    pub queued: i64,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct DailyDeliveriesResponse {
+    pub timezone: String,
+    /// Every day in the window, oldest first, including days with none.
+    pub days: Vec<DailyCounts>,
+}
+
+#[derive(Deserialize, ToSchema)]
+pub struct DailyDeliveriesRequest {
+    /// Created at or after; defaults to 7 days ago.
+    #[serde(default)]
+    since: Option<DateTime<FixedOffset>>,
+    /// Created before; defaults to now.
+    #[serde(default)]
+    until: Option<DateTime<FixedOffset>>,
+    #[serde(default)]
+    channel: Option<String>,
+    /// IANA zone that days are counted in (e.g. America/Los_Angeles);
+    /// defaults to UTC.
+    #[serde(default)]
+    timezone: Option<String>,
 }
 
 #[derive(Deserialize, ToSchema)]
@@ -554,6 +590,102 @@ pub async fn list_recipient_activity(
         .collect();
 
     Ok(Json(Paginated::new(rows, total).into()))
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/odo/notify/delivery/daily",
+    request_body = DailyDeliveriesRequest,
+    responses((status = 200, body = DailyDeliveriesResponse, description = "Deliveries per day by outcome")),
+    security(("bearer" = [])),
+    tag = "delivery-admin"
+)]
+pub async fn daily_deliveries(
+    State(state): State<Arc<AppState>>,
+    Json(params): Json<DailyDeliveriesRequest>,
+) -> ApiResult<Json<DailyDeliveriesResponse>> {
+    require_read(&state).await?;
+
+    if let Some(channel) = params.channel.as_deref() {
+        check_allowed("channel", channel, CHANNELS)?;
+    }
+    let since = params.since.unwrap_or_else(default_since);
+    let until_or_now: DateTime<FixedOffset> = params.until.unwrap_or_else(|| Utc::now().into());
+    if until_or_now < since {
+        return Err(LocalError::invalid_input("until must not be before since").into());
+    }
+    if until_or_now - since > Duration::days(MAX_DAILY_DAYS) {
+        return Err(LocalError::invalid_input(format!(
+            "the window may span at most {MAX_DAILY_DAYS} days"
+        ))
+        .into());
+    }
+
+    // An unknown zone is the caller's mistake, not a server error, so
+    // check it rather than letting AT TIME ZONE fail the query.
+    let timezone = params.timezone.unwrap_or_else(|| "UTC".to_string());
+    let known = state
+        .db
+        .query_one_raw(Statement::from_sql_and_values(
+            DbBackend::Postgres,
+            "SELECT EXISTS (SELECT 1 FROM pg_timezone_names WHERE name = $1) AS known",
+            [timezone.clone().into()],
+        ))
+        .await?
+        .map(|row| row.try_get::<bool>("", "known"))
+        .transpose()?
+        .unwrap_or(false);
+    if !known {
+        return Err(LocalError::invalid_input(format!("unknown timezone: {timezone}")).into());
+    }
+
+    // generate_series supplies every day, so quiet days come back as zeros.
+    let rows = state
+        .db
+        .query_all_raw(Statement::from_sql_and_values(
+            DbBackend::Postgres,
+            "WITH days AS ( \
+                 SELECT d::date AS day \
+                 FROM generate_series( \
+                     ($1::timestamptz AT TIME ZONE $4)::date, \
+                     ($2::timestamptz AT TIME ZONE $4)::date, \
+                     interval '1 day') AS d \
+             ), counts AS ( \
+                 SELECT (created_at AT TIME ZONE $4)::date AS day, \
+                        COUNT(*) FILTER (WHERE status = 'delivered') AS delivered, \
+                        COUNT(*) FILTER (WHERE status = 'failed') AS failed, \
+                        COUNT(*) FILTER (WHERE status = 'skipped') AS skipped, \
+                        COUNT(*) FILTER (WHERE status IN ('pending', 'processing')) AS queued \
+                 FROM notification.delivery \
+                 WHERE created_at >= $1 AND created_at < $2 \
+                   AND ($3::text IS NULL OR channel = $3) \
+                 GROUP BY 1 \
+             ) \
+             SELECT days.day, \
+                    COALESCE(c.delivered, 0) AS delivered, COALESCE(c.failed, 0) AS failed, \
+                    COALESCE(c.skipped, 0) AS skipped, COALESCE(c.queued, 0) AS queued \
+             FROM days LEFT JOIN counts c ON c.day = days.day \
+             ORDER BY days.day",
+            [
+                since.into(),
+                until_or_now.into(),
+                params.channel.clone().into(),
+                timezone.clone().into(),
+            ],
+        ))
+        .await?;
+
+    let mut days = Vec::with_capacity(rows.len());
+    for r in rows {
+        days.push(DailyCounts {
+            day: r.try_get("", "day")?,
+            delivered: r.try_get("", "delivered")?,
+            failed: r.try_get("", "failed")?,
+            skipped: r.try_get("", "skipped")?,
+            queued: r.try_get("", "queued")?,
+        });
+    }
+    Ok(Json(DailyDeliveriesResponse { timezone, days }))
 }
 
 #[utoipa::path(

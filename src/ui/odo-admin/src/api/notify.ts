@@ -77,6 +77,7 @@ export type DeliveryRecipient = S["DeliveryRecipient"]
 export type DeliverySummary = S["DeliverySummaryResponse"]
 export type RecipientActivityRow = S["RecipientActivityRow"]
 export type RecipientActivityPage = S["RecipientActivityPage"]
+export type DailyCounts = S["DailyCounts"]
 
 const DELIVERY = "/api/v1/odo/notify/delivery"
 
@@ -92,6 +93,10 @@ export const deliveriesApi = {
   /** Counts by channel and status; the window defaults to the last 7 days. */
   summary(params: S["DeliveryWindowRequest"]): Promise<DeliverySummary> {
     return apiPost(`${DELIVERY}/summary`, params)
+  },
+  /** Deliveries per day by outcome, every day in the window, in `timezone`. */
+  daily(params: S["DailyDeliveriesRequest"]): Promise<S["DailyDeliveriesResponse"]> {
+    return apiPost(`${DELIVERY}/daily`, params)
   },
   /** Queue a failed or skipped email delivery to send again (delivery.write). */
   retry(id: number): Promise<DeliveryRow> {

@@ -4,6 +4,22 @@
  */
 
 export interface paths {
+    "/api/v1/odo/notify/delivery/daily": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["daily_deliveries"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/odo/notify/delivery/get": {
         parameters: {
             query?: never;
@@ -417,6 +433,45 @@ export interface components {
             org_unit?: number | null;
             sample_data?: unknown;
             subject_template: string;
+        };
+        /** @description One day's deliveries, by outcome. */
+        DailyCounts: {
+            /** Format: date */
+            day: string;
+            /** Format: int64 */
+            delivered: number;
+            /** Format: int64 */
+            failed: number;
+            /**
+             * Format: int64
+             * @description Pending or processing.
+             */
+            queued: number;
+            /** Format: int64 */
+            skipped: number;
+        };
+        DailyDeliveriesRequest: {
+            channel?: string | null;
+            /**
+             * Format: date-time
+             * @description Created at or after; defaults to 7 days ago.
+             */
+            since?: string | null;
+            /**
+             * @description IANA zone that days are counted in (e.g. America/Los_Angeles);
+             *     defaults to UTC.
+             */
+            timezone?: string | null;
+            /**
+             * Format: date-time
+             * @description Created before; defaults to now.
+             */
+            until?: string | null;
+        };
+        DailyDeliveriesResponse: {
+            /** @description Every day in the window, oldest first, including days with none. */
+            days: components["schemas"]["DailyCounts"][];
+            timezone: string;
         };
         DeliveryDetailResponse: {
             action_url?: string | null;
@@ -872,6 +927,30 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    daily_deliveries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DailyDeliveriesRequest"];
+            };
+        };
+        responses: {
+            /** @description Deliveries per day by outcome */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DailyDeliveriesResponse"];
+                };
+            };
+        };
+    };
     get_delivery: {
         parameters: {
             query?: never;

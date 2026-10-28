@@ -9,6 +9,41 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/api/v1/odo/notify/delivery/daily": {
+      "post": {
+        "tags": [
+          "delivery-admin"
+        ],
+        "operationId": "daily_deliveries",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DailyDeliveriesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Deliveries per day by outcome",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DailyDeliveriesResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/odo/notify/delivery/get": {
       "post": {
         "tags": [
@@ -921,6 +956,93 @@
           },
           "sample_data": {},
           "subject_template": {
+            "type": "string"
+          }
+        }
+      },
+      "DailyCounts": {
+        "type": "object",
+        "description": "One day's deliveries, by outcome.",
+        "required": [
+          "day",
+          "delivered",
+          "failed",
+          "skipped",
+          "queued"
+        ],
+        "properties": {
+          "day": {
+            "type": "string",
+            "format": "date"
+          },
+          "delivered": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "failed": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "queued": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Pending or processing."
+          },
+          "skipped": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "DailyDeliveriesRequest": {
+        "type": "object",
+        "properties": {
+          "channel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "since": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Created at or after; defaults to 7 days ago."
+          },
+          "timezone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "IANA zone that days are counted in (e.g. America/Los_Angeles);\ndefaults to UTC."
+          },
+          "until": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Created before; defaults to now."
+          }
+        }
+      },
+      "DailyDeliveriesResponse": {
+        "type": "object",
+        "required": [
+          "timezone",
+          "days"
+        ],
+        "properties": {
+          "days": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DailyCounts"
+            },
+            "description": "Every day in the window, oldest first, including days with none."
+          },
+          "timezone": {
             "type": "string"
           }
         }
