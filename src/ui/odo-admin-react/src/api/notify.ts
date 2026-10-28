@@ -74,3 +74,32 @@ export const emailGroupsApi = {
     return apiPost(`${EMAIL_GROUP}/member/delete`, { id } satisfies S["EmailGroupMemberIdRequest"])
   },
 }
+
+export type DeliveryRow = S["DeliveryRow"]
+export type DeliveryPage = S["DeliveryPage"]
+export type DeliveryDetail = S["DeliveryDetailResponse"]
+export type DeliveryRecipient = S["DeliveryRecipient"]
+export type DeliverySummary = S["DeliverySummaryResponse"]
+export type RecipientActivityRow = S["RecipientActivityRow"]
+export type RecipientActivityPage = S["RecipientActivityPage"]
+
+const DELIVERY = "/api/v1/odo/notify/delivery"
+
+/** Read-only delivery history (odo.notify.delivery.read). */
+export const deliveriesApi = {
+  /** One page of deliveries, newest first unless sorted otherwise. */
+  listPage(params: Partial<S["ListDeliveriesRequest"]>): Promise<DeliveryPage> {
+    return apiPost(`${DELIVERY}/list`, params)
+  },
+  get(id: number): Promise<DeliveryDetail> {
+    return apiPost(`${DELIVERY}/get`, { id } satisfies S["DeliveryIdRequest"])
+  },
+  /** Counts by channel and status; the window defaults to the last 7 days. */
+  summary(params: S["DeliveryWindowRequest"]): Promise<DeliverySummary> {
+    return apiPost(`${DELIVERY}/summary`, params)
+  },
+  /** Per-recipient activity; sortable by total, failed, or last. */
+  recipientsPage(params: Partial<S["ListRecipientActivityRequest"]>): Promise<RecipientActivityPage> {
+    return apiPost(`${DELIVERY}/recipients`, params)
+  },
+}

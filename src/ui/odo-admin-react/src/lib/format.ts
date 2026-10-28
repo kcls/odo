@@ -57,6 +57,9 @@ export function useFormatters() {
       const [h, min] = hms.split(":").map(Number)
       return new Intl.DateTimeFormat(lng, { timeStyle: "short" }).format(new Date(2000, 0, 1, h, min))
     },
+    /** A headline count, compacted past 10,000: 1,284 / 12.9K. */
+    count: (n: number) =>
+      new Intl.NumberFormat(lng, n >= 10_000 ? { notation: "compact", maximumFractionDigits: 1 } : {}).format(n),
     /** 0 = Sunday, as odo-org stores it. */
     weekday: (day: number) => weekdayName(day, lng),
   }

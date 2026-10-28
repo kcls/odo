@@ -4,6 +4,7 @@ import type common from "@/locales/en/common.json"
 import type emailGroups from "@/locales/en/emailGroups.json"
 import type home from "@/locales/en/home.json"
 import type login from "@/locales/en/login.json"
+import type notifications from "@/locales/en/notifications.json"
 import type orgUnits from "@/locales/en/orgUnits.json"
 import type permissions from "@/locales/en/permissions.json"
 import type roles from "@/locales/en/roles.json"
@@ -22,6 +23,7 @@ declare module "i18next" {
       emailGroups: typeof emailGroups
       home: typeof home
       login: typeof login
+      notifications: typeof notifications
       orgUnits: typeof orgUnits
       permissions: typeof permissions
       roles: typeof roles

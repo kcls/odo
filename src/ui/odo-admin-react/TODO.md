@@ -57,24 +57,31 @@
       admin endpoint behind `odo.auth.user.write` (hashing with
       `auth.hash_password`, clearing `locked_until` and failed attempts),
       then a "Set password" action on the user's page.
-- [ ] **Email notifications page**: which groups and users get emails,
-      when, and what failed. `notification.delivery` already records
-      channel, status, scheduled/processed times, retry_count and
-      max_retries, error_code and error_message, and the recipient (a
-      user or an email group), linked to `notification.event`
-      (template, source service/entity). There is no admin read API
-      yet. Needs, in odo-notify: a paginated, sortable, filterable
-      delivery list (status, channel, template, recipient, date range)
-      via `page_type!`; a delivery detail (rendered title/body, error,
-      retries, event); a summary (counts by status over a window,
-      recent failures); a read perm (e.g.
-      `odo.notify.delivery.read`) seeded and granted to `odo-admin`;
-      routing is covered by the existing `/api/v1/odo/notify` prefix.
-      Possibly a retry action later, behind a write perm. Then the
-      page: summary, failures first, filters in the URL, links to the
-      email group or user.
+- [x] **Notifications page**: outcome tiles (delivered, failed, skipped,
+      queued) for a time range and channel, each linking to those
+      deliveries; per-recipient activity (totals, failures, last sent,
+      last failure; sortable); the delivery list (outcome, subject, and
+      recipient filters, partial group failures called out); and a page
+      per delivery with its outcome, per-address results, the message as
+      sent, and the event behind it. Backed by new read-only odo-notify
+      endpoints `delivery/{list,get,summary,recipients}` behind
+      `odo.notify.delivery.read` (sqitch `008_notify_delivery_read`, which
+      also indexes `delivery.created_at`), with integration tests in
+      `tests/integration/tests/delivery_admin.rs`.
+- [ ] Possible next steps for Notifications: a daily volume chart, and a
+      retry action for failed deliveries (needs a write permission and
+      endpoint).
 
 ## Known issues found while porting
+
+- [ ] **Admin searches are case-sensitive.** `odo_service::admin::clean_search`
+      says to pair it with SeaORM's `Column::contains`, "case-insensitive
+      ILIKE on Postgres", but `contains` emits a plain `LIKE`, so
+      "incident" doesn't find "Incident" in the permission, role,
+      template, email group, unit type, and SAML mapping searches (10
+      call sites). Fix centrally: an `ilike`-based helper in odo-service
+      that also escapes `%`/`_` (as `delivery_admin::contains_pattern`
+      does), used by every caller, and correct the doc comment.
 
 - [ ] **odo-auth `create_user` inserts the account before validating
       the password**, outside a transaction, so a password under 8
