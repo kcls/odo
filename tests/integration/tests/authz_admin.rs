@@ -131,60 +131,63 @@ async fn permission_crud_lifecycle() {
     assert_eq!(resp.status(), 404);
 }
 
+/// `field` of every row of an admin list, in the order a sort request
+/// returns them, read page by page (these lists outgrow one page). Rows
+/// minted by tests (codes `itest.*` / `itest-*`) are left out: other tests
+/// create and delete them concurrently, so they can differ between reads.
+async fn all_sorted(
+    c: &reqwest::Client,
+    token: &str,
+    path: &str,
+    field: &str,
+    sort: serde_json::Value,
+) -> Vec<String> {
+    let mut values = Vec::new();
+    let mut offset = 0;
+    loop {
+        let mut body = sort.clone();
+        body["limit"] = json!(200);
+        body["offset"] = json!(offset);
+        let resp = post_json(c, token, path, body).await;
+        assert_eq!(resp.status(), 200);
+        let page: serde_json::Value = resp.json().await.unwrap();
+        let rows = page["rows"].as_array().unwrap();
+        offset += rows.len();
+        values.extend(
+            rows.iter()
+                .filter(|row| !row["code"].as_str().unwrap().starts_with("itest"))
+                .map(|row| row[field].as_str().unwrap().to_string()),
+        );
+        if rows.is_empty() || offset as i64 >= page["total"].as_i64().unwrap() {
+            return values;
+        }
+    }
+}
+
 #[tokio::test]
 async fn permission_list_sorts_by_allowed_columns() {
     let c = client();
     let token = odo_admin_token(&c).await;
 
-    let codes = |data: &serde_json::Value| -> Vec<String> {
-        data["rows"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|p| p["code"].as_str().unwrap().to_string())
-            .collect()
-    };
-
     // Default sort == explicit code ascending (the DB's own collation order;
     // we don't re-sort in Rust, whose byte order differs from Postgres locale
     // collation for punctuation like `.` vs `_`).
-    let resp = post_json(&c, &token, "/permission/list", json!({})).await;
-    let default_codes = codes(&resp.json().await.unwrap());
-    let resp = post_json(
-        &c,
-        &token,
-        "/permission/list",
-        json!({"sort_by": "code", "sort_dir": "asc"}),
-    )
-    .await;
-    let asc_codes = codes(&resp.json().await.unwrap());
+    let codes = |sort| all_sorted(&c, &token, "/permission/list", "code", sort);
+    let default_codes = codes(json!({})).await;
+    let asc_codes = codes(json!({"sort_by": "code", "sort_dir": "asc"})).await;
+    assert!(!asc_codes.is_empty(), "the seed's permissions are listed");
     assert_eq!(default_codes, asc_codes, "default sort is code ascending");
 
     // Explicit code descending is the exact reverse of code ascending.
-    let resp = post_json(
-        &c,
-        &token,
-        "/permission/list",
-        json!({"sort_by": "code", "sort_dir": "desc"}),
-    )
-    .await;
-    let desc_codes = codes(&resp.json().await.unwrap());
+    let desc_codes = codes(json!({"sort_by": "code", "sort_dir": "desc"})).await;
     let mut desc_expected = asc_codes.clone();
     desc_expected.reverse();
     assert_eq!(desc_codes, desc_expected, "code desc reverses code asc");
 
     // An unknown / malicious sort key must fall back to the default, not error
     // and not inject — the allow-list rejects it.
-    let resp = post_json(
-        &c,
-        &token,
-        "/permission/list",
-        json!({"sort_by": "code; DROP TABLE authz.permission", "sort_dir": "desc"}),
-    )
-    .await;
-    assert_eq!(resp.status(), 200);
-    let bad: serde_json::Value = resp.json().await.unwrap();
-    assert_eq!(codes(&bad), asc_codes, "unknown sort key falls back to default");
+    let bad = codes(json!({"sort_by": "code; DROP TABLE authz.permission", "sort_dir": "desc"})).await;
+    assert_eq!(bad, asc_codes, "unknown sort key falls back to default");
 }
 
 #[tokio::test]
@@ -322,33 +325,10 @@ async fn role_list_sorts_by_label() {
     let c = client();
     let token = odo_admin_token(&c).await;
 
-    let labels = |data: &serde_json::Value| -> Vec<String> {
-        data["rows"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|r| r["label"].as_str().unwrap().to_string())
-            .collect()
-    };
-
-    // label ascending then descending.
-    let resp = post_json(
-        &c,
-        &token,
-        "/role/list",
-        json!({"sort_by": "label", "sort_dir": "asc"}),
-    )
-    .await;
-    let asc = labels(&resp.json().await.unwrap());
-
-    let resp = post_json(
-        &c,
-        &token,
-        "/role/list",
-        json!({"sort_by": "label", "sort_dir": "desc"}),
-    )
-    .await;
-    let desc = labels(&resp.json().await.unwrap());
+    // label ascending then descending, every page.
+    let labels = |sort| all_sorted(&c, &token, "/role/list", "label", sort);
+    let asc = labels(json!({"sort_by": "label", "sort_dir": "asc"})).await;
+    let desc = labels(json!({"sort_by": "label", "sort_dir": "desc"})).await;
 
     // Same rows both ways; the extremes swap (collation-agnostic, tie-tolerant
     // — we don't re-sort in Rust, whose ordering differs from PG collation).
