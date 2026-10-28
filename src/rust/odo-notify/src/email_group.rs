@@ -13,7 +13,7 @@ use odo_client::context::RequestContext;
 use odo_client::error::{ApiResult, LocalError};
 use odo_entity::notification::{email_group, email_group_member};
 use odo_service::admin::{
-    Page, Paginated, Sort, clean_code, clean_email, clean_required, clean_search,
+    Page, Paginated, Sort, clean_code, clean_email, clean_required, clean_search, contains_ci,
     map_unique_violation,
 };
 use sea_orm::prelude::*;
@@ -177,8 +177,8 @@ pub async fn list_email_groups(
     if let Some(search) = clean_search(params.search.as_deref()) {
         condition = condition.add(
             Condition::any()
-                .add(email_group::Column::Code.contains(&search))
-                .add(email_group::Column::Label.contains(&search)),
+                .add(contains_ci(email_group::Column::Code, &search))
+                .add(contains_ci(email_group::Column::Label, &search)),
         );
     }
 

@@ -13,7 +13,7 @@ use chrono::Utc;
 use odo_client::error::{ApiResult, LocalError};
 use odo_entity::org::{unit, unit_type};
 use odo_service::admin::{
-    Page, Paginated, Sort, clean_code, clean_optional, clean_required, clean_search,
+    Page, Paginated, Sort, clean_code, clean_optional, clean_required, clean_search, contains_ci,
     map_unique_violation,
 };
 use sea_orm::prelude::*;
@@ -156,7 +156,7 @@ pub async fn list_unit_types(
 
     let mut condition = Condition::all().add(unit_type::Column::DeletedAt.is_null());
     if let Some(search) = clean_search(params.search.as_deref()) {
-        condition = condition.add(unit_type::Column::Label.contains(&search));
+        condition = condition.add(contains_ci(unit_type::Column::Label, &search));
     }
 
     let total = unit_type::Entity::find()
