@@ -1,0 +1,123 @@
+{
+  "title": "Notifications",
+  "subtitle": "Who notifications went to, when, and what failed.",
+  "window": {
+    "label": "Time range",
+    "1d": "Last 24 hours",
+    "7d": "Last 7 days",
+    "30d": "Last 30 days",
+    "90d": "Last 90 days"
+  },
+  "channel": {
+    "label": "Channel",
+    "all": "All channels",
+    "email": "Email",
+    "in_app": "In-app"
+  },
+  "status": {
+    "delivered": "Delivered",
+    "failed": "Failed",
+    "skipped": "Skipped",
+    "queued": "Queued",
+    "pending": "Pending",
+    "processing": "Sending"
+  },
+  "statusHint": {
+    "delivered": "Accepted by at least one address",
+    "failed": "Gave up after retrying",
+    "skipped": "Recipient deleted or switched off",
+    "queued": "Waiting to send or retry"
+  },
+  "tiles": "Deliveries by outcome",
+  "showFiltered": "Show {{status}} deliveries",
+  "views": {
+    "label": "View",
+    "recipients": "Recipients",
+    "deliveries": "Deliveries"
+  },
+  "kind": {
+    "label": "Recipient type",
+    "all": "Groups and users",
+    "email_group": "Email groups",
+    "user": "Users"
+  },
+  "recipientKind": {
+    "email_group": "Group",
+    "user": "User"
+  },
+  "inactive": "Inactive",
+  "unknownRecipient": "Unknown recipient",
+  "recipients": {
+    "columns": {
+      "recipient": "Recipient",
+      "total": "Total",
+      "delivered": "Delivered",
+      "failed": "Failed",
+      "skipped": "Skipped",
+      "queued": "Queued",
+      "lastSent": "Last sent",
+      "lastFailed": "Last failure"
+    },
+    "empty": "Nothing was sent in this period.",
+    "showDeliveries": "Show deliveries to {{name}}"
+  },
+  "deliveries": {
+    "search": "Filter by subject",
+    "statusFilter": "Outcome",
+    "allStatuses": "All outcomes",
+    "columns": {
+      "created": "Queued",
+      "subject": "Subject",
+      "recipient": "Recipient",
+      "status": "Outcome",
+      "template": "Template"
+    },
+    "partial_one": "{{count, number}} address failed",
+    "partial_other": "{{count, number}} addresses failed",
+    "retries": "Retry {{count, number}} of {{max, number}}",
+    "empty": "No deliveries in this period.",
+    "noMatches": "No deliveries match.",
+    "filteredTo": "Showing deliveries to {{name}}",
+    "clearRecipient": "Show all recipients"
+  },
+  "detail": {
+    "back": "Notifications",
+    "untitled": "(no subject)",
+    "outcome": "Outcome",
+    "facts": {
+      "status": "Status",
+      "recipient": "Recipient",
+      "channel": "Channel",
+      "template": "Template",
+      "queued": "Queued",
+      "scheduledFor": "Scheduled for",
+      "processed": "Processed",
+      "attempts": "Retries",
+      "nextRetry": "Next retry",
+      "error": "Error",
+      "read": "Read",
+      "dismissed": "Dismissed"
+    },
+    "attempts": "{{count, number}} of {{max, number}}",
+    "addresses": "Addresses",
+    "deliveredTo": "Delivered to",
+    "failedFor": "Failed for",
+    "noAddresses": "No per-address results were recorded.",
+    "message": "Message",
+    "subject": "Subject",
+    "body": "Body",
+    "htmlFrame": "Email body as sent",
+    "noBody": "No body.",
+    "actionUrl": "Link",
+    "event": "Event",
+    "eventFacts": {
+      "source": "Sent by",
+      "entity": "About",
+      "createdBy": "Triggered by",
+      "createdAt": "Event time",
+      "id": "Event ID"
+    },
+    "entity": "{{type}} #{{id}}",
+    "noEvent": "The event behind this delivery no longer exists."
+  }
+}
