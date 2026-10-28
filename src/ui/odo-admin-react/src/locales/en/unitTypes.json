@@ -1,0 +1,35 @@
+{
+  "title": "Org unit types",
+  "subtitle": "Categories of org units (system, region, branch, …) and what each may contain. Every org unit has a type.",
+  "new": "New type",
+  "columns": {
+    "label": "Label",
+    "parent": "Parent type",
+    "contains": "May contain",
+    "units": "Units"
+  },
+  "staff": "Staff",
+  "patrons": "Patrons",
+  "empty": "No unit types configured.",
+  "editLabel": "Edit {{label}}",
+  "deleteLabel": "Delete {{label}}",
+  "inUse_one": "{{count, number}} active unit has this type; change it first.",
+  "inUse_other": "{{count, number}} active units have this type; change them first.",
+  "dialog": {
+    "createTitle": "New unit type",
+    "editTitle": "Edit unit type",
+    "label": "Label",
+    "parent": "Parent type",
+    "noParent": "None",
+    "parentPermanent": "A parent type can't be removed once set, only changed to another type.",
+    "canHaveStaff": "Can have staff",
+    "canHavePatrons": "Can have patrons",
+    "created": "Created {{label}}",
+    "updated": "Saved {{label}}"
+  },
+  "delete": {
+    "title": "Delete unit type?",
+    "body": "{{label}} will be deactivated.",
+    "done": "Deleted {{label}}"
+  }
+}

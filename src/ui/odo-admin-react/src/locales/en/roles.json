@@ -1,0 +1,73 @@
+{
+  "title": "Roles",
+  "subtitle": "Roles bundle permissions; users hold roles at org units.",
+  "new": "New role",
+  "search": "Filter roles",
+  "columns": {
+    "code": "Code",
+    "label": "Label",
+    "permissions": "Permissions",
+    "users": "Users"
+  },
+  "noMatches": "No roles match.",
+  "empty": "No roles found.",
+  "create": {
+    "title": "New role",
+    "code": "Code",
+    "codePlaceholder": "e.g. incident-viewer",
+    "codeHint": "Unique identifier; cannot be changed later.",
+    "label": "Label",
+    "labelPlaceholder": "e.g. Incident Viewer",
+    "description": "Description",
+    "submit": "Create role",
+    "created": "Created {{label}}"
+  },
+  "detail": {
+    "back": "Roles",
+    "userCount_one": "{{count, number}} user",
+    "userCount_other": "{{count, number}} users",
+    "edit": "Edit",
+    "delete": "Delete role",
+    "deleteBlocked_one": "Assigned to {{count, number}} user; remove the assignment first.",
+    "deleteBlocked_other": "Assigned to {{count, number}} users; remove the assignments first.",
+    "noDescription": "No description."
+  },
+  "edit": {
+    "title": "Edit role",
+    "label": "Label",
+    "description": "Description",
+    "saved": "Saved {{label}}"
+  },
+  "delete": {
+    "title": "Delete role?",
+    "body": "{{label}} and its permission grants will be permanently deleted.",
+    "done": "Deleted {{label}}"
+  },
+  "grants": {
+    "title": "Permissions",
+    "titleCount": "Permissions ({{count, number}})",
+    "description": "Permissions this role grants. Min depth sets how far up the org tree, from where the role is held, each grant reaches.",
+    "none": "This role has no permissions yet.",
+    "columns": {
+      "permission": "Permission",
+      "minDepth": "Min depth"
+    },
+    "minDepthLabel": "Minimum depth for {{perm}}",
+    "minDepthSaved": "{{perm}} now applies at depth {{depth, number}} and below",
+    "grant": "Grant permission",
+    "permission": "Permission",
+    "permissionPlaceholder": "Choose a permission",
+    "permissionSearch": "Search permissions",
+    "allGranted": "This role already has every permission.",
+    "minDepth": "Minimum depth",
+    "minDepthHint": "Measured from the root (depth 0). For someone holding this role at an org unit, the grant covers everything under that unit's ancestor at this depth, so 0 covers the whole tree. A depth below their unit covers only its descendants that deep or deeper.",
+    "submit": "Grant",
+    "granted": "Granted {{perm}}",
+    "pickerFailed": "Could not load the permission list.",
+    "revokeLabel": "Revoke {{perm}}",
+    "revokeTitle": "Revoke permission?",
+    "revokeBody": "{{perm}} will be revoked from {{label}}.",
+    "revoke": "Revoke",
+    "revoked": "Revoked {{perm}}"
+  }
+}

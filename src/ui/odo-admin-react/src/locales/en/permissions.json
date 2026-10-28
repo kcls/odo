@@ -1,0 +1,32 @@
+{
+  "title": "Permissions",
+  "subtitle": "The permission codes that roles grant.",
+  "new": "New permission",
+  "search": "Filter permissions",
+  "columns": {
+    "code": "Code",
+    "description": "Description",
+    "roles": "Roles"
+  },
+  "noMatches": "No permissions match.",
+  "empty": "No permissions found.",
+  "editLabel": "Edit {{code}}",
+  "deleteLabel": "Delete {{code}}",
+  "inUse_one": "Granted by {{count}} role; revoke it before deleting.",
+  "inUse_other": "Granted by {{count}} roles; revoke them before deleting.",
+  "dialog": {
+    "createTitle": "New permission",
+    "editTitle": "Edit permission",
+    "code": "Code",
+    "codePlaceholder": "e.g. incident.report.read",
+    "codeImmutable": "Codes cannot be changed once created.",
+    "description": "Description",
+    "created": "Created {{code}}",
+    "updated": "Saved {{code}}"
+  },
+  "delete": {
+    "title": "Delete permission?",
+    "body": "{{code}} will be permanently deleted.",
+    "done": "Deleted {{code}}"
+  }
+}
