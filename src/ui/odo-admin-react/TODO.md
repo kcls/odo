@@ -111,8 +111,19 @@
 ## Cutover
 
 - [ ] Port the remaining tools above
-- [ ] Point e2e (`tests/e2e/apps/odo-admin`) at the new UI and update
-      selectors; the User Roles smoke entry goes away
+- [ ] **Overhaul the e2e tests** (`tests/e2e/apps/odo-admin`) once the
+      UI is done. Every spec is tied to Angular internals (`tr.odo-row`,
+      `odo-table`, `odo-sort-header`, `mat-icon` text, `.shell-nav-link`,
+      `.app-error-snackbar`, `td.cell-code`), so rewrite them against
+      roles and accessible names (`getByRole`, `aria-sort`) rather than
+      repointing selectors. Carry over smoke, negative-perm, sorting,
+      effective permissions (now on the Users page; the User Roles entry
+      goes away) and org-unit child navigation. Add coverage for what's
+      new: list state in the URL (deep links, back/forward), assigning
+      and removing roles from the Users page, the template editor's
+      unsaved-changes guard and preview, the session-expiry redirect
+      back to the original page, and serving at a base path other than
+      `/odo/admin`.
 - [ ] Move `src/ui/odo-admin-react` to `src/ui/odo-admin`, delete the
       Angular app, update `service-map.yaml` (dockerfile path),
       `scripts/generate-openapi.sh` (TS_OUT_DIRS), CI, and CLAUDE.md
