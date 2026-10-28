@@ -34,10 +34,14 @@
       URL), create, edit, deactivate/reactivate, and members managed in
       place (add inline, switch on or off, remove; a filter appears for
       large groups)
-
-## Stages to come
-
-- [ ] SAML: IdP list/detail, attributes, role mappings, SP dialogs
+- [x] SAML: identity providers, their service providers, attributes,
+      and role mappings (paginated, state in the URL). Changes from
+      Angular: SPs linked to no IdP were invisible there; they're now
+      listed on the SAML page and can be linked from their edit dialog.
+      Fields the API can't clear once set (an IdP's session lifetime and
+      attribute mapping, an SP's IdP) are required once set, with the
+      reason shown, instead of offering a blank that silently does
+      nothing. The mapping role picker lists every role.
 
 ## New features
 
@@ -113,7 +117,6 @@
 
 ## Cutover
 
-- [ ] Port the remaining tools above
 - [ ] **Overhaul the e2e tests** (`tests/e2e/apps/odo-admin`) once the
       UI is done. Every spec is tied to Angular internals (`tr.odo-row`,
       `odo-table`, `odo-sort-header`, `mat-icon` text, `.shell-nav-link`,

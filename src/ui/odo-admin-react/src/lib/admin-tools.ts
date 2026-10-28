@@ -1,4 +1,4 @@
-import { KeyRoundIcon, MailIcon, MailsIcon, NetworkIcon, ShapesIcon, ShieldIcon, UsersIcon, type LucideIcon } from "lucide-react"
+import { FingerprintIcon, KeyRoundIcon, MailIcon, MailsIcon, NetworkIcon, ShapesIcon, ShieldIcon, UsersIcon, type LucideIcon } from "lucide-react"
 import type { RouteObject } from "react-router"
 
 import { session } from "@/auth/session"
@@ -20,7 +20,7 @@ export type AdminTool = {
   children: RouteObject[]
 }
 
-export type ToolId = "users" | "roles" | "permissions" | "orgUnits" | "orgUnitTypes" | "templates" | "emailGroups"
+export type ToolId = "users" | "roles" | "permissions" | "orgUnits" | "orgUnitTypes" | "templates" | "emailGroups" | "saml"
 
 /** In no particular order; the nav and home page sort by label. */
 export const ADMIN_TOOLS: AdminTool[] = [
@@ -87,6 +87,16 @@ export const ADMIN_TOOLS: AdminTool[] = [
     children: [
       { index: true, lazy: () => import("@/routes/email-groups") },
       { path: ":groupId", lazy: () => import("@/routes/email-groups/detail") },
+    ],
+  },
+  {
+    id: "saml",
+    path: "saml",
+    icon: FingerprintIcon,
+    readPerm: PERMS.SAML_READ,
+    children: [
+      { index: true, lazy: () => import("@/routes/saml") },
+      { path: ":idpId", lazy: () => import("@/routes/saml/detail") },
     ],
   },
 ]
