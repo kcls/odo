@@ -365,3 +365,29 @@ async fn create_saml_user_rejects_password() {
         .unwrap();
     assert_eq!(resp.status(), 400);
 }
+
+#[tokio::test]
+async fn short_password_is_refused_without_creating_the_account() {
+    let c = client();
+    let admin = odo_admin_token(&c).await;
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let username = format!("itest-shortpw-{nanos}");
+    let email = format!("{username}@odo.example.org");
+    let create = |password: &'static str| {
+        c.post(create_url())
+            .headers(auth_header(&admin))
+            .json(&json!({"username": username, "email": email, "password": password}))
+            .send()
+    };
+
+    let resp = create("short").await.unwrap();
+    assert_eq!(resp.status(), 400);
+
+    // The refusal left nothing behind: the same identity is still free.
+    // (It used to be inserted first, so this got USERNAME_TAKEN.)
+    let resp = create("long-enough-1").await.unwrap();
+    assert_eq!(resp.status(), 200, "create after refusal: {:?}", resp.text().await);
+}

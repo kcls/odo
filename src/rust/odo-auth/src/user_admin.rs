@@ -22,7 +22,7 @@ use odo_entity::authz::usr_role_org_map;
 use odo_entity::org::unit;
 use odo_service::admin::clean_optional;
 use sea_orm::prelude::*;
-use sea_orm::{QueryOrder, QuerySelect, Set};
+use sea_orm::{QueryOrder, QuerySelect, Set, TransactionTrait};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -34,6 +34,7 @@ use crate::role_assignments::{self, AssignmentRow};
 
 const DETAIL_PERM: &str = "odo.auth.user.detail.read";
 const WRITE_PERM: &str = "odo.auth.user.write";
+const MIN_PASSWORD_LEN: usize = 8;
 const RECENT_SESSIONS: u64 = 10;
 
 // ===========================================================================
@@ -381,6 +382,18 @@ pub struct CreateUserRequest {
     uuid: Option<String>,
 }
 
+/// The server's rule for a new local password. Length is in bytes, as it
+/// always has been: never stricter than a client counting characters or
+/// UTF-16 units, so a password a client accepts isn't refused here.
+fn check_password(password: &str) -> Result<(), LocalError> {
+    if password.len() < MIN_PASSWORD_LEN {
+        return Err(LocalError::invalid_input(format!(
+            "password must be at least {MIN_PASSWORD_LEN} characters"
+        )));
+    }
+    Ok(())
+}
+
 /// Create a user account (and optionally its local-account password).
 ///
 /// This is the API face of what create-local-account.sh used to do with
@@ -416,6 +429,9 @@ pub async fn create_user(
     }
     if auth_method == "saml" && params.password.is_some() {
         return Err(LocalError::invalid_input("SAML accounts cannot have a local password").into());
+    }
+    if let Some(password) = params.password.as_deref() {
+        check_password(password)?;
     }
 
     let pinned_uuid = match params.uuid.as_deref() {
@@ -466,16 +482,15 @@ pub async fn create_user(
     if let Some(u) = pinned_uuid {
         model.uuid = Set(u);
     }
-    let created = model.insert(&state.db).await?;
+    // The account and its password are written together: a failure partway
+    // must not leave a passwordless account holding the username.
+    let txn = state.db.begin().await?;
+    let created = model.insert(&txn).await?;
 
     if let Some(password) = params.password.as_deref() {
-        if password.len() < 8 {
-            return Err(LocalError::invalid_input("password must be at least 8 characters").into());
-        }
         // Hash in-DB with the same function login verifies against.
         use sea_orm::ConnectionTrait;
-        let hashed = state
-            .db
+        let hashed = txn
             .query_one_raw(sea_orm::Statement::from_sql_and_values(
                 sea_orm::DbBackend::Postgres,
                 "SELECT auth.hash_password($1) AS hash",
@@ -492,8 +507,9 @@ pub async fn create_user(
             password_hash: Set(hash),
             ..Default::default()
         };
-        account.insert(&state.db).await?;
+        account.insert(&txn).await?;
     }
+    txn.commit().await?;
 
     // Re-fetch: a DB trigger recomputes display_name from the name fields.
     let created = usr::Entity::find_by_id(created.id)
@@ -516,4 +532,15 @@ pub async fn create_user(
         updated_at: created.updated_at,
         last_login_at: created.last_login_at,
     }))
+}
+
+#[cfg(test)]
+mod create_user_tests {
+    use super::check_password;
+
+    #[test]
+    fn check_password_enforces_the_minimum() {
+        assert!(check_password("1234567").is_err());
+        assert!(check_password("12345678").is_ok());
+    }
 }
