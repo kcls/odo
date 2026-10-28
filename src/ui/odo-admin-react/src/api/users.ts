@@ -24,6 +24,14 @@ export const usersApi = {
     return apiPost(`${BASE}/detail`, { id })
   },
 
+  /**
+   * A new active account. A local account's password must be set here:
+   * there is no endpoint to set one later.
+   */
+  create(params: S["CreateUserRequest"]): Promise<UserAccount> {
+    return apiPost(`${BASE}/create`, params)
+  },
+
   /** Local accounts only; SAML accounts are refused server-side. */
   update(id: number, params: Omit<S["UpdateUserRequest"], "id">): Promise<UserAccount> {
     return apiPost(`${BASE}/update`, { id, ...params })

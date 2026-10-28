@@ -45,15 +45,18 @@
 
 ## New features
 
-- [ ] **Create user accounts** from the Users page. `POST
-      /api/v1/odo/auth/user/create` already exists (`CreateUserRequest`:
-      username, email, names, auth_method, optional password, optional
-      pinned uuid). Needs: a "New user" dialog gated on
-      `odo.auth.user.write`, local vs. pre-provisioned SAML choice,
-      optional initial password (or none, so the account can't sign in
-      until one is set), then go to the new user's detail page to
-      assign roles. Decide whether the UI should ever pin a uuid
-      (probably not; that's for fixtures and registration).
+- [x] **Create user accounts** from the Users page ("New user", gated
+      on `odo.auth.user.write`): password sign-in or pre-provisioned
+      SAML, then straight to the new user's page to assign roles. Local
+      accounts require a password (8+ characters, confirmed), because
+      nothing can set one later; SAML accounts never send one. No pinned
+      uuids from the UI (that's for fixtures and registration).
+- [ ] **Set or reset a local user's password.** odo-auth has no
+      endpoint for it, so a forgotten password, or an account created
+      without one (only possible via the API), needs SQL. Needs an
+      admin endpoint behind `odo.auth.user.write` (hashing with
+      `auth.hash_password`, clearing `locked_until` and failed attempts),
+      then a "Set password" action on the user's page.
 - [ ] **Email notifications page**: which groups and users get emails,
       when, and what failed. `notification.delivery` already records
       channel, status, scheduled/processed times, retry_count and
@@ -72,6 +75,14 @@
       email group or user.
 
 ## Known issues found while porting
+
+- [ ] **odo-auth `create_user` inserts the account before validating
+      the password**, outside a transaction, so a password under 8
+      characters returns an error but leaves a passwordless account
+      behind, and retrying fails with `USERNAME_TAKEN`. The UI checks
+      the length first, but API callers (registration manifests,
+      scripts) can still hit it. Fix: validate before inserting, or wrap
+      the insert and password write in one transaction.
 
 - [ ] **Emails escape HTML in subjects and plain-text bodies.**
       `odo_service::template::render` uses Handlebars' default HTML

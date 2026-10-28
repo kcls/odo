@@ -109,5 +109,33 @@
     "unitAndBelow": "{{unit}} and below",
     "more": "+{{count, number}} more",
     "less": "Show less"
+  },
+  "new": "New user",
+  "create": {
+    "title": "New user",
+    "description": "Create an account, then assign its roles on the next page.",
+    "accountType": "Account type",
+    "local": "Password sign-in",
+    "localHint": "Signs in to odo with a username and password.",
+    "saml": "Single sign-on (SAML)",
+    "samlHint": "Signs in through an identity provider. Accounts are normally created at first sign-in; create one here only to assign roles beforehand. It's matched by email, so use the address the identity provider sends.",
+    "username": "Username",
+    "usernameHint": "No spaces.",
+    "usernameSpaces": "Usernames can't contain spaces.",
+    "email": "Email",
+    "firstName": "First name",
+    "middleName": "Middle name",
+    "familyName": "Family name",
+    "password": "Password",
+    "passwordHint": "At least 8 characters. There's no way to set it again later from here, so share it with the user securely.",
+    "passwordShort": "Use at least 8 characters.",
+    "confirmPassword": "Confirm password",
+    "passwordMismatch": "The passwords don't match.",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "submit": "Create user",
+    "usernameTaken": "An active account already uses this username.",
+    "emailTaken": "An active account already uses this email address.",
+    "created": "Created {{name}}"
   }
 }
