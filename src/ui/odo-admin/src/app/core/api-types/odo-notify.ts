@@ -4,6 +4,70 @@
  */
 
 export interface paths {
+    "/api/v1/odo/notify/delivery/get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["get_delivery"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/odo/notify/delivery/list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["list_deliveries"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/odo/notify/delivery/recipients": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["list_recipient_activity"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/odo/notify/delivery/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["delivery_summary"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/odo/notify/email-group/create": {
         parameters: {
             query?: never;
@@ -322,9 +386,36 @@ export interface components {
             sample_data?: unknown;
             subject_template: string;
         };
+        DeliveryDetailResponse: {
+            action_url?: string | null;
+            /** @description The rendered body: HTML for email, text for in-app. */
+            body?: string | null;
+            delivered_addresses: string[];
+            delivery: components["schemas"]["DeliveryRow"];
+            /** Format: date-time */
+            dismissed_at?: string | null;
+            event?: null | components["schemas"]["DeliveryEvent"];
+            failed_addresses: string[];
+            /** Format: date-time */
+            read_at?: string | null;
+        };
+        DeliveryEvent: {
+            /** Format: date-time */
+            created_at: string;
+            /** Format: int32 */
+            created_by?: number | null;
+            created_by_name?: string | null;
+            /** Format: int64 */
+            id: number;
+            /** Format: int64 */
+            source_entity_id?: number | null;
+            source_entity_type?: string | null;
+            source_service?: string | null;
+            template_code?: string | null;
+        };
         DeliveryIdRequest: {
             /** Format: int64 */
-            delivery_id: number;
+            id: number;
         };
         DeliveryInfo: {
             channel: string;
@@ -335,6 +426,84 @@ export interface components {
             /** Format: int32 */
             recipient_user?: number | null;
             status: string;
+        };
+        /** @description One page of notification deliveries. */
+        DeliveryPage: {
+            /** @description The rows on this page. */
+            rows: components["schemas"]["DeliveryRow"][];
+            /**
+             * Format: int64
+             * @description Total rows matching the filter, ignoring limit/offset.
+             */
+            total: number;
+        };
+        /** @description Who a delivery was addressed to, decorated for display. */
+        DeliveryRecipient: {
+            /**
+             * @description False for a deleted user, or a deleted or deactivated group: email
+             *     to it is skipped at send time.
+             */
+            active: boolean;
+            /** @description A user's email, or a group's code. */
+            detail: string;
+            /** Format: int32 */
+            id: number;
+            kind: components["schemas"]["RecipientKind"];
+            /** @description A user's display name, or a group's label. */
+            label: string;
+        };
+        DeliveryRow: {
+            channel: string;
+            /** Format: date-time */
+            created_at: string;
+            error_code?: string | null;
+            error_message?: string | null;
+            /** Format: int64 */
+            event_id: number;
+            /**
+             * Format: int64
+             * @description Addresses that refused a delivery reported as delivered (a group's
+             *     partial failure); 0 when none or not recorded.
+             */
+            failed_address_count: number;
+            /** Format: int64 */
+            id: number;
+            /** Format: int32 */
+            max_retries: number;
+            /** Format: date-time */
+            next_retry_at?: string | null;
+            /** Format: date-time */
+            processed_at?: string | null;
+            recipient?: null | components["schemas"]["DeliveryRecipient"];
+            /** Format: int32 */
+            retry_count: number;
+            /** Format: date-time */
+            scheduled_for?: string | null;
+            status: string;
+            /** @description The rendered subject (email) or title (in-app). */
+            subject: string;
+            template_code?: string | null;
+        };
+        DeliverySummaryResponse: {
+            /** @description One row per (channel, status) with any deliveries in the window. */
+            counts: components["schemas"]["StatusCount"][];
+            /** Format: date-time */
+            since: string;
+            /** Format: date-time */
+            until?: string | null;
+        };
+        DeliveryWindowRequest: {
+            channel?: string | null;
+            /**
+             * Format: date-time
+             * @description Created at or after; defaults to 7 days ago.
+             */
+            since?: string | null;
+            /**
+             * Format: date-time
+             * @description Created before; open-ended when absent.
+             */
+            until?: string | null;
         };
         EmailGroupDetailResponse: {
             group: components["schemas"]["EmailGroupRow"];
@@ -405,9 +574,43 @@ export interface components {
             event_id: number;
             is_duplicate: boolean;
         };
+        ListDeliveriesRequest: components["schemas"]["Page"] & components["schemas"]["Sort"] & {
+            /** @description email or in_app. */
+            channel?: string | null;
+            /** Format: int32 */
+            recipient_email_group?: number | null;
+            /** Format: int32 */
+            recipient_user?: number | null;
+            /** @description Case-insensitive substring of the rendered subject. */
+            search?: string | null;
+            /**
+             * Format: date-time
+             * @description Created at or after.
+             */
+            since?: string | null;
+            /** @description Any of: pending, processing, delivered, failed, skipped. */
+            status?: string[] | null;
+            template_code?: string | null;
+            /**
+             * Format: date-time
+             * @description Created before.
+             */
+            until?: string | null;
+        };
         ListEmailGroupsRequest: components["schemas"]["Page"] & components["schemas"]["Sort"] & {
             include_inactive?: boolean;
             search?: string | null;
+        };
+        ListRecipientActivityRequest: components["schemas"]["Page"] & components["schemas"]["Sort"] & {
+            channel?: string | null;
+            kind?: null | components["schemas"]["RecipientKind"];
+            /**
+             * Format: date-time
+             * @description Created at or after; defaults to 7 days ago.
+             */
+            since?: string | null;
+            /** Format: date-time */
+            until?: string | null;
         };
         ListRequest: {
             /** Format: int64 */
@@ -493,6 +696,41 @@ export interface components {
             /** @enum {string} */
             type: "email_group";
         };
+        /** @description One page of per-recipient delivery activity. */
+        RecipientActivityPage: {
+            /** @description The rows on this page. */
+            rows: components["schemas"]["RecipientActivityRow"][];
+            /**
+             * Format: int64
+             * @description Total rows matching the filter, ignoring limit/offset.
+             */
+            total: number;
+        };
+        /** @description One recipient's deliveries in a window. */
+        RecipientActivityRow: {
+            /** Format: int64 */
+            delivered: number;
+            /** Format: int64 */
+            failed: number;
+            /** Format: date-time */
+            last_created_at: string;
+            /** Format: date-time */
+            last_delivered_at?: string | null;
+            /** Format: date-time */
+            last_failed_at?: string | null;
+            /**
+             * Format: int64
+             * @description Pending or processing.
+             */
+            queued: number;
+            recipient?: null | components["schemas"]["DeliveryRecipient"];
+            /** Format: int64 */
+            skipped: number;
+            /** Format: int64 */
+            total: number;
+        };
+        /** @enum {string} */
+        RecipientKind: "user" | "email_group";
         /**
          * @description Standard sort inputs for admin list endpoints. Flatten this into a
          *     per-resource request struct alongside `Page`:
@@ -524,6 +762,12 @@ export interface components {
          * @enum {string}
          */
         SortDir: "asc" | "desc";
+        StatusCount: {
+            channel: string;
+            /** Format: int64 */
+            count: number;
+            status: string;
+        };
         SuccessResponse: {
             success: boolean;
         };
@@ -596,6 +840,102 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    get_delivery: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeliveryIdRequest"];
+            };
+        };
+        responses: {
+            /** @description One delivery with its message and event */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryDetailResponse"];
+                };
+            };
+        };
+    };
+    list_deliveries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ListDeliveriesRequest"];
+            };
+        };
+        responses: {
+            /** @description Deliveries, newest first by default */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryPage"];
+                };
+            };
+        };
+    };
+    list_recipient_activity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ListRecipientActivityRequest"];
+            };
+        };
+        responses: {
+            /** @description Delivery activity per recipient */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecipientActivityPage"];
+                };
+            };
+        };
+    };
+    delivery_summary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeliveryWindowRequest"];
+            };
+        };
+        responses: {
+            /** @description Delivery counts by channel and status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliverySummaryResponse"];
+                };
+            };
+        };
+    };
     create_email_group: {
         parameters: {
             query?: never;

@@ -9,6 +9,146 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/api/v1/odo/notify/delivery/get": {
+      "post": {
+        "tags": [
+          "delivery-admin"
+        ],
+        "operationId": "get_delivery",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeliveryIdRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "One delivery with its message and event",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryDetailResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/notify/delivery/list": {
+      "post": {
+        "tags": [
+          "delivery-admin"
+        ],
+        "operationId": "list_deliveries",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ListDeliveriesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Deliveries, newest first by default",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryPage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/notify/delivery/recipients": {
+      "post": {
+        "tags": [
+          "delivery-admin"
+        ],
+        "operationId": "list_recipient_activity",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ListRecipientActivityRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Delivery activity per recipient",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecipientActivityPage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/notify/delivery/summary": {
+      "post": {
+        "tags": [
+          "delivery-admin"
+        ],
+        "operationId": "delivery_summary",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeliveryWindowRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Delivery counts by channel and status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliverySummaryResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/odo/notify/email-group/create": {
       "post": {
         "tags": [
@@ -715,13 +855,130 @@
           }
         }
       },
+      "DeliveryDetailResponse": {
+        "type": "object",
+        "required": [
+          "delivery",
+          "delivered_addresses",
+          "failed_addresses"
+        ],
+        "properties": {
+          "action_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "body": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The rendered body: HTML for email, text for in-app."
+          },
+          "delivered_addresses": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "delivery": {
+            "$ref": "#/components/schemas/DeliveryRow"
+          },
+          "dismissed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "event": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DeliveryEvent"
+              }
+            ]
+          },
+          "failed_addresses": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "read_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "DeliveryEvent": {
+        "type": "object",
+        "required": [
+          "id",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "created_by": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "created_by_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "source_entity_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "source_entity_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_service": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "template_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
       "DeliveryIdRequest": {
         "type": "object",
         "required": [
-          "delivery_id"
+          "id"
         ],
         "properties": {
-          "delivery_id": {
+          "id": {
             "type": "integer",
             "format": "int64"
           }
@@ -758,6 +1015,215 @@
           },
           "status": {
             "type": "string"
+          }
+        }
+      },
+      "DeliveryPage": {
+        "type": "object",
+        "description": "One page of notification deliveries.",
+        "required": [
+          "rows",
+          "total"
+        ],
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeliveryRow"
+            },
+            "description": "The rows on this page."
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Total rows matching the filter, ignoring limit/offset."
+          }
+        }
+      },
+      "DeliveryRecipient": {
+        "type": "object",
+        "description": "Who a delivery was addressed to, decorated for display.",
+        "required": [
+          "kind",
+          "id",
+          "label",
+          "detail",
+          "active"
+        ],
+        "properties": {
+          "active": {
+            "type": "boolean",
+            "description": "False for a deleted user, or a deleted or deactivated group: email\nto it is skipped at send time."
+          },
+          "detail": {
+            "type": "string",
+            "description": "A user's email, or a group's code."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/RecipientKind"
+          },
+          "label": {
+            "type": "string",
+            "description": "A user's display name, or a group's label."
+          }
+        }
+      },
+      "DeliveryRow": {
+        "type": "object",
+        "required": [
+          "id",
+          "event_id",
+          "channel",
+          "subject",
+          "status",
+          "created_at",
+          "retry_count",
+          "max_retries",
+          "failed_address_count"
+        ],
+        "properties": {
+          "channel": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "error_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "error_message": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "event_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "failed_address_count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Addresses that refused a delivery reported as delivered (a group's\npartial failure); 0 when none or not recorded."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "max_retries": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "next_retry_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "processed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "recipient": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DeliveryRecipient",
+                "description": "None only if the recipient row no longer exists at all."
+              }
+            ]
+          },
+          "retry_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "scheduled_for": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string"
+          },
+          "subject": {
+            "type": "string",
+            "description": "The rendered subject (email) or title (in-app)."
+          },
+          "template_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "DeliverySummaryResponse": {
+        "type": "object",
+        "required": [
+          "since",
+          "counts"
+        ],
+        "properties": {
+          "counts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatusCount"
+            },
+            "description": "One row per (channel, status) with any deliveries in the window."
+          },
+          "since": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "until": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "DeliveryWindowRequest": {
+        "type": "object",
+        "properties": {
+          "channel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "since": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Created at or after; defaults to 7 days ago."
+          },
+          "until": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Created before; open-ended when absent."
           }
         }
       },
@@ -977,6 +1443,81 @@
           }
         }
       },
+      "ListDeliveriesRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Page"
+          },
+          {
+            "$ref": "#/components/schemas/Sort"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "channel": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "email or in_app."
+              },
+              "recipient_email_group": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "int32"
+              },
+              "recipient_user": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "int32"
+              },
+              "search": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Case-insensitive substring of the rendered subject."
+              },
+              "since": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time",
+                "description": "Created at or after."
+              },
+              "status": {
+                "type": [
+                  "array",
+                  "null"
+                ],
+                "items": {
+                  "type": "string"
+                },
+                "description": "Any of: pending, processing, delivered, failed, skipped."
+              },
+              "template_code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "until": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time",
+                "description": "Created before."
+              }
+            }
+          }
+        ]
+      },
       "ListEmailGroupsRequest": {
         "allOf": [
           {
@@ -996,6 +1537,53 @@
                   "string",
                   "null"
                 ]
+              }
+            }
+          }
+        ]
+      },
+      "ListRecipientActivityRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Page"
+          },
+          {
+            "$ref": "#/components/schemas/Sort",
+            "description": "Sortable by total, failed, or last (most recent delivery)."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "channel": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "kind": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/RecipientKind"
+                  }
+                ]
+              },
+              "since": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time",
+                "description": "Created at or after; defaults to 7 days ago."
+              },
+              "until": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
               }
             }
           }
@@ -1270,6 +1858,98 @@
         ],
         "description": "A recipient is referenced by id or by stable uuid. Callers outside the\nodo database (apps that hold only uuids) use the uuid; when both are\ngiven, the id wins."
       },
+      "RecipientActivityPage": {
+        "type": "object",
+        "description": "One page of per-recipient delivery activity.",
+        "required": [
+          "rows",
+          "total"
+        ],
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecipientActivityRow"
+            },
+            "description": "The rows on this page."
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Total rows matching the filter, ignoring limit/offset."
+          }
+        }
+      },
+      "RecipientActivityRow": {
+        "type": "object",
+        "description": "One recipient's deliveries in a window.",
+        "required": [
+          "total",
+          "delivered",
+          "failed",
+          "skipped",
+          "queued",
+          "last_created_at"
+        ],
+        "properties": {
+          "delivered": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "failed": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "last_created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "last_delivered_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "last_failed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "queued": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Pending or processing."
+          },
+          "recipient": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DeliveryRecipient"
+              }
+            ]
+          },
+          "skipped": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "RecipientKind": {
+        "type": "string",
+        "enum": [
+          "user",
+          "email_group"
+        ]
+      },
       "Sort": {
         "type": "object",
         "description": "Standard sort inputs for admin list endpoints. Flatten this into a\nper-resource request struct alongside `Page`:\n\n```ignore\n#[derive(Deserialize, ToSchema)]\npub struct ListThingsRequest {\n    #[serde(default)]\n    search: Option<String>,\n    #[serde(flatten)]\n    page: Page,\n    #[serde(flatten)]\n    sort: Sort,\n}\n```\n\n`sort_by` is a client-supplied string, so a handler must NEVER map it to a\ncolumn directly — resolve it against an explicit allow-list with\n[`Sort::resolve`], which falls back to the handler's default for any\nunknown or absent key.",
@@ -1301,6 +1981,26 @@
           "asc",
           "desc"
         ]
+      },
+      "StatusCount": {
+        "type": "object",
+        "required": [
+          "channel",
+          "status",
+          "count"
+        ],
+        "properties": {
+          "channel": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
       },
       "SuccessResponse": {
         "type": "object",
@@ -1545,6 +2245,10 @@
     {
       "name": "template-admin",
       "description": "Notification template administration"
+    },
+    {
+      "name": "delivery-admin",
+      "description": "Notification delivery history (read-only)"
     }
   ]
 }

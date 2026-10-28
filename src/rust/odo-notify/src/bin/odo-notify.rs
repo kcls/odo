@@ -3,7 +3,7 @@ use axum::middleware;
 use axum::routing::{get, post};
 use odo_client::auth::TokenManager;
 use odo_notify::AppState;
-use odo_notify::{email_group, enqueue, inbox, template_admin};
+use odo_notify::{delivery_admin, email_group, enqueue, inbox, template_admin};
 use odo_service::health;
 use odo_service::middleware::{log_access, request_tracing, require_auth};
 use std::env;
@@ -33,6 +33,10 @@ use utoipa::OpenApi;
         template_admin::update_template,
         template_admin::delete_template,
         template_admin::preview_template,
+        delivery_admin::list_deliveries,
+        delivery_admin::get_delivery,
+        delivery_admin::delivery_summary,
+        delivery_admin::list_recipient_activity,
     ),
     components(schemas(
         inbox::ListRequest,
@@ -63,12 +67,27 @@ use utoipa::OpenApi;
         template_admin::UpdateTemplateRequest,
         template_admin::TemplateIdRequest,
         template_admin::PreviewRequest,
+        delivery_admin::RecipientKind,
+        delivery_admin::DeliveryRecipient,
+        delivery_admin::DeliveryRow,
+        delivery_admin::DeliveryEvent,
+        delivery_admin::DeliveryDetailResponse,
+        delivery_admin::DeliveryPage,
+        delivery_admin::StatusCount,
+        delivery_admin::DeliverySummaryResponse,
+        delivery_admin::RecipientActivityRow,
+        delivery_admin::RecipientActivityPage,
+        delivery_admin::ListDeliveriesRequest,
+        delivery_admin::DeliveryIdRequest,
+        delivery_admin::DeliveryWindowRequest,
+        delivery_admin::ListRecipientActivityRequest,
     )),
     tags(
         (name = "inbox", description = "Notification inbox (list, read, dismiss)"),
         (name = "enqueue", description = "Send notifications"),
         (name = "email-group", description = "Email group administration"),
         (name = "template-admin", description = "Notification template administration"),
+        (name = "delivery-admin", description = "Notification delivery history (read-only)"),
     ),
     security(("bearer" = []))
 )]
@@ -197,6 +216,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route(
             "/api/v1/odo/notify/template/preview",
             post(template_admin::preview_template),
+        )
+        .route(
+            "/api/v1/odo/notify/delivery/list",
+            post(delivery_admin::list_deliveries),
+        )
+        .route(
+            "/api/v1/odo/notify/delivery/get",
+            post(delivery_admin::get_delivery),
+        )
+        .route(
+            "/api/v1/odo/notify/delivery/summary",
+            post(delivery_admin::delivery_summary),
+        )
+        .route(
+            "/api/v1/odo/notify/delivery/recipients",
+            post(delivery_admin::list_recipient_activity),
         )
         .layer(middleware::from_fn(log_access))
         .layer(middleware::from_fn_with_state(state.clone(), require_auth))
