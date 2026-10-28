@@ -42,3 +42,35 @@ export const templatesApi = {
     return apiPost(`${TEMPLATE}/preview`, params)
   },
 }
+
+export type EmailGroupRow = S["EmailGroupRow"]
+export type EmailGroupPage = S["EmailGroupPage"]
+export type EmailGroupMemberRow = S["EmailGroupMemberRow"]
+export type EmailGroupDetail = S["EmailGroupDetailResponse"]
+
+const EMAIL_GROUP = "/api/v1/odo/notify/email-group"
+
+export const emailGroupsApi = {
+  /** One page of groups: server-driven search + sort + pagination. */
+  listPage(params: Partial<S["ListEmailGroupsRequest"]>): Promise<EmailGroupPage> {
+    return apiPost(`${EMAIL_GROUP}/list`, params)
+  },
+  get(id: number): Promise<EmailGroupDetail> {
+    return apiPost(`${EMAIL_GROUP}/get`, { id } satisfies S["EmailGroupIdRequest"])
+  },
+  create(params: S["CreateEmailGroupRequest"]): Promise<EmailGroupRow> {
+    return apiPost(`${EMAIL_GROUP}/create`, params)
+  },
+  update(params: S["UpdateEmailGroupRequest"]): Promise<EmailGroupRow> {
+    return apiPost(`${EMAIL_GROUP}/update`, params)
+  },
+  addMember(params: S["CreateEmailGroupMemberRequest"]): Promise<EmailGroupMemberRow> {
+    return apiPost(`${EMAIL_GROUP}/member/create`, params)
+  },
+  updateMember(params: S["UpdateEmailGroupMemberRequest"]): Promise<EmailGroupMemberRow> {
+    return apiPost(`${EMAIL_GROUP}/member/update`, params)
+  },
+  deleteMember(id: number): Promise<S["SuccessResponse"]> {
+    return apiPost(`${EMAIL_GROUP}/member/delete`, { id } satisfies S["EmailGroupMemberIdRequest"])
+  },
+}

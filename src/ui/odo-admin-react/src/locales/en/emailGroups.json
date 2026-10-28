@@ -1,0 +1,67 @@
+{
+  "title": "Email groups",
+  "subtitle": "Groups of email addresses that notifications can be sent to.",
+  "new": "New group",
+  "search": "Filter groups",
+  "showInactive": "Show inactive groups",
+  "columns": {
+    "code": "Code",
+    "label": "Label",
+    "status": "Status",
+    "members": "Members",
+    "updated": "Updated"
+  },
+  "active": "Active",
+  "inactive": "Inactive",
+  "memberCounts": "{{active, number}} of {{total, number}} active",
+  "noMatches": "No groups match.",
+  "empty": "No email groups found.",
+  "form": {
+    "createTitle": "New email group",
+    "editTitle": "Edit email group",
+    "code": "Code",
+    "codePlaceholder": "e.g. shoreline-staff",
+    "codeHint": "Unique identifier; not shown to recipients. Apps send to a group by its code.",
+    "label": "Label",
+    "labelPlaceholder": "e.g. Shoreline Staff",
+    "submitCreate": "Create group",
+    "created": "Created {{label}}",
+    "saved": "Saved {{label}}"
+  },
+  "detail": {
+    "back": "Email groups",
+    "edit": "Edit",
+    "deactivate": "Deactivate",
+    "reactivate": "Reactivate",
+    "reactivated": "Reactivated {{label}}"
+  },
+  "deactivate": {
+    "title": "Deactivate email group?",
+    "body": "{{label}} will stop receiving notification emails until it's reactivated. Its members are kept.",
+    "done": "Deactivated {{label}}"
+  },
+  "members": {
+    "title": "Members",
+    "description": "Inactive members stay in the group but don't receive email.",
+    "filter": "Filter members",
+    "add": "Add",
+    "addLabel": "Email address to add",
+    "addPlaceholder": "name@example.org",
+    "added": "Added {{email}}",
+    "invalidEmail": "Enter a valid email address.",
+    "none": "This group has no members yet.",
+    "noMatches": "No members match.",
+    "columns": {
+      "email": "Email",
+      "active": "Active",
+      "added": "Added"
+    },
+    "activeLabel": "{{email}} receives email",
+    "activated": "{{email}} will receive email",
+    "deactivated": "{{email}} won't receive email",
+    "removeLabel": "Remove {{email}}",
+    "removeTitle": "Remove member?",
+    "removeBody": "{{email}} will be removed from {{label}}.",
+    "removed": "Removed {{email}}"
+  }
+}

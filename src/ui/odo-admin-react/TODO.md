@@ -30,10 +30,13 @@
       unsaved edits. The HTML preview renders in an empty-sandbox
       iframe: the Angular app relied on Angular's innerHTML
       sanitizing, React has none, and templates can contain script.
+- [x] Email Groups: list (inactive groups behind a filter kept in the
+      URL), create, edit, deactivate/reactivate, and members managed in
+      place (add inline, switch on or off, remove; a filter appears for
+      large groups)
 
 ## Stages to come
 
-- [ ] Email Groups: list, detail with members
 - [ ] SAML: IdP list/detail, attributes, role mappings, SP dialogs
 
 ## New features

@@ -1,6 +1,7 @@
 import "i18next"
 
 import type common from "@/locales/en/common.json"
+import type emailGroups from "@/locales/en/emailGroups.json"
 import type home from "@/locales/en/home.json"
 import type login from "@/locales/en/login.json"
 import type orgUnits from "@/locales/en/orgUnits.json"
@@ -17,6 +18,7 @@ declare module "i18next" {
     defaultNS: "common"
     resources: {
       common: typeof common
+      emailGroups: typeof emailGroups
       home: typeof home
       login: typeof login
       orgUnits: typeof orgUnits
