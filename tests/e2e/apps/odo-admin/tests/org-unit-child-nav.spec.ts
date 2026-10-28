@@ -1,42 +1,28 @@
 import { test, expect } from '@playwright/test';
-import { AdminLoginPage } from '../pages/login.page';
-import { ADMIN_USERS } from '../test-users';
+import { loginAs } from '../support';
 
 /**
- * Regression guard: navigating from an org unit to one of its child units
- * reuses the OrgUnitDetail component (same route, different :id). The page must
- * reload for the new id — an effect on the id signal, not ngOnInit (which fires
- * once). We assert both the URL and the heading change.
+ * Navigating from an org unit to one of its children stays on the same
+ * route with a new :unitId; the page must load the child, not keep showing
+ * the parent.
  */
-test.describe('org-unit child navigation', () => {
+test.describe('org unit child navigation', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
   test.beforeEach(async ({ page }) => {
-    const login = new AdminLoginPage(page);
-    await login.goto();
-    await login.loginAndWaitForHome(
-      ADMIN_USERS.admin.username,
-      ADMIN_USERS.admin.password,
-    );
+    await loginAs(page);
   });
 
-  test('clicking a child unit routes and reloads the detail page', async ({
-    page,
-  }) => {
-    // Reach the root's detail page via the org-units list (ids are not
-    // fixed), then navigate to a child.
+  test('clicking a child unit loads its page', async ({ page }) => {
     await page.goto('/odo/admin/org-units');
-    await page.locator('tr.odo-row', { hasText: 'Odo Library System' }).first().click();
-    const heading = page.getByRole('heading', { level: 1 }).first();
-    await expect(heading).toHaveText('Odo Library System');
+    await page.getByRole('main').getByRole('link', { name: 'Odo Library System', exact: true }).click();
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Odo Library System');
+    const parentUrl = page.url();
 
-    // Click a known child row (platform seed) in the "Child units" table.
-    const childRow = page.locator('tr.odo-row', { hasText: 'East Region' }).first();
-    await childRow.click();
+    const children = page.getByRole('table', { name: 'Child units' });
+    await children.getByRole('link', { name: 'East Region', exact: true }).click();
 
-    await expect(page).toHaveURL(/\/org-units\/\d+$/);
-    // The heading must update to the child — proves the page reloaded, not just
-    // the URL changing while the stale parent view remained.
-    await expect(heading).toHaveText('East Region');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('East Region');
+    expect(page.url()).not.toBe(parentUrl);
   });
 });
