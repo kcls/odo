@@ -1,4 +1,4 @@
-# odo-admin-react: TODO
+# odo-admin: TODO
 
 ## Ported
 
@@ -123,23 +123,16 @@
 
 ## Cutover
 
-- [ ] **Overhaul the e2e tests** (`tests/e2e/apps/odo-admin`) once the
-      UI is done. Every spec is tied to Angular internals (`tr.odo-row`,
-      `odo-table`, `odo-sort-header`, `mat-icon` text, `.shell-nav-link`,
-      `.app-error-snackbar`, `td.cell-code`), so rewrite them against
-      roles and accessible names (`getByRole`, `aria-sort`) rather than
-      repointing selectors. Carry over smoke, negative-perm, sorting,
-      effective permissions (now on the Users page; the User Roles entry
-      goes away) and org-unit child navigation. Add coverage for what's
-      new: list state in the URL (deep links, back/forward), assigning
-      and removing roles from the Users page, the template editor's
-      unsaved-changes guard and preview, the session-expiry redirect
-      back to the original page, and serving at a base path other than
-      `/odo/admin`.
-- [ ] Move `src/ui/odo-admin-react` to `src/ui/odo-admin`, delete the
-      Angular app, update `service-map.yaml` (dockerfile path),
-      `scripts/generate-openapi.sh` (TS_OUT_DIRS), CI, and CLAUDE.md
-- [ ] The k8s deployment's probes hit `/odo/admin`; with the new nginx
-      config that returns a 301 to `/odo/admin/`. Probes accept 3xx, but
-      pointing them at `/odo/admin/` is cleaner
-- [ ] Update `docs/adding-a-tool.md` for the React app
+- [x] Port every Angular tool
+- [x] Move the app to `src/ui/odo-admin` and delete the Angular app;
+      repoint `scripts/generate-openapi.sh`, CI, CLAUDE.md, and the k8s
+      probes (now `/odo/admin/`, which no longer redirects)
+- [x] Rewrite `docs/adding-a-tool.md` for this app
+- [ ] **Overhaul the e2e tests** (`tests/e2e/apps/odo-admin`) against
+      roles and accessible names
+- [ ] Deploy (`./scripts/build-and-deploy-service.sh ui-odo-admin --wait`)
+      and run the e2e suite against the cluster
+      (`cd tests/e2e && BASE_URL=http://localhost:30080 npm run test:odo-admin`)
+- [ ] Serving at a base path other than `/odo/admin` is checked by hand
+      (the container accepts `ODO_ADMIN_BASE_PATH`); e2e runs against
+      one deployment, so it can't cover it

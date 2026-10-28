@@ -38,8 +38,10 @@ templates, or fixtures.
   `manage-database.sh deploy-test`.
 - `tests/integration/`, `tests/e2e/` (Playwright, odo-admin project),
   `tests/db/` (pgTAP), `tests/load/` (weighted API load harness).
-- `src/ui/odo-admin/` — Angular admin SPA (`/odo/admin`); `src/ui/core` —
-  shared UI lib it depends on.
+- `src/ui/odo-admin/` — admin SPA (`/odo/admin`): Vite, React, React
+  Router, Tailwind, shadcn/ui, react-i18next; see its README, and
+  `docs/adding-a-tool.md` before adding a tool. `src/ui/core` — shared
+  UI lib it depends on.
 - `k8s/` — gateway, envoy routes/security, registry. The README
   carries the gateway routing registry (claimed path prefixes).
   PostgreSQL is NOT in the cluster: it runs on the host (or an external
@@ -86,7 +88,7 @@ templates, or fixtures.
   (the DB endpoint resolves from the secret's `DATABASE_URL`; `PG*` env
   vars only override it).
 - e2e locally: `cd tests/e2e && BASE_URL=http://localhost:30080 npm test`.
-  The UIs need a recent Node (the Angular CLI requires >= 20).
+  The admin UI needs Node >= 22.22 (React Router 8).
 - OpenAPI: `./scripts/generate-openapi.sh` regenerates `openapi/*.json` +
   the admin UI's generated TS types; `--check` is the drift gate. Commit
   the results whenever handler signatures/schemas change.
@@ -157,7 +159,7 @@ templates, or fixtures.
 ## Gotchas
 
 - `src/ui/core` must be BUILT before `src/ui/odo-admin` will build:
-  `@odo/core` resolves to `./dist/index.js`, so `ng build` fails with
+  `@odo/core` resolves to `./dist/index.js`, so the admin build fails with
   "Cannot find module '@odo/core'" until `npm run build` has run in core.
 - `--features saml` builds samael, which links xmlsec1/libxml2 and needs
   clang for bindgen: `pkg-config libssl-dev libxml2-dev libxmlsec1-dev

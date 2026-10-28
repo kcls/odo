@@ -1,250 +1,255 @@
-# Adding a new admin tool
+# Adding an admin tool
 
-This app is a **reference implementation**: every tool is built the same way,
-from the same reusable parts, so adding one is mostly configuration plus a few
-small files — never hand-rolled plumbing. Read one existing tool end to end
-first; **`features/org-units/`** is the canonical example (list + drill-down
-detail + dialogs + a feature-local typed API client), and the simpler
-**`features/permissions/`** shows a single-list tool.
+Every tool is built the same way, from the same parts, so adding one is
+mostly a registry entry, a couple of route modules, and strings. Read one
+existing tool end to end first: **`routes/roles/`** is the canonical
+example (a server-driven list, a detail page, dialogs, a nested list of
+grants), and **`routes/permissions/`** is the simplest list.
 
-The golden rules that make this app maintainable:
+The rules that keep this app maintainable:
 
-1. **Generated types are the source of truth.** Never hand-write an interface
-   that mirrors a backend struct. Import from `core/api-types/<service>`.
-2. **Tables are `<odo-table>`** (CDK-based), never Material's `mat-table`;
-   paginate them with `<odo-paginator>`, never `mat-paginator`.
-3. **Detail pages are `<odo-detail-page>`** with stacked `<section>`s — the user
-   should feel they are drilling into one subject, not reading disconnected lists.
-4. **Style with Material's token API only.** No `.mat-mdc-*` / `.mdc-*` selectors
-   in stylesheets; reuse the global utility classes.
-5. **Server-driven lists.** Growing lists are paginated (`{ rows, total }`) and
-   sorted server-side (allow-listed columns only); gate every write affordance
-   on the tool's `*_WRITE` perm.
+1. **Generated types are the source of truth.** Never hand-write a type
+   that mirrors a backend struct; import from `src/api/types/<service>`.
+2. **URLs are the state.** Search, sort, page, filters, and tabs live in
+   the query string, so every view deep-links and survives a reload.
+3. **Loaders load, middleware guards.** A route's `loader` fetches what it
+   renders; the router's middleware has already checked the session and
+   the tool's read permission, so a loader never makes a call the user
+   isn't allowed to make.
+4. **Lists are `DataTable` + `Paginator`**, with columns as data. Detail
+   pages are `DetailHeader` + stacked `Section`s about one subject.
+5. **Every visible string is a `t()` key** in `src/locales/en/*.json`.
 
 ---
 
 ## 0. Backend (only if the endpoints don't exist yet)
 
-If your tool needs new admin endpoints, add them to the owning Rust service
-(`odo-auth` / `odo-org` / `odo-notify` / `odo-asset`) following the existing
-admin modules:
+Add admin endpoints to the owning Rust service (`odo-auth` / `odo-org` /
+`odo-notify` / `odo-asset`), following its existing admin modules:
 
-- Use the `odo::admin` helpers: `clean_required`/`clean_code`/`clean_optional`/
-  `clean_email`/`clean_search` for input, `map_unique_violation` for 409s,
-  `Page`/`Paginated<T>` for list inputs/outputs.
-- For a **paginated** list, declare its response type with the macro — a bare
-  `type XPage = Paginated<Row>` alias will NOT get a row-typed OpenAPI schema:
+- Use the `odo_service::admin` helpers: `clean_required` / `clean_code` /
+  `clean_optional` / `clean_email` / `clean_search` for input,
+  `contains_ci` for search (SeaORM's `Column::contains` is a
+  case-sensitive `LIKE`), `map_unique_violation` for 409s, and
+  `Page` / `Paginated<T>` / `Sort` for lists.
+- Declare a paginated response with the macro; a bare
+  `type XPage = Paginated<Row>` alias does NOT get a row-typed schema:
 
   ```rust
-  odo::page_type!(WidgetPage, WidgetRow, "One page of widgets.");
+  odo_service::page_type!(WidgetPage, WidgetRow, "One page of widgets.");
   // handler: Ok(Json(Paginated::new(rows, total).into()))
   ```
 
-- Gate each handler with a `read`/`write` permission check.
-- Register new schemas + paths in the service's `bin/<service>.rs` `ApiDoc`.
-- **Derived/read-only views** (anything computed from authz + the org tree, e.g.
-  effective permission scope): put the logic in a SQL function in a sqitch
-  migration and have the handler just call it, rather than re-deriving in Rust or
-  TypeScript. Reuse the *same* expressions the enforcement path uses so the
-  display can't drift from what's actually enforced — see
-  `authz.usr_perm_scopes` (migration 092), which mirrors `authz.usr_has_perm_at`,
-  and its pgTAP coverage in `tests/db/usr_perm_scopes_tests.sql`. Add pgTAP
-  tests for any non-trivial SQL function; run them with
-  `PGPASSWORD=… PGHOST=localhost PGPORT=5432 ./run-tests.sh` from `tests/db`.
+- Resolve `Sort` against an explicit allow-list, never mapping the client
+  string to a column, and add a stable tiebreaker:
 
-Then regenerate the committed specs + TypeScript types:
+  ```rust
+  let (col, ord) = params.sort.resolve(
+      &[("code", Column::Code), ("description", Column::Description)],
+      (Column::Code, Order::Asc),   // default + fallback for unknown keys
+  );
+  query.order_by(col, ord).order_by_asc(Column::Id)
+  ```
+
+- In update requests, a null field means "unchanged". If a nullable field
+  must be clearable, add a `clear_<field>: bool` and refuse both at once
+  with `check_clear`.
+- Gate each handler on its `read` / `write` permission, and register its
+  schemas and paths in the service's `bin/<service>.rs` `ApiDoc`.
+- **Derived, read-only views** (anything computed from authz and the org
+  tree, like effective permission scope) belong in a SQL function that
+  reuses the enforcement path's expressions, so display can't drift from
+  enforcement: see `authz.usr_perm_scopes` (in `001_odo_baseline`), which
+  mirrors `authz.usr_has_perm_at`, and its pgTAP tests in
+  `tests/db/odo/usr_perm_scopes_tests.sql` (`./scripts/run-tests.sh --db`).
+- **Add integration tests** for every new endpoint in
+  `tests/integration/tests/`: authn (401), authz (403), validation, and
+  the behaviour itself. Tests run concurrently against shared data, so
+  create what you assert on and don't assume a list fits on one page.
+
+Then regenerate the committed specs and the UI's types:
 
 ```bash
-scripts/generate-openapi.sh          # dumps specs, regenerates api-types/*.ts
+scripts/generate-openapi.sh          # specs + src/ui/odo-admin/src/api/types/*.ts
 scripts/generate-openapi.sh --check  # what CI runs; must be clean
 ```
 
 ## 1. Permission
 
-Add the tool's `read`/`write` codes to **`core/perms.ts`** (mirroring the codes
-seeded by sqitch change `090_odo_admin_role`), and make sure that migration
-seeds them and grants them to the `odo-admin` role.
+Add the tool's codes to **`src/auth/perms.ts`**, mirroring the sqitch
+change that seeds them and grants them to the `odo-admin` role:
 
 ```ts
-WIDGET_READ: 'widget.read',
-WIDGET_WRITE: 'widget.write',
+WIDGET_READ: "odo.widget.read",
+WIDGET_WRITE: "odo.widget.write",
 ```
 
-## 2. Feature folder
+## 2. API client
 
-Create `features/<tool>/` with:
+Add a typed client in **`src/api/<service>.ts`** (or extend the existing
+one), typed from the generated schemas:
 
-- **`<tool>-api.ts`** — the typed client. Copy the shape from
-  `features/org-units/org-admin-api.ts`:
+```ts
+import { apiPost } from "./client"
+import type { components } from "./types/odo-widget"
 
-  ```ts
-  import { apiGet, apiPost } from '../../core/api';
-  import type { components } from '../../core/api-types/odo-<service>';
-  type S = components['schemas'];
+type S = components["schemas"]
+export type WidgetRow = S["WidgetRow"]
 
-  export type WidgetRow = S['WidgetRow'];
-  export type WidgetPage = S['WidgetPage'];
+export const widgetsApi = {
+  listPage(params: Partial<S["ListWidgetsRequest"]>): Promise<S["WidgetPage"]> {
+    return apiPost("/api/v1/odo/widget/admin/widget/list", params)
+  },
+  /** Every widget, for pickers: lists default to 50 rows. */
+  listAll(): Promise<WidgetRow[]> {
+    return fetchAllPages((page) => widgetsApi.listPage(page))
+  },
+  create(params: S["CreateWidgetRequest"]): Promise<WidgetRow> {
+    return apiPost("/api/v1/odo/widget/admin/widget/create", params)
+  },
+}
+```
 
-  export const widgetApi = {
-    async list(search?: string): Promise<WidgetRow[]> {
-      const res = await apiPost<WidgetPage>('/api/v1/odo/<svc>/admin/widget/list', {
-        search: search || undefined,
-      });
-      return res.rows;            // paginated list -> read .rows
+Errors arrive as `ApiRequestError` (`status`, `code`, `field`); show them
+with `describeError(err)`. Add a widely shared error code to
+`src/api/errors.ts` and `errors.codes.*` in `common.json`.
+
+## 3. Strings
+
+Create **`src/locales/en/<tool>.json`** for the tool's namespace, register
+it in **`src/i18n/i18next.d.ts`** (keys are type-checked), and add the
+tool's `label` and `description` under `tools.<id>` in `common.json`.
+
+## 4. Routes
+
+Create **`src/routes/<tool>/`** with one module per route. Each exports a
+`loader` and a `Component`, and optionally a `handle` naming its
+breadcrumb:
+
+```tsx
+const LIST: ListDefaults = {
+  sort: { key: "code", dir: "asc" },
+  sortKeys: ["code", "label"],          // the backend's allow-list
+}
+
+export async function loader({ request }: LoaderFunctionArgs) {
+  const url = new URL(request.url)
+  const state = readListState(url.searchParams, LIST)
+  const [page, perms] = await Promise.all([
+    widgetsApi.listPage(listRequest(state)),
+    checkPerms({ canWrite: PERMS.WIDGET_WRITE }),
+    loadNamespaces("widgets"),
+  ])
+  redirectPastLastPage(url, state, page.total, LIST)
+  return { page, ...perms }
+}
+
+export function Component() {
+  const { page, canWrite } = useLoaderData<typeof loader>()
+  const { t } = useTranslation("widgets")
+  const [list, setList] = useListState(LIST)
+  const columns: Column<WidgetRow>[] = [
+    {
+      id: "code",
+      header: t("columns.code"),
+      sortKey: "code",
+      cell: (w) => <Link to={String(w.id)}>{w.code}</Link>,
     },
-    create(params: S['CreateWidgetRequest']): Promise<WidgetRow> {
-      return apiPost('/api/v1/odo/<svc>/admin/widget/create', params);
-    },
-    // update / delete ...
-  };
-  ```
+    // a computed column (a count) has no sortKey
+  ]
+  return (
+    <div className="flex flex-col gap-4">
+      <PageHeader title={t("title")} description={t("subtitle")} />
+      <SearchInput value={list.q} onCommit={(q) => setList({ q })} label={t("search")} />
+      <DataTable rows={page.rows} columns={columns} rowKey={(w) => w.id}
+        rowHref={(w) => String(w.id)} sort={list.sort}
+        onSortChange={(sort) => setList({ sort })} empty={t("empty")} busy={useBusy()} />
+      <Paginator total={page.total} pageIndex={list.pageIndex}
+        pageSize={list.pageSize} onChange={setList} />
+    </div>
+  )
+}
+```
 
-- **`<tool>.routes.ts`** — export a `Routes` const: `''` → list component,
-  and `':id'` → detail component if the tool drills in.
+Building blocks to reuse rather than rewrite:
 
-- **List component** (`<tool>-list.ts` + `.html` + `.scss`):
-  - Import `CdkTableModule` **and** `OdoTable` (the column defs live in the
-    host template, so the host must bring `CdkTableModule`).
-  - Load into signals in `ngOnInit`; use `ErrorHandlerService.show(err, '…')`.
-  - Set a `canWrite` signal from `auth.hasPerm(PERMS.WIDGET_WRITE)`.
-  - Render `<odo-table [rows] [displayedColumns] [clickableRows] (rowClick)>`
-    with projected `cdkColumnDef` columns. `.scss` is usually just
-    `:host { display: block; }`.
+| Need | Use |
+|---|---|
+| List table, sort headers, paging | `DataTable`, `Paginator`, `lib/list-state` |
+| Debounced search box bound to the URL | `SearchInput` |
+| Detail page header (back link, title, facts, actions) | `DetailHeader` |
+| A facet of a detail page | `Section` |
+| A bounded sub-list with create/edit/delete dialogs | `FacetSection` |
+| "Are you sure?" | `ConfirmDialog` |
+| A disabled action that says why | `DisabledReason` |
+| A searchable picker for long lists | `Combobox` |
+| Status label (icon/tone + text) | `StatusBadge` |
+| Headline counts | `StatTile` |
+| Dates, times, counts in the user's locale | `useFormatters` |
+| Reporting an unexpected error | `useReportError` |
 
-  - For a **server-paginated** list, place an `<odo-paginator>` directly beneath
-    the `<odo-table>` and drive both from server state:
+Dialogs remount their form on each open (render the form only while open)
+so state never leaks between uses; see `routes/roles/create-role-dialog.tsx`.
+After a write, call `useRevalidator().revalidate()` rather than patching
+loader data by hand.
 
-    ```html
-    <odo-table [rows]="rows()" [displayedColumns]="cols" />
-    <odo-paginator
-      [length]="total()"
-      [pageIndex]="pageIndex()"
-      [pageSize]="pageSize()"
-      (page)="onPage($event)"
-    />
-    ```
+## 5. Register the tool
 
-    ```ts
-    onPage(e: OdoPageEvent) {           // { pageIndex, pageSize }
-      this.pageIndex.set(e.pageIndex);
-      this.pageSize.set(e.pageSize);
-      void this.reload();               // re-fetch with limit/offset
-    }
-    ```
-
-    Use `limit: pageSize`, `offset: pageIndex * pageSize` in the request, and
-    set `total()` from the response's `total`. See `features/saml/idp-detail`.
-
-  - For **server-driven sorting**, keep a `sort` signal, bind it to
-    `<odo-table>`, wrap sortable headers in `<odo-sort-header key="...">`, and
-    send `sort_by`/`sort_dir` in the request. Only allow-listed **real DB
-    columns** are sortable — computed/aggregate columns (counts) render a plain
-    header. See `features/permissions/permission-list` (the reference).
-
-    ```html
-    <odo-table [rows]="rows()" [displayedColumns]="cols"
-               [sort]="sort()" (sortChange)="onSort($event)">
-      <ng-container cdkColumnDef="code">
-        <th cdk-header-cell *cdkHeaderCellDef>
-          <odo-sort-header key="code" i18n>Code</odo-sort-header>
-        </th>
-        <td cdk-cell *cdkCellDef="let r">{{ r.code }}</td>
-      </ng-container>
-      <!-- a computed column: plain header, not sortable -->
-      <ng-container cdkColumnDef="roles">
-        <th cdk-header-cell *cdkHeaderCellDef i18n>Roles</th>
-        <td cdk-cell *cdkCellDef="let r">{{ r.role_count }}</td>
-      </ng-container>
-    </odo-table>
-    ```
-
-    ```ts
-    onSort(s: OdoSort) {                 // { active, direction }
-      this.sort.set(s);
-      this.pageIndex.set(0);            // sort change resets to page 1
-      void this.reload();
-    }
-    ```
-
-    On the **backend**, flatten `odo::admin::Sort` into the request struct and
-    resolve it against an explicit allow-list — never map the client string to a
-    column directly (injection/enumeration risk). Append a stable tiebreaker
-    (usually the PK) unless the sort column is already unique:
-
-    ```rust
-    let (col, ord) = params.sort.resolve(
-        &[("code", Column::Code), ("description", Column::Description)],
-        (Column::Code, Order::Asc),   // default + fallback for unknown keys
-    );
-    query.order_by(col, ord).order_by_asc(Column::Id)
-    ```
-
-- **Detail component** (if drilling in) — wrap in `<odo-detail-page>` with
-  `backLink`/`backLabel`/`title`, a `[slot=summary]`, an optional
-  `[slot=actions]` (write-gated), and a body of stacked
-  `<section class="section">` blocks, each a `.section-header` (`<h2>` +
-  optional `.page-intro` + action button) followed by an `<odo-table>`.
-
-- **Dialogs** — copy a dialog from `features/org-units/` (e.g. `unit-dialog.ts`).
-  Use documented Material form modules, `ServerErrorStateMatcher`, and map known
-  `ApiRequestError.code`s to field errors.
-
-Reuse the global classes from `styles.scss`: `.page-header`, `.page-intro`,
-`.section`, `.section-header`, `.list-loading`, `.list-empty`, `.cell-code`,
-`.cell-actions`, `.status-badge` + `.status-*`.
-
-## 3. Register the tool
-
-Append one entry to `ADMIN_TOOLS` in **`core/admin-tools.ts`**. This wires the
-lazy route, the sidenav entry, **and** the home-page card at once:
+Add one entry to `ADMIN_TOOLS` in **`src/lib/admin-tools.ts`** and the id
+to `ToolId`. That wires the routes (behind the read-perm middleware), the
+sidebar entry, the breadcrumb, and the home card:
 
 ```ts
 {
-  path: 'widgets',
-  icon: 'widgets',                     // a Material Symbols name
-  label: $localize`:Admin tool name:Widgets`,
-  description: $localize`:Admin tool description:Manage widgets.`,
+  id: "widgets",
+  path: "widgets",
+  icon: PuzzleIcon,                      // a lucide-react icon
   readPerm: PERMS.WIDGET_READ,
-  loadChildren: () =>
-    import('../features/widgets/widgets.routes').then((m) => m.WIDGET_ROUTES),
+  children: [
+    { index: true, lazy: () => import("@/routes/widgets") },
+    { path: ":widgetId", lazy: () => import("@/routes/widgets/detail") },
+  ],
 },
 ```
 
-That's the only wiring step — routing (`app.routes.ts`), nav, and home grid all
-read the registry and are permission-filtered automatically.
-
-## 4. Verify
+## 6. Verify
 
 ```bash
-# from src/ui/odo-admin (Node 24 via nvm)
-npm run build        # must be clean: no errors AND no NG8116 warnings
-npm test             # component specs
+# from src/ui/odo-admin (Node >= 22.22; build ../core first)
+npm run typecheck
+npm run lint
+npm test
+npm run build
+npm run dev    # http://localhost:5173, API proxied to the dev cluster
 ```
 
-Check your feature dir has **no** `mat-table`/`MatTableModule` and **no**
-`.mat-mdc-*`/`.mdc-*` selectors.
+Add unit tests for any pure logic (parsing, mapping, rules) beside it as
+`*.test.ts`. Try the pseudo-locales from the account menu: `en-XA` shows
+hard-coded or truncated text, `ar-XB` shows layout that isn't
+direction-aware.
 
-## 5. E2E
+## 7. E2E
 
 Add the tool to the smoke list in
-`tests/e2e/apps/odo-admin/tests/smoke.spec.ts` (its nav label + a heading its
-list page renders). Run against a deployed cluster:
+`tests/e2e/apps/odo-admin/tests/smoke.spec.ts` (its nav label and the
+heading its page renders), using roles and accessible names rather than
+CSS classes. Run it against the cluster, or against `npm run dev`:
 
 ```bash
 # from tests/e2e
 BASE_URL=http://localhost:30080 npm run test:odo-admin
 ```
 
-## 6. Deploy
+## 8. Deploy
 
-Backend changes: `./scripts/build-and-deploy-service.sh <service>` and wait
-~20s. UI changes:
+Backend changes: `./scripts/build-and-deploy-service.sh <service>`, then
+wait ~20s. UI changes:
 
 ```bash
 ./scripts/build-and-deploy-service.sh ui-odo-admin --wait
 ```
 
-No new envoy route is needed for a tool — the SPA is one app under
-`/odo/admin`, and its `/api/v1/odo/*` calls are already routed. New *backend*
-endpoints under an existing `/api/v1/odo/<service>` prefix are already covered
-by `odo-routes.yaml`; only a brand-new path prefix would need a route there.
+No new Envoy route is needed for a tool: the SPA is one app under
+`/odo/admin`, and new endpoints under an existing `/api/v1/odo/<service>`
+prefix are already routed by `odo-routes.yaml`. Only a brand-new path
+prefix needs a route there (and an entry in the README's routing registry).

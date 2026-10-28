@@ -16,13 +16,8 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
 OPENAPI_DIR="openapi"
-# Generated TS types go to each admin UI. Both exist while the React
-# rewrite (odo-admin-react) replaces the Angular app; drop the Angular
-# entry at cutover.
-TS_OUT_DIRS=(
-    "src/ui/odo-admin/src/app/core/api-types"
-    "src/ui/odo-admin-react/src/api/types"
-)
+UI_DIR="src/ui/odo-admin"
+TS_OUT_DIR="$UI_DIR/src/api/types"
 
 # service name -> cargo manifest
 SERVICES=(odo-auth odo-org odo-notify odo-asset)
@@ -39,32 +34,29 @@ for svc in "${SERVICES[@]}"; do
 done
 
 
-# Generate TypeScript types for each admin UI that is present.
+# Generate TypeScript types when the admin UI exists.
 # openapi-typescript emits one file per spec (it does not merge inputs), and
 # the services are distinct APIs anyway, so we keep one types module each.
-for out_dir in "${TS_OUT_DIRS[@]}"; do
-    ui_dir="${out_dir%%/src/*}"
-    if [ ! -f "$ui_dir/package.json" ]; then
-        echo "$ui_dir not present; skipping its TypeScript generation."
-        continue
-    fi
-    echo "Generating TypeScript types for $ui_dir..."
-    mkdir -p "$out_dir"
+if [ -f "$UI_DIR/package.json" ]; then
+    echo "Generating TypeScript types..."
+    mkdir -p "$TS_OUT_DIR"
     for svc in "${SERVICES[@]}"; do
         npx --yes openapi-typescript "$OPENAPI_DIR/$svc.json" \
-            -o "$out_dir/$svc.ts" || {
+            -o "$TS_OUT_DIR/$svc.ts" || {
             echo "TypeScript generation failed for $svc" >&2
             exit 1
         }
     done
-done
+else
+    echo "Admin UI not present; skipping TypeScript generation."
+fi
 
 if [ "$CHECK_MODE" = "1" ]; then
-    if ! git diff --quiet -- "$OPENAPI_DIR" "${TS_OUT_DIRS[@]}" 2>/dev/null; then
+    if ! git diff --quiet -- "$OPENAPI_DIR" "$TS_OUT_DIR" 2>/dev/null; then
         echo >&2
         echo "ERROR: committed OpenAPI specs / generated types are out of date." >&2
         echo "Run scripts/generate-openapi.sh and commit the result." >&2
-        git --no-pager diff --stat -- "$OPENAPI_DIR" "${TS_OUT_DIRS[@]}" >&2
+        git --no-pager diff --stat -- "$OPENAPI_DIR" "$TS_OUT_DIR" >&2
         exit 1
     fi
     echo "OpenAPI specs and generated types are up to date."

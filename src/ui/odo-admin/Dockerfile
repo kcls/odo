@@ -1,43 +1,39 @@
-# Stage 1: Builder
+# Build context: the repository root (see service-map.yaml).
+
+# Stage 1: build the SPA
+# Node 24: React Router 8 needs Node >= 22.22, Vite 8 >= 22.12.
 FROM node:24-alpine AS builder
 
-ARG VERSION
-ENV APP_VERSION=$VERSION
+# Substituted with ODO_ADMIN_BASE_PATH when the container starts;
+# see docker-entrypoint.d/40-base-path.sh.
+ENV VITE_BASE_PATH=/__ODO_ADMIN_BASE_PATH__/
 
-WORKDIR /app
-
-# Copy ui/core as a local dependency (required by @odo/core)
-COPY src/ui/core /core
-
-# Build @odo/core first
-WORKDIR /core
+# @odo/core is a local dependency (file:../core) that resolves to its
+# built dist/, so build it first, at the same relative location.
+WORKDIR /ui/core
+COPY src/ui/core/ ./
 RUN npm ci && npm run build
 
-# Switch back to app directory
-WORKDIR /app
-
-# Copy package files
+WORKDIR /ui/odo-admin
 COPY src/ui/odo-admin/package*.json ./
-
-# Install all dependencies including devDependencies for build
 RUN npm ci
 
-# Copy application source
 COPY src/ui/odo-admin/ ./
-
-# Build the Angular application
 RUN npm run build
 
-# Stage 2: Production
+# Stage 2: serve with nginx
 FROM nginx:alpine
 
-# Copy custom nginx configuration
-COPY src/ui/odo-admin/nginx.conf /etc/nginx/conf.d/default.conf
+# nginx config template and the startup script that renders it and places
+# the app at ODO_ADMIN_BASE_PATH (default /odo/admin).
+COPY src/ui/odo-admin/nginx.conf.template /etc/nginx/templates-odo-admin/default.conf.template
+COPY --chmod=755 src/ui/odo-admin/docker-entrypoint.d/40-base-path.sh /docker-entrypoint.d/40-base-path.sh
 
-# Copy built Angular app from builder stage
-COPY --from=builder /app/dist/odo-admin/browser /usr/share/nginx/html
+# The pristine build stays root-owned; the startup script copies it into
+# the served directory and substitutes the base path there.
+COPY --from=builder /ui/odo-admin/dist /usr/share/nginx/html-dist
 
-# Create a non-root user
+# Run as a non-root user.
 RUN addgroup -g 1010 -S nginx-user && \
     adduser -S nginx-user -u 1010 -G nginx-user && \
     chown -R nginx-user:nginx-user /usr/share/nginx/html && \
@@ -47,7 +43,6 @@ RUN addgroup -g 1010 -S nginx-user && \
     touch /var/run/nginx.pid && \
     chown -R nginx-user:nginx-user /var/run/nginx.pid
 
-# Switch to non-root user
 USER nginx-user
 
 EXPOSE 8080

@@ -103,7 +103,6 @@ jobs:
           cache-dependency-path: |
             src/ui/core/package-lock.json
             src/ui/odo-admin/package-lock.json
-            src/ui/odo-admin-react/package-lock.json
 
       - name: Install core dependencies
         working-directory: src/ui/core
@@ -128,29 +127,15 @@ jobs:
         working-directory: src/ui/odo-admin
         run: npm ci
 
-      - name: Admin unit tests
+      - name: Lint admin
         working-directory: src/ui/odo-admin
-        run: npx ng test --watch=false
-
-      # ng build is the admin UI's typecheck; there is no separate tsc script.
-      - name: Build admin
-        working-directory: src/ui/odo-admin
-        run: npx ng build
-
-      # The React rewrite of the admin UI; replaces the Angular steps above
-      # at cutover. `npm run build` runs tsc -b (the typecheck) first.
-      - name: Install admin (React) dependencies
-        working-directory: src/ui/odo-admin-react
-        run: npm ci
-
-      - name: Lint admin (React)
-        working-directory: src/ui/odo-admin-react
         run: npm run lint
 
-      - name: Admin (React) unit tests
-        working-directory: src/ui/odo-admin-react
+      - name: Admin unit tests
+        working-directory: src/ui/odo-admin
         run: npx vitest run
 
-      - name: Build admin (React)
-        working-directory: src/ui/odo-admin-react
+      # `npm run build` runs tsc -b (the typecheck) before vite build.
+      - name: Build admin
+        working-directory: src/ui/odo-admin
         run: npm run build
