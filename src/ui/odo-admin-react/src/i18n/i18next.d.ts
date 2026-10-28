@@ -7,6 +7,7 @@ import type login from "@/locales/en/login.json"
 import type orgUnits from "@/locales/en/orgUnits.json"
 import type permissions from "@/locales/en/permissions.json"
 import type roles from "@/locales/en/roles.json"
+import type saml from "@/locales/en/saml.json"
 import type templates from "@/locales/en/templates.json"
 import type unitTypes from "@/locales/en/unitTypes.json"
 import type users from "@/locales/en/users.json"
@@ -24,6 +25,7 @@ declare module "i18next" {
       orgUnits: typeof orgUnits
       permissions: typeof permissions
       roles: typeof roles
+      saml: typeof saml
       templates: typeof templates
       unitTypes: typeof unitTypes
       users: typeof users

@@ -28,6 +28,10 @@
       "label": "Email groups",
       "description": "Manage notification email groups and their member addresses."
     },
+    "saml": {
+      "label": "SAML",
+      "description": "Configure SAML identity and service providers for single sign-on."
+    },
     "orgUnits": {
       "label": "Org units",
       "description": "Manage the organizational tree and each unit's addresses, closures, and hours."
