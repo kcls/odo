@@ -1,14 +1,15 @@
 /**
  * Permission codes the admin UI gates on. These mirror the codes seeded
- * by sqitch changes 002_odo_seed and 008_notify_delivery_read. Each admin
- * resource has a read/write pair (delivery history is read-only); the UI
- * gates tool visibility/routes on the read perm and edit affordances on
- * the write perm.
+ * by sqitch changes 002_odo_seed, 008_notify_delivery_read, and
+ * 009_notify_delivery_write. Each admin resource has a read/write pair;
+ * the UI gates tool visibility/routes on the read perm and edit
+ * affordances on the write perm.
  */
 export const PERMS = {
   EMAIL_GROUP_READ: "odo.notify.email_group.read",
   EMAIL_GROUP_WRITE: "odo.notify.email_group.write",
   DELIVERY_READ: "odo.notify.delivery.read",
+  DELIVERY_WRITE: "odo.notify.delivery.write",
   TEMPLATE_READ: "odo.notify.template.read",
   TEMPLATE_WRITE: "odo.notify.template.write",
   ROLE_READ: "odo.auth.role.read",

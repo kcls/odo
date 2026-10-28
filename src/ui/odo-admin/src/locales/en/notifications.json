@@ -118,6 +118,14 @@
       "id": "Event ID"
     },
     "entity": "{{type}} #{{id}}",
-    "noEvent": "The event behind this delivery no longer exists."
+    "noEvent": "The event behind this delivery no longer exists.",
+    "retry": "Retry"
+  },
+  "retry": {
+    "title": "Send this again?",
+    "body": "The delivery to {{recipient}} goes back in the queue and is sent on the next pass, with a fresh set of retries.",
+    "confirm": "Retry",
+    "done": "Queued to send again",
+    "notRetryable": "Only failed or skipped email deliveries can be retried."
   }
 }

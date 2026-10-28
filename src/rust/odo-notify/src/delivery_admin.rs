@@ -1,9 +1,10 @@
-//! Read-only admin views of notification delivery history: who was sent
-//! what, when, and what failed.
+//! Admin views of notification delivery history (who was sent what,
+//! when, and what failed), and retrying a failed delivery.
 //!
-//! Everything requires `odo.notify.delivery.read`. Deliveries carry
-//! rendered message bodies, so this is its own permission rather than
-//! riding on template or email-group access.
+//! Reads require `odo.notify.delivery.read`; deliveries carry rendered
+//! message bodies, so this is its own permission rather than riding on
+//! template or email-group access. Retrying requires
+//! `odo.notify.delivery.write`.
 //!
 //! A delivery's status is one of `pending` (queued, possibly awaiting a
 //! retry), `processing` (claimed by a worker), `delivered`, `failed`
@@ -21,7 +22,7 @@ use odo_entity::auth::usr;
 use odo_entity::notification::{delivery, email_group, event};
 use odo_service::admin::{Page, Paginated, Sort, SortDir, clean_search, contains_ci};
 use sea_orm::prelude::*;
-use sea_orm::{Condition, DbBackend, Order, QueryOrder, QuerySelect, Statement};
+use sea_orm::{Condition, DbBackend, Order, QueryOrder, QuerySelect, Set, Statement};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -30,12 +31,15 @@ use utoipa::ToSchema;
 use crate::AppState;
 
 const READ_PERM: &str = "odo.notify.delivery.read";
+const WRITE_PERM: &str = "odo.notify.delivery.write";
 
 const STATUSES: &[&str] = &["pending", "processing", "delivered", "failed", "skipped"];
 const CHANNELS: &[&str] = &["email", "in_app"];
 
 /// The window summary and recipient views use when the caller gives none.
 const DEFAULT_WINDOW_DAYS: i64 = 7;
+/// Statuses a retry may move back to pending: terminal, and not delivered.
+const RETRYABLE: &[&str] = &["failed", "skipped"];
 
 // ===========================================================================
 // Shapes
@@ -552,6 +556,71 @@ pub async fn list_recipient_activity(
     Ok(Json(Paginated::new(rows, total).into()))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/odo/notify/delivery/retry",
+    request_body = DeliveryIdRequest,
+    responses((status = 200, body = DeliveryRow, description = "The delivery, queued to send again")),
+    security(("bearer" = [])),
+    tag = "delivery-admin"
+)]
+pub async fn retry_delivery(
+    State(state): State<Arc<AppState>>,
+    Json(params): Json<DeliveryIdRequest>,
+) -> ApiResult<Json<DeliveryRow>> {
+    RequestContext::user_id().ok_or(LocalError::unauthenticated())?;
+    state
+        .auth_client
+        .permission_required(WRITE_PERM, None)
+        .await?;
+
+    let dlv = delivery::Entity::find_by_id(params.id)
+        .one(&state.db)
+        .await?
+        .ok_or_else(|| LocalError::not_found(format!("delivery {}", params.id)))?;
+    // In-app deliveries are delivered on enqueue; only the email queue retries.
+    if dlv.channel != "email" || !RETRYABLE.contains(&dlv.status.as_str()) {
+        return Err(not_retryable().into());
+    }
+
+    tracing::info!(id = dlv.id, status = %dlv.status, "RetryDelivery");
+
+    // Back to a fresh pending delivery: a new retry budget, and no stale
+    // error or results (the processor doesn't clear them on success). The
+    // status condition makes this a no-op if the row changed meanwhile.
+    let reset = delivery::ActiveModel {
+        status: Set("pending".to_string()),
+        retry_count: Set(0),
+        next_retry_at: Set(None),
+        processing_started_at: Set(None),
+        processing_expires_at: Set(None),
+        processing_owner: Set(None),
+        processed_at: Set(None),
+        error_code: Set(None),
+        error_message: Set(None),
+        channel_metadata: Set(None),
+        updated_at: Set(Utc::now().into()),
+        ..Default::default()
+    };
+    let result = delivery::Entity::update_many()
+        .set(reset)
+        .filter(delivery::Column::Id.eq(dlv.id))
+        .filter(delivery::Column::Status.is_in(RETRYABLE.iter().copied()))
+        .exec(&state.db)
+        .await?;
+    if result.rows_affected == 0 {
+        return Err(not_retryable().into());
+    }
+
+    let dlv = delivery::Entity::find_by_id(dlv.id)
+        .one(&state.db)
+        .await?
+        .ok_or_else(|| LocalError::not_found(format!("delivery {}", params.id)))?;
+    let labels =
+        RecipientLabels::load(&state.db, dlv.recipient_user, dlv.recipient_email_group).await?;
+    Ok(Json(delivery_row(&dlv, &labels)))
+}
+
 // ===========================================================================
 // Helpers
 // ===========================================================================
@@ -563,6 +632,14 @@ async fn require_read(state: &AppState) -> ApiResult<()> {
         .permission_required(READ_PERM, None)
         .await?;
     Ok(())
+}
+
+fn not_retryable() -> LocalError {
+    LocalError::conflict(
+        "DELIVERY_NOT_RETRYABLE",
+        None,
+        "Only failed or skipped email deliveries can be retried.",
+    )
 }
 
 fn default_since() -> DateTime<FixedOffset> {

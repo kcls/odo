@@ -1,13 +1,20 @@
+import { RotateCcwIcon } from "lucide-react"
+import { useState } from "react"
 import { useTranslation } from "react-i18next"
-import { Link, useLoaderData, type LoaderFunctionArgs } from "react-router"
+import { Link, useLoaderData, useRevalidator, type LoaderFunctionArgs } from "react-router"
+import { toast } from "sonner"
 
+import { ApiRequestError } from "@/api/client"
 import { deliveriesApi, type DeliveryDetail } from "@/api/notify"
 import { PERMS } from "@/auth/perms"
 import { checkPerms } from "@/auth/session"
+import { ConfirmDialog } from "@/components/confirm-dialog"
 import { DetailHeader } from "@/components/detail-header"
 import { Section } from "@/components/section"
 import { StatusBadge } from "@/components/status-badge"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { useReportError } from "@/hooks/use-report-error"
 import { loadNamespaces } from "@/i18n"
 import { useFormatters } from "@/lib/format"
 import { orNotFound, requireIdParam } from "@/lib/loader"
@@ -18,7 +25,11 @@ export async function loader({ params }: LoaderFunctionArgs) {
   const id = requireIdParam(params.deliveryId)
   const [detail, perms] = await Promise.all([
     orNotFound(deliveriesApi.get(id)),
-    checkPerms({ canSeeGroups: PERMS.EMAIL_GROUP_READ, canSeeUsers: PERMS.USER_DETAIL_READ }),
+    checkPerms({
+      canSeeGroups: PERMS.EMAIL_GROUP_READ,
+      canSeeUsers: PERMS.USER_DETAIL_READ,
+      canRetry: PERMS.DELIVERY_WRITE,
+    }),
     loadNamespaces("notifications"),
   ])
   return { detail, ...perms }
@@ -33,10 +44,30 @@ type Fact = [string, React.ReactNode]
 
 /** One delivery: what happened, to whom, what was sent, and why. */
 export function Component() {
-  const { detail, canSeeGroups, canSeeUsers } = useLoaderData<typeof loader>()
+  const { detail, canSeeGroups, canSeeUsers, canRetry } = useLoaderData<typeof loader>()
   const { t } = useTranslation(["notifications", "common"])
   const fmt = useFormatters()
+  const revalidator = useRevalidator()
+  const reportError = useReportError()
+  const [confirmingRetry, setConfirmingRetry] = useState(false)
   const d = detail.delivery
+  // Only the email queue retries; in-app deliveries are delivered on enqueue.
+  const retryable = canRetry && d.channel === "email" && (d.status === "failed" || d.status === "skipped")
+
+  const retry = async () => {
+    try {
+      await deliveriesApi.retry(d.id)
+      toast.success(t("retry.done"))
+      await revalidator.revalidate()
+    } catch (err) {
+      if (err instanceof ApiRequestError && err.code === "DELIVERY_NOT_RETRYABLE") {
+        toast.error(t("retry.notRetryable"))
+        await revalidator.revalidate()
+      } else {
+        reportError(err, "Failed to retry delivery")
+      }
+    }
+  }
   const none = <span className="text-muted-foreground">{t("common:none")}</span>
   const when = (iso: string | null | undefined) => (iso ? fmt.dateTime(iso) : none)
 
@@ -104,6 +135,14 @@ export function Component() {
           channelLabel(d.channel, t),
           <span title={fmt.dateTime(d.created_at)}>{fmt.relativeTime(d.created_at)}</span>,
         ]}
+        actions={
+          retryable && (
+            <Button variant="outline" onClick={() => setConfirmingRetry(true)}>
+              <RotateCcwIcon data-icon="inline-start" />
+              {t("detail.retry")}
+            </Button>
+          )
+        }
       />
 
       <Section title={t("detail.outcome")}>
@@ -143,6 +182,15 @@ export function Component() {
           </CardContent>
         </Card>
       </Section>
+
+      <ConfirmDialog
+        open={confirmingRetry}
+        onOpenChange={setConfirmingRetry}
+        title={t("retry.title")}
+        description={t("retry.body", { recipient: recipient?.label ?? t("unknownRecipient") })}
+        confirmLabel={t("retry.confirm")}
+        onConfirm={retry}
+      />
 
       <Section title={t("detail.event")}>
         {detail.event ? (

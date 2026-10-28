@@ -80,7 +80,7 @@ export type RecipientActivityPage = S["RecipientActivityPage"]
 
 const DELIVERY = "/api/v1/odo/notify/delivery"
 
-/** Read-only delivery history (odo.notify.delivery.read). */
+/** Delivery history (odo.notify.delivery.read) and retrying (….write). */
 export const deliveriesApi = {
   /** One page of deliveries, newest first unless sorted otherwise. */
   listPage(params: Partial<S["ListDeliveriesRequest"]>): Promise<DeliveryPage> {
@@ -92,6 +92,10 @@ export const deliveriesApi = {
   /** Counts by channel and status; the window defaults to the last 7 days. */
   summary(params: S["DeliveryWindowRequest"]): Promise<DeliverySummary> {
     return apiPost(`${DELIVERY}/summary`, params)
+  },
+  /** Queue a failed or skipped email delivery to send again (delivery.write). */
+  retry(id: number): Promise<DeliveryRow> {
+    return apiPost(`${DELIVERY}/retry`, { id } satisfies S["DeliveryIdRequest"])
   },
   /** Per-recipient activity; sortable by total, failed, or last. */
   recipientsPage(params: Partial<S["ListRecipientActivityRequest"]>): Promise<RecipientActivityPage> {
