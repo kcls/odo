@@ -6,11 +6,15 @@ import "./index.css"
 import { session } from "@/auth/session"
 import { ThemeProvider } from "@/components/theme-provider"
 import { i18nReady, loadNamespaces } from "@/i18n"
-import { router } from "@/router"
 
 // Render once the shell's strings are in and any existing session is
 // restored, so nothing flashes raw keys and guards see the final state.
 await Promise.all([i18nReady.then(() => loadNamespaces("common")), session.init()])
+
+// Imported only now: creating the router starts the first navigation, and
+// its auth middleware must not run before the session is restored, or a
+// reload with a valid session can land on the login page.
+const { router } = await import("@/router")
 
 session.onSessionEnded((expired) => {
   const { pathname, search } = router.state.location
