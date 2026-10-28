@@ -38,6 +38,7 @@ use utoipa::OpenApi;
         delivery_admin::get_delivery,
         delivery_admin::delivery_summary,
         delivery_admin::list_recipient_activity,
+        delivery_admin::daily_deliveries,
         delivery_admin::retry_delivery,
     ),
     components(schemas(
@@ -83,6 +84,9 @@ use utoipa::OpenApi;
         delivery_admin::DeliveryIdRequest,
         delivery_admin::DeliveryWindowRequest,
         delivery_admin::ListRecipientActivityRequest,
+        delivery_admin::DailyCounts,
+        delivery_admin::DailyDeliveriesResponse,
+        delivery_admin::DailyDeliveriesRequest,
     )),
     tags(
         (name = "inbox", description = "Notification inbox (list, read, dismiss)"),
@@ -238,6 +242,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route(
             "/api/v1/odo/notify/delivery/recipients",
             post(delivery_admin::list_recipient_activity),
+        )
+        .route(
+            "/api/v1/odo/notify/delivery/daily",
+            post(delivery_admin::daily_deliveries),
         )
         .route(
             "/api/v1/odo/notify/delivery/retry",

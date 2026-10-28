@@ -121,6 +121,16 @@
     "noEvent": "The event behind this delivery no longer exists.",
     "retry": "Retry"
   },
+  "daily": {
+    "title": "Deliveries per day",
+    "description": "By outcome, counted in your time zone ({{timezone}}).",
+    "view": "Show as",
+    "chart": "Chart",
+    "table": "Table",
+    "day": "Day",
+    "total": "Total",
+    "empty": "Nothing was sent in this period."
+  },
   "retry": {
     "title": "Send this again?",
     "body": "The delivery to {{recipient}} goes back in the queue and is sent on the next pass, with a fresh set of retries.",

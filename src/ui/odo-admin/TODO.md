@@ -65,9 +65,13 @@
       `odo.notify.delivery.read` (sqitch `008_notify_delivery_read`, which
       also indexes `delivery.created_at`), with integration tests in
       `tests/integration/tests/delivery_admin.rs`.
-- [ ] Possible next steps for Notifications: a daily volume chart, and a
-      retry action for failed deliveries (needs a write permission and
-      endpoint).
+- [x] **Notifications: per-day chart and retry.** A stacked bar chart
+      of deliveries per day by outcome (counted in the viewer's time
+      zone, quiet days included), with a table view kept in the URL,
+      from odo-notify `delivery/daily`. A Retry action on a failed or
+      skipped email delivery's page puts it back in the queue with a
+      fresh retry budget, from `delivery/retry` behind the new
+      `odo.notify.delivery.write` (sqitch `009_notify_delivery_write`).
 
 ## Known issues found while porting
 

@@ -1,6 +1,12 @@
 import { XIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { Link, useLoaderData, useSearchParams, type LoaderFunctionArgs } from "react-router"
+import {
+  Link,
+  useLoaderData,
+  useSearchParams,
+  type LoaderFunctionArgs,
+  type ShouldRevalidateFunctionArgs,
+} from "react-router"
 
 import {
   deliveriesApi,
@@ -29,6 +35,7 @@ import {
   useListState,
   type ListDefaults,
 } from "@/lib/list-state"
+import { DailyChart } from "./daily-chart"
 import { DeliveryStatus } from "./delivery-status"
 import { isOutcome, OUTCOME_STYLE, OUTCOMES, outcomeTotals, statusesFor } from "./outcome"
 
@@ -40,6 +47,7 @@ import { isOutcome, OUTCOME_STYLE, OUTCOMES, outcomeTotals, statusesFor } from "
  *   kind     email_group | user          (recipients view)
  *   status   an outcome                    (deliveries view)
  *   group / user   one recipient's deliveries (deliveries view)
+ *   daily    table, to show the per-day numbers as a table
  * plus each view's search/sort/page list state.
  */
 
@@ -89,8 +97,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const listDefaults = f.view === "recipients" ? RECIPIENT_LIST : DELIVERY_LIST
   const list = readListState(url.searchParams, listDefaults)
 
-  const [summary, recipients, deliveries, perms] = await Promise.all([
+  // Days are counted in the viewer's own zone.
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  const [summary, daily, recipients, deliveries, perms] = await Promise.all([
     deliveriesApi.summary({ since, channel }),
+    deliveriesApi.daily({ since, channel, timezone }),
     f.view === "recipients"
       ? deliveriesApi.recipientsPage({ ...listRequest(list), since, channel, kind: f.kind ?? undefined })
       : null,
@@ -108,11 +119,22 @@ export async function loader({ request }: LoaderFunctionArgs) {
     loadNamespaces("notifications"),
   ])
   redirectPastLastPage(url, list, (recipients ?? deliveries)?.total ?? 0, listDefaults)
-  return { summary, recipients, deliveries, ...perms }
+  return { summary, daily, recipients, deliveries, ...perms }
+}
+
+/** Switching the per-day numbers between chart and table needs no refetch. */
+export function shouldRevalidate({ currentUrl, nextUrl, defaultShouldRevalidate }: ShouldRevalidateFunctionArgs) {
+  const strip = (url: URL) => {
+    const params = new URLSearchParams(url.search)
+    params.delete("daily")
+    return `${url.pathname}?${params}`
+  }
+  if (currentUrl.search !== nextUrl.search && strip(currentUrl) === strip(nextUrl)) return false
+  return defaultShouldRevalidate
 }
 
 export function Component() {
-  const { summary, recipients, deliveries, canSeeGroups, canSeeUsers } = useLoaderData<typeof loader>()
+  const { summary, daily, recipients, deliveries, canSeeGroups, canSeeUsers } = useLoaderData<typeof loader>()
   const { t } = useTranslation("notifications")
   const fmt = useFormatters()
   const [params, setParams] = useSearchParams()
@@ -194,6 +216,22 @@ export function Component() {
           />
         ))}
       </section>
+
+      <DailyChart
+        days={daily.days}
+        timezone={daily.timezone}
+        asTable={params.get("daily") === "table"}
+        onAsTable={(asTable) =>
+          setParams(
+            (prev) => {
+              if (asTable) prev.set("daily", "table")
+              else prev.delete("daily")
+              return prev
+            },
+            { replace: true }
+          )
+        }
+      />
 
       <Tabs value={f.view} onValueChange={(v) => update({ view: v }, { view: "recipients" })}>
         <TabsList aria-label={t("views.label")}>
