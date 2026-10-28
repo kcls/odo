@@ -18,10 +18,16 @@
 - [x] Roles: list, create, detail, edit, delete (blocked while
       assigned), permission grants with inline min-depth editing
 - [x] Org Unit Types: list, create, edit, delete (blocked while in use)
+- [x] Org Units: indented tree with a filter (in the URL, client-side),
+      detail with child units, addresses, closures, and hours. Changes
+      from Angular: delete moved from the list to the unit's page
+      (blocked for the root and units with children, with the reason
+      shown); "Add child unit" presets the parent; timezone is picked
+      from the browser's IANA list; days and times format per locale;
+      closures sort newest first and mark past ones.
 
 ## Stages to come
 
-- [ ] Org Units: tree list, detail with addresses, closures, hours
 - [ ] Email Templates: list, editor with preview
 - [ ] Email Groups: list, detail with members
 - [ ] SAML: IdP list/detail, attributes, role mappings, SP dialogs
@@ -76,6 +82,9 @@
       offer "None" once a type has a parent and says why. Backend fix:
       accept an explicit clear (e.g. a `clear_parent` flag, or
       distinguish an absent field from null).
+- [ ] The Users page's org-unit picker uses `@odo/core`'s per-session
+      tree cache, so units added or renamed in Org Units don't appear
+      there until a reload. Org Units itself always reads fresh.
 - [ ] `@odo/core`'s `userHasPerm` returns false on any error, and the
       result is cached for the session, so a transient failure hides a
       tool until the next sign-in. Same as the Angular app.

@@ -20,6 +20,11 @@ export function relativeTime(iso: string, displayLng: string): string {
   return rtf.format(0, "minute")
 }
 
+export function weekdayName(day: number, displayLng: string): string {
+  // 2023-01-01 was a Sunday.
+  return new Intl.DateTimeFormat(displayLng, { weekday: "long" }).format(new Date(2023, 0, 1 + day))
+}
+
 /**
  * Locale-aware formatters bound to the current UI language. Pseudo
  * locales are not real Intl locales, so they format as English. Null or
@@ -42,5 +47,17 @@ export function useFormatters() {
     /** e.g. "Oct 28, 2026" */
     date: (iso: string | null | undefined) => dateTime(iso, { dateStyle: "medium" }),
     relativeTime: (iso: string) => relativeTime(iso, lng),
+    /** A date-only value ("2026-12-25"), read as a calendar date, not UTC. */
+    calendarDate: (ymd: string) => {
+      const [y, m, d] = ymd.split("-").map(Number)
+      return new Intl.DateTimeFormat(lng, { dateStyle: "medium" }).format(new Date(y, m - 1, d))
+    },
+    /** A time of day ("17:30:00"), e.g. "5:30 PM". */
+    timeOfDay: (hms: string) => {
+      const [h, min] = hms.split(":").map(Number)
+      return new Intl.DateTimeFormat(lng, { timeStyle: "short" }).format(new Date(2000, 0, 1, h, min))
+    },
+    /** 0 = Sunday, as odo-org stores it. */
+    weekday: (day: number) => weekdayName(day, lng),
   }
 }
