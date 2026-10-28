@@ -25,10 +25,14 @@
       shown); "Add child unit" presets the parent; timezone is picked
       from the browser's IANA list; days and times format per locale;
       closures sort newest first and mark past ones.
+- [x] Email Templates: list, and an editor with the form beside a live
+      preview (debounced as you type) and a guard against leaving with
+      unsaved edits. The HTML preview renders in an empty-sandbox
+      iframe: the Angular app relied on Angular's innerHTML
+      sanitizing, React has none, and templates can contain script.
 
 ## Stages to come
 
-- [ ] Email Templates: list, editor with preview
 - [ ] Email Groups: list, detail with members
 - [ ] SAML: IdP list/detail, attributes, role mappings, SP dialogs
 
@@ -61,6 +65,21 @@
       email group or user.
 
 ## Known issues found while porting
+
+- [ ] **Emails escape HTML in subjects and plain-text bodies.**
+      `odo_service::template::render` uses Handlebars' default HTML
+      escaping, and odo-notify's enqueue path renders subjects and
+      plain bodies with it, so a variable like `O'Brien` or `Smith &
+      Sons` arrives as `O&#x27;Brien` / `Smith &amp; Sons`. Only the
+      HTML body should escape. Fix in odo-service: a non-escaping
+      renderer (`hbs.register_escape_fn(handlebars::no_escape)`) for
+      subject and text bodies, with tests; the preview endpoint shares
+      it, so the admin preview will follow.
+- [ ] Template lookup by id pages through the whole list: odo-notify
+      has no `template/get`. The Angular editor asked for
+      `limit: 1000`, which the server clamps to 200, so templates past
+      the 200th couldn't be opened there. Fine at today's counts; a get
+      endpoint would be better.
 
 - [ ] `UserAccountRow` (user/detail) lacks `second_given_name`, so the
       edit dialog can't show the middle name. The Angular dialog

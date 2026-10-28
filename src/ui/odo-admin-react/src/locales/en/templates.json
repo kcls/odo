@@ -1,0 +1,64 @@
+{
+  "title": "Email templates",
+  "subtitle": "Notification templates rendered for email and in-app messages.",
+  "new": "New template",
+  "search": "Filter templates",
+  "columns": {
+    "code": "Code",
+    "name": "Name",
+    "status": "Status",
+    "updated": "Updated"
+  },
+  "active": "Active",
+  "inactive": "Inactive",
+  "html": "HTML",
+  "noMatches": "No templates match.",
+  "empty": "No templates found.",
+  "editor": {
+    "back": "Email templates",
+    "newTitle": "New template",
+    "unsaved": "Unsaved changes",
+    "save": "Save",
+    "delete": "Delete",
+    "readOnly": "You can view this template but not change it.",
+    "code": "Code",
+    "codePlaceholder": "e.g. incident.assigned",
+    "name": "Name",
+    "description": "Description",
+    "isActive": "Active",
+    "isActiveHint": "Inactive templates aren't used for new notifications.",
+    "subject": "Subject template",
+    "body": "Body template",
+    "bodyHint": "Plain text; also used for in-app messages.",
+    "bodyHtml": "HTML body template",
+    "bodyHtmlHint": "Optional. Email clients that show HTML use this instead of the plain body.",
+    "sampleData": "Sample data",
+    "sampleDataHint": "JSON object of template variables, used for the preview.",
+    "invalidJson": "Sample data must be valid JSON.",
+    "created": "Created {{name}}",
+    "saved": "Saved {{name}}"
+  },
+  "preview": {
+    "title": "Preview",
+    "description": "Rendered from the form as it is now, with the sample data.",
+    "refresh": "Refresh",
+    "rendering": "Rendering…",
+    "subject": "Subject",
+    "body": "Body",
+    "bodyHtml": "HTML body",
+    "htmlFrame": "HTML body preview",
+    "nothing": "Nothing to preview yet.",
+    "failed": "Preview failed: {{message}}"
+  },
+  "delete": {
+    "title": "Delete template?",
+    "body": "{{name}} will be removed. Past notifications that used it are kept.",
+    "done": "Deleted {{name}}"
+  },
+  "leave": {
+    "title": "Discard unsaved changes?",
+    "body": "Your edits to this template haven't been saved.",
+    "stay": "Keep editing",
+    "discard": "Discard changes"
+  }
+}
