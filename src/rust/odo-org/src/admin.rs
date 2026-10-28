@@ -13,8 +13,8 @@ use chrono::Utc;
 use odo_client::error::{ApiResult, LocalError};
 use odo_entity::org::{unit, unit_type};
 use odo_service::admin::{
-    Page, Paginated, Sort, clean_code, clean_optional, clean_required, clean_search, contains_ci,
-    map_unique_violation,
+    Page, Paginated, Sort, check_clear, clean_code, clean_optional, clean_required, clean_search,
+    contains_ci, map_unique_violation,
 };
 use sea_orm::prelude::*;
 use sea_orm::{Condition, Order, QueryOrder, QuerySelect, Set};
@@ -88,8 +88,12 @@ pub struct UpdateUnitTypeRequest {
     id: i32,
     #[serde(default)]
     label: Option<String>,
+    /// A null or absent parent leaves it unchanged; see `clear_parent`.
     #[serde(default)]
     parent: Option<i32>,
+    /// Remove the parent type. Not allowed together with `parent`.
+    #[serde(default)]
+    clear_parent: bool,
     #[serde(default)]
     can_have_staff: Option<bool>,
     #[serde(default)]
@@ -303,6 +307,7 @@ pub async fn update_unit_type(
         .permission_required(WRITE_PERM, None)
         .await?;
 
+    check_clear("parent", params.parent.is_some(), params.clear_parent)?;
     let existing = find_unit_type(&state.db, params.id).await?;
     let type_id = existing.id;
 
@@ -319,6 +324,9 @@ pub async fn update_unit_type(
         find_unit_type(&state.db, parent_id).await?;
         assert_no_type_cycle(&state.db, type_id, parent_id).await?;
         model.parent = Set(Some(parent_id));
+    }
+    if params.clear_parent {
+        model.parent = Set(None);
     }
     if let Some(v) = params.can_have_staff {
         model.can_have_staff = Set(v);

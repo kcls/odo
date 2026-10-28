@@ -21,7 +21,6 @@
     "label": "Label",
     "parent": "Parent type",
     "noParent": "None",
-    "parentPermanent": "A parent type can't be removed once set, only changed to another type.",
     "canHaveStaff": "Can have staff",
     "canHavePatrons": "Can have patrons",
     "created": "Created {{label}}",

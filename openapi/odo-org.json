@@ -2019,6 +2019,10 @@
               "null"
             ]
           },
+          "clear_parent": {
+            "type": "boolean",
+            "description": "Remove the parent type. Not allowed together with `parent`."
+          },
           "id": {
             "type": "integer",
             "format": "int32"
@@ -2034,7 +2038,8 @@
               "integer",
               "null"
             ],
-            "format": "int32"
+            "format": "int32",
+            "description": "A null or absent parent leaves it unchanged; see `clear_parent`."
           }
         }
       }

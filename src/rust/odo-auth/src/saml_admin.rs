@@ -13,7 +13,7 @@ use axum::extract::State;
 use chrono::Utc;
 use odo_client::error::{ApiResult, LocalError};
 use odo_entity::auth::{saml_idp_config, saml_sp_config, usr_saml_identities};
-use odo_service::admin::{clean_optional, clean_required, map_unique_violation};
+use odo_service::admin::{check_clear, clean_optional, clean_required, map_unique_violation};
 use sea_orm::prelude::*;
 use sea_orm::{QueryOrder, Set};
 use serde::{Deserialize, Serialize};
@@ -160,12 +160,22 @@ pub struct UpdateIdpRequest {
     metadata_url: Option<String>,
     #[serde(default)]
     is_active: Option<bool>,
+    /// A null or absent value leaves it unchanged; see the clear flag.
     #[serde(default)]
     session_lifetime_hours: Option<i32>,
+    /// Remove the session lifetime (use the default). Not allowed together
+    /// with `session_lifetime_hours`.
+    #[serde(default)]
+    clear_session_lifetime_hours: bool,
     #[serde(default)]
     allow_idp_initiated: Option<bool>,
+    /// A null or absent value leaves it unchanged; see the clear flag.
     #[serde(default)]
     attribute_mapping: Option<serde_json::Value>,
+    /// Remove the attribute mapping. Not allowed together with
+    /// `attribute_mapping`.
+    #[serde(default)]
+    clear_attribute_mapping: bool,
 }
 
 #[derive(Deserialize, ToSchema)]
@@ -208,8 +218,12 @@ pub struct UpdateSpRequest {
     metadata_url: Option<String>,
     #[serde(default)]
     callback_url: Option<String>,
+    /// A null or absent idp leaves it unchanged; see `clear_idp`.
     #[serde(default)]
     idp: Option<i32>,
+    /// Unlink the SP from its IdP. Not allowed together with `idp`.
+    #[serde(default)]
+    clear_idp: bool,
     #[serde(default)]
     is_active: Option<bool>,
     #[serde(default)]
@@ -320,6 +334,16 @@ pub async fn update_idp(
     Json(params): Json<UpdateIdpRequest>,
 ) -> ApiResult<Json<IdpRow>> {
     require_perm(&state, WRITE_PERM, None).await?;
+    check_clear(
+        "session_lifetime_hours",
+        params.session_lifetime_hours.is_some(),
+        params.clear_session_lifetime_hours,
+    )?;
+    check_clear(
+        "attribute_mapping",
+        params.attribute_mapping.is_some(),
+        params.clear_attribute_mapping,
+    )?;
 
     let existing = find_idp(&state.db, params.id).await?;
     let idp_id = existing.id;
@@ -348,11 +372,17 @@ pub async fn update_idp(
     if let Some(hours) = params.session_lifetime_hours {
         model.session_lifetime_hours = Set(Some(hours));
     }
+    if params.clear_session_lifetime_hours {
+        model.session_lifetime_hours = Set(None);
+    }
     if let Some(allow) = params.allow_idp_initiated {
         model.allow_idp_initiated = Set(Some(allow));
     }
     if params.attribute_mapping.is_some() {
         model.attribute_mapping = Set(params.attribute_mapping);
+    }
+    if params.clear_attribute_mapping {
+        model.attribute_mapping = Set(None);
     }
     model.updated_at = Set(Some(Utc::now().into()));
 
@@ -524,6 +554,7 @@ pub async fn update_sp(
     Json(params): Json<UpdateSpRequest>,
 ) -> ApiResult<Json<SpRow>> {
     require_perm(&state, WRITE_PERM, None).await?;
+    check_clear("idp", params.idp.is_some(), params.clear_idp)?;
 
     let existing = saml_sp_config::Entity::find_by_id(params.id)
         .one(&state.db)
@@ -557,6 +588,9 @@ pub async fn update_sp(
     if params.idp.is_some() {
         resolve_idp_name(&state.db, params.idp).await?;
         model.idp = Set(params.idp);
+    }
+    if params.clear_idp {
+        model.idp = Set(None);
     }
     if params.idp_x509_cert.is_some() {
         model.idp_x509_cert = Set(clean_optional(params.idp_x509_cert.as_deref()));

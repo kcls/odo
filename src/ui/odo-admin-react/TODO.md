@@ -38,10 +38,7 @@
       and role mappings (paginated, state in the URL). Changes from
       Angular: SPs linked to no IdP were invisible there; they're now
       listed on the SAML page and can be linked from their edit dialog.
-      Fields the API can't clear once set (an IdP's session lifetime and
-      attribute mapping, an SP's IdP) are required once set, with the
-      reason shown, instead of offering a blank that silently does
-      nothing. The mapping role picker lists every role.
+      The mapping role picker lists every role.
 
 ## New features
 
@@ -110,12 +107,13 @@
       default to 50 rows (max 200), and the Angular app's "all roles" and
       "all permissions" pickers never passed a limit. The React pickers
       page through everything (`api/paging.ts`) and are searchable.
-- [ ] odo-org can't clear a unit type's parent: `UpdateUnitTypeRequest`
-      treats a null `parent` as "unchanged". The Angular dialog offered
-      "None" anyway and silently did nothing. The React dialog doesn't
-      offer "None" once a type has a parent and says why. Backend fix:
-      accept an explicit clear (e.g. a `clear_parent` flag, or
-      distinguish an absent field from null).
+- [x] Fields that couldn't be cleared once set (null meant "unchanged"):
+      a unit type's parent, an IdP's session lifetime and attribute
+      mapping, an SP's IdP. Fixed with explicit flags (`clear_parent`,
+      `clear_session_lifetime_hours`, `clear_attribute_mapping`,
+      `clear_idp`; a value and its clear flag together are refused), so
+      existing callers sending null are unaffected. The admin dialogs
+      offer "None"/blank again.
 - [ ] The Users page's org-unit picker uses `@odo/core`'s per-session
       tree cache, so units added or renamed in Org Units don't appear
       there until a reload. Org Units itself always reads fresh.

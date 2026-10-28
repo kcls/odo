@@ -120,10 +120,6 @@ function SpForm({
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
 
-  // The API treats a null idp as "unchanged", so a linked SP can't be
-  // unlinked; don't offer "None" once it has one.
-  const idpPermanent = existing?.idp != null
-
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     setPending(true)
@@ -137,10 +133,16 @@ function SpForm({
       callback_url: callbackUrl.trim(),
       is_active: isActive,
       idp_x509_cert: cert.trim(),
-      idp: idp === NO_IDP ? null : Number(idp),
     }
+    const idpId = idp === NO_IDP ? null : Number(idp)
     try {
-      const saved = existing ? await samlApi.updateSp(existing.id, fields) : await samlApi.createSp(fields)
+      const saved = existing
+        ? await samlApi.updateSp(existing.id, {
+            ...fields,
+            // A null idp means "unchanged" to the API; unlinking is its own flag.
+            ...(idpId !== null ? { idp: idpId } : { clear_idp: existing.idp != null }),
+          })
+        : await samlApi.createSp({ ...fields, idp: idpId })
       toast.success(t("sps.saved", { name: spName(saved) }))
       onDone()
     } catch (err) {
@@ -199,7 +201,7 @@ function SpForm({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {!idpPermanent && <SelectItem value={NO_IDP}>{t("sps.idpNone")}</SelectItem>}
+              <SelectItem value={NO_IDP}>{t("sps.idpNone")}</SelectItem>
               {idps.map((i) => (
                 <SelectItem key={i.id} value={String(i.id)}>
                   {i.name}
@@ -207,7 +209,6 @@ function SpForm({
               ))}
             </SelectContent>
           </Select>
-          {idpPermanent && <FieldDescription>{t("sps.idpPermanent")}</FieldDescription>}
         </Field>
         <Field>
           <FieldLabel htmlFor="sp-cert">{t("sps.cert")}</FieldLabel>

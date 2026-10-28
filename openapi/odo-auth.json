@@ -3399,7 +3399,17 @@
               "null"
             ]
           },
-          "attribute_mapping": {},
+          "attribute_mapping": {
+            "description": "A null or absent value leaves it unchanged; see the clear flag."
+          },
+          "clear_attribute_mapping": {
+            "type": "boolean",
+            "description": "Remove the attribute mapping. Not allowed together with\n`attribute_mapping`."
+          },
+          "clear_session_lifetime_hours": {
+            "type": "boolean",
+            "description": "Remove the session lifetime (use the default). Not allowed together\nwith `session_lifetime_hours`."
+          },
           "entity_id": {
             "type": [
               "string",
@@ -3433,7 +3443,8 @@
               "integer",
               "null"
             ],
-            "format": "int32"
+            "format": "int32",
+            "description": "A null or absent value leaves it unchanged; see the clear flag."
           },
           "slo_url": {
             "type": [
@@ -3524,6 +3535,10 @@
               "null"
             ]
           },
+          "clear_idp": {
+            "type": "boolean",
+            "description": "Unlink the SP from its IdP. Not allowed together with `idp`."
+          },
           "entity_id": {
             "type": [
               "string",
@@ -3539,7 +3554,8 @@
               "integer",
               "null"
             ],
-            "format": "int32"
+            "format": "int32",
+            "description": "A null or absent idp leaves it unchanged; see `clear_idp`."
           },
           "idp_x509_cert": {
             "type": [
