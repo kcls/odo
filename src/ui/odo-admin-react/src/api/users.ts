@@ -32,6 +32,14 @@ export const usersApi = {
     return apiPost(`${BASE}/create`, params)
   },
 
+  /**
+   * Set a local account's password (giving it one if it has none). Also
+   * clears any lockout and ends the user's other sessions.
+   */
+  setPassword(id: number, password: string): Promise<S["SetPasswordResponse"]> {
+    return apiPost(`${BASE}/set-password`, { id, password } satisfies S["SetPasswordRequest"])
+  },
+
   /** Local accounts only; SAML accounts are refused server-side. */
   update(id: number, params: Omit<S["UpdateUserRequest"], "id">): Promise<UserAccount> {
     return apiPost(`${BASE}/update`, { id, ...params })

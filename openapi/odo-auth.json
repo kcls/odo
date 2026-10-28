@@ -1567,6 +1567,43 @@
         ]
       }
     },
+    "/api/v1/odo/auth/user/set-password": {
+      "post": {
+        "tags": [
+          "user"
+        ],
+        "summary": "Set a local account's password, giving it one if it has none.",
+        "description": "Also clears any lockout and failed-attempt count, and ends the user's\nactive sessions so a compromised session can't outlive the reset.\nRefused for SAML accounts (`NOT_LOCAL_ACCOUNT`) and deleted ones\n(`ACCOUNT_DELETED`; restore it first).",
+        "operationId": "set_password",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetPasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Password set",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetPasswordResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/odo/auth/user/update": {
       "post": {
         "tags": [
@@ -3144,6 +3181,40 @@
               "string",
               "null"
             ]
+          }
+        }
+      },
+      "SetPasswordRequest": {
+        "type": "object",
+        "required": [
+          "id",
+          "password"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "password": {
+            "type": "string"
+          }
+        }
+      },
+      "SetPasswordResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "sessions_revoked"
+        ],
+        "properties": {
+          "sessions_revoked": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The user's sessions this ended (all but the caller's own current\nsession, when setting your own password).",
+            "minimum": 0
+          },
+          "success": {
+            "type": "boolean"
           }
         }
       },

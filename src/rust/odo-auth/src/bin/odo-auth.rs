@@ -67,6 +67,7 @@ use utoipa::OpenApi;
         user_admin::user_detail,
         user_admin::update_user,
         user_admin::create_user,
+        user_admin::set_password,
     ),
     components(schemas(
         handler::LoginRequest,
@@ -155,6 +156,8 @@ use utoipa::OpenApi;
         user_admin::SessionRow,
         user_admin::UpdateUserRequest,
         user_admin::CreateUserRequest,
+        user_admin::SetPasswordRequest,
+        user_admin::SetPasswordResponse,
     )),
     tags(
         (name = "auth", description = "Login, logout, and session management"),
@@ -396,6 +399,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route(
             "/api/v1/odo/auth/user/create",
             post(user_admin::create_user),
+        )
+        .route(
+            "/api/v1/odo/auth/user/set-password",
+            post(user_admin::set_password),
         )
         .layer(middleware::from_fn(log_access))
         .layer(middleware::from_fn_with_state(state.clone(), require_auth));

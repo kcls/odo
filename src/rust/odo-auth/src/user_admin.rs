@@ -488,23 +488,9 @@ pub async fn create_user(
     let created = model.insert(&txn).await?;
 
     if let Some(password) = params.password.as_deref() {
-        // Hash in-DB with the same function login verifies against.
-        use sea_orm::ConnectionTrait;
-        let hashed = txn
-            .query_one_raw(sea_orm::Statement::from_sql_and_values(
-                sea_orm::DbBackend::Postgres,
-                "SELECT auth.hash_password($1) AS hash",
-                [password.into()],
-            ))
-            .await?
-            .ok_or_else(|| LocalError::internal("hash_password returned nothing"))?;
-        let hash: String = hashed
-            .try_get("", "hash")
-            .map_err(|e| LocalError::internal(e.to_string()))?;
-
         let account = local_account::ActiveModel {
             usr: Set(created.id),
-            password_hash: Set(hash),
+            password_hash: Set(hash_password(&txn, password).await?),
             ..Default::default()
         };
         account.insert(&txn).await?;
@@ -531,6 +517,132 @@ pub async fn create_user(
         created_at: created.created_at,
         updated_at: created.updated_at,
         last_login_at: created.last_login_at,
+    }))
+}
+
+/// Hash a password in-DB with the same function login verifies against.
+async fn hash_password(
+    conn: &impl sea_orm::ConnectionTrait,
+    password: &str,
+) -> Result<String, LocalError> {
+    let row = conn
+        .query_one_raw(sea_orm::Statement::from_sql_and_values(
+            sea_orm::DbBackend::Postgres,
+            "SELECT auth.hash_password($1) AS hash",
+            [password.into()],
+        ))
+        .await?
+        .ok_or_else(|| LocalError::internal("hash_password returned nothing"))?;
+    row.try_get("", "hash")
+        .map_err(|e| LocalError::internal(e.to_string()))
+}
+
+#[derive(Deserialize, ToSchema)]
+pub struct SetPasswordRequest {
+    id: i32,
+    password: String,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct SetPasswordResponse {
+    success: bool,
+    /// The user's sessions this ended (all but the caller's own current
+    /// session, when setting your own password).
+    sessions_revoked: u64,
+}
+
+/// Set a local account's password, giving it one if it has none.
+///
+/// Also clears any lockout and failed-attempt count, and ends the user's
+/// active sessions so a compromised session can't outlive the reset.
+/// Refused for SAML accounts (`NOT_LOCAL_ACCOUNT`) and deleted ones
+/// (`ACCOUNT_DELETED`; restore it first).
+#[utoipa::path(
+    post,
+    path = "/api/v1/odo/auth/user/set-password",
+    request_body = SetPasswordRequest,
+    responses((status = 200, body = SetPasswordResponse, description = "Password set")),
+    security(("bearer" = [])),
+    tag = "user"
+)]
+pub async fn set_password(
+    State(state): State<Arc<AppState>>,
+    Json(params): Json<SetPasswordRequest>,
+) -> ApiResult<Json<SetPasswordResponse>> {
+    let caller_id = RequestContext::user_id().ok_or(LocalError::unauthenticated())? as i32;
+    require_perm(&state, WRITE_PERM, None).await?;
+    check_password(&params.password)?;
+
+    let user = usr::Entity::find_by_id(params.id)
+        .one(&state.db)
+        .await?
+        .ok_or_else(|| LocalError::not_found(format!("user {}", params.id)))?;
+    if user.auth_method != "local" {
+        return Err(LocalError::conflict(
+            "NOT_LOCAL_ACCOUNT",
+            None,
+            "SAML accounts sign in through their identity provider and have no password here.",
+        )
+        .into());
+    }
+    if user.deleted_at.is_some() {
+        return Err(LocalError::conflict(
+            "ACCOUNT_DELETED",
+            None,
+            "Restore the account before setting its password.",
+        )
+        .into());
+    }
+
+    // Never log the password itself.
+    tracing::info!(id = user.id, "SetPassword");
+
+    let txn = state.db.begin().await?;
+    let hash = hash_password(&txn, &params.password).await?;
+    let now = Utc::now();
+
+    let existing = local_account::Entity::find()
+        .filter(local_account::Column::Usr.eq(user.id))
+        .one(&txn)
+        .await?;
+    match existing {
+        Some(account) => {
+            let mut model = local_account::ActiveModel::from(account);
+            model.password_hash = Set(hash);
+            model.failed_login_attempts = Set(Some(0));
+            model.locked_until = Set(None);
+            model.updated_at = Set(Some(now.into()));
+            model.update(&txn).await?;
+        }
+        None => {
+            local_account::ActiveModel {
+                usr: Set(user.id),
+                password_hash: Set(hash),
+                ..Default::default()
+            }
+            .insert(&txn)
+            .await?;
+        }
+    }
+
+    // End the user's sessions, sparing only the one making this request
+    // when an admin sets their own password.
+    let mut sessions = session::Entity::update_many()
+        .col_expr(session::Column::IsActive, Expr::value(false))
+        .col_expr(session::Column::ExpiresAt, Expr::value(now))
+        .filter(session::Column::Usr.eq(user.id))
+        .filter(session::Column::IsActive.eq(true));
+    if user.id == caller_id
+        && let Some(claims) = RequestContext::claims()
+    {
+        sessions = sessions.filter(session::Column::Uuid.ne(claims.session_id));
+    }
+    let revoked = sessions.exec(&txn).await?.rows_affected;
+    txn.commit().await?;
+
+    Ok(Json(SetPasswordResponse {
+        success: true,
+        sessions_revoked: revoked,
     }))
 }
 

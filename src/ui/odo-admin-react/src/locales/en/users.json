@@ -45,7 +45,8 @@
       "ip": "IP",
       "client": "Client",
       "status": "Status"
-    }
+    },
+    "setPassword": "Set password"
   },
   "status": {
     "active": "Active",
@@ -127,7 +128,7 @@
     "middleName": "Middle name",
     "familyName": "Family name",
     "password": "Password",
-    "passwordHint": "At least 8 characters. There's no way to set it again later from here, so share it with the user securely.",
+    "passwordHint": "At least 8 characters. Share it with the user securely.",
     "passwordShort": "Use at least 8 characters.",
     "confirmPassword": "Confirm password",
     "passwordMismatch": "The passwords don't match.",
@@ -137,5 +138,14 @@
     "usernameTaken": "An active account already uses this username.",
     "emailTaken": "An active account already uses this email address.",
     "created": "Created {{name}}"
+  },
+  "setPassword": {
+    "title": "Set password",
+    "description": "Sets a new password for {{name}}, unlocks the account if it was locked, and signs them out everywhere.",
+    "hint": "At least 8 characters. Share it with the user securely.",
+    "submit": "Set password",
+    "done": "Password set for {{name}}",
+    "doneSessions_one": "Password set for {{name}}; {{count, number}} session ended",
+    "doneSessions_other": "Password set for {{name}}; {{count, number}} sessions ended"
   }
 }

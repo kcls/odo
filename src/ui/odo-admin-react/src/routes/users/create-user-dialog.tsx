@@ -1,4 +1,3 @@
-import { EyeIcon, EyeOffIcon } from "lucide-react"
 import { useState, type FormEvent } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
@@ -27,9 +26,9 @@ import {
   FieldSet,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { newUserProblems, newUserRequest, type AuthMethod, type NewUserForm } from "./new-user"
+import { newUserProblems, newUserRequest, passwordProblems, type AuthMethod, type NewUserForm } from "./new-user"
+import { PasswordFields } from "./password-fields"
 
 export function CreateUserDialog({
   open,
@@ -73,7 +72,6 @@ type FieldErrors = { username?: string; email?: string }
 function CreateUserForm({ onDone }: { onDone: (user: UserAccount) => void }) {
   const { t } = useTranslation(["users", "common"])
   const [form, setForm] = useState(EMPTY)
-  const [showPassword, setShowPassword] = useState(false)
   // Problems show once the user has tried to submit, not while typing.
   const [attempted, setAttempted] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
@@ -183,48 +181,15 @@ function CreateUserForm({ onDone }: { onDone: (user: UserAccount) => void }) {
         </div>
 
         {isLocal && (
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field data-invalid={shown.has("passwordShort")}>
-              <FieldLabel htmlFor="new-user-password">{t("create.password")}</FieldLabel>
-              <InputGroup>
-                <InputGroupInput
-                  id="new-user-password"
-                  type={showPassword ? "text" : "password"}
-                  required
-                  // Not this admin's own password; keep managers from offering theirs.
-                  autoComplete="new-password"
-                  value={form.password}
-                  aria-invalid={shown.has("passwordShort")}
-                  onChange={(e) => set("password")(e.target.value)}
-                />
-                <InputGroupAddon align="inline-end">
-                  <InputGroupButton
-                    size="icon-xs"
-                    aria-label={showPassword ? t("create.hidePassword") : t("create.showPassword")}
-                    aria-pressed={showPassword}
-                    onClick={() => setShowPassword((s) => !s)}
-                  >
-                    {showPassword ? <EyeOffIcon /> : <EyeIcon />}
-                  </InputGroupButton>
-                </InputGroupAddon>
-              </InputGroup>
-              {shown.has("passwordShort") && <FieldError>{t("create.passwordShort")}</FieldError>}
-            </Field>
-            <Field data-invalid={shown.has("passwordMismatch")}>
-              <FieldLabel htmlFor="new-user-confirm">{t("create.confirmPassword")}</FieldLabel>
-              <Input
-                id="new-user-confirm"
-                type={showPassword ? "text" : "password"}
-                required
-                autoComplete="new-password"
-                value={form.confirmPassword}
-                aria-invalid={shown.has("passwordMismatch")}
-                onChange={(e) => set("confirmPassword")(e.target.value)}
-              />
-              {shown.has("passwordMismatch") && <FieldError>{t("create.passwordMismatch")}</FieldError>}
-            </Field>
-            <FieldDescription className="sm:col-span-2">{t("create.passwordHint")}</FieldDescription>
-          </div>
+          <PasswordFields
+            idPrefix="new-user"
+            password={form.password}
+            confirm={form.confirmPassword}
+            onPassword={set("password")}
+            onConfirm={set("confirmPassword")}
+            problems={attempted ? passwordProblems(form.password, form.confirmPassword) : new Set()}
+            hint={t("create.passwordHint")}
+          />
         )}
 
         {error && <FieldError>{error}</FieldError>}

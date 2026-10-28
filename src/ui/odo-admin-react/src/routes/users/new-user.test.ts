@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { newUserProblems, newUserRequest, type NewUserForm } from "./new-user"
+import { newUserProblems, newUserRequest, passwordProblems, type NewUserForm } from "./new-user"
 
 const form = (patch: Partial<NewUserForm> = {}): NewUserForm => ({
   authMethod: "local",
@@ -49,5 +49,13 @@ describe("newUserRequest", () => {
 
   it("never sends a password for SAML accounts", () => {
     expect(newUserRequest(form({ authMethod: "saml" }))).not.toHaveProperty("password")
+  })
+})
+
+describe("passwordProblems", () => {
+  it("requires length and a matching confirmation", () => {
+    expect(passwordProblems("12345678", "12345678").size).toBe(0)
+    expect([...passwordProblems("1234567", "1234567")]).toEqual(["passwordShort"])
+    expect([...passwordProblems("12345678", "x")]).toEqual(["passwordMismatch"])
   })
 })

@@ -758,6 +758,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/odo/auth/user/set-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set a local account's password, giving it one if it has none.
+         * @description Also clears any lockout and failed-attempt count, and ends the user's
+         *     active sessions so a compromised session can't outlive the reset.
+         *     Refused for SAML accounts (`NOT_LOCAL_ACCOUNT`) and deleted ones
+         *     (`ACCOUNT_DELETED`; restore it first).
+         */
+        post: operations["set_password"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/odo/auth/user/update": {
         parameters: {
             query?: never;
@@ -1275,6 +1298,20 @@ export interface components {
             org_unit?: number | null;
             org_unit_label?: string | null;
             user_agent?: string | null;
+        };
+        SetPasswordRequest: {
+            /** Format: int32 */
+            id: number;
+            password: string;
+        };
+        SetPasswordResponse: {
+            /**
+             * Format: int64
+             * @description The user's sessions this ended (all but the caller's own current
+             *     session, when setting your own password).
+             */
+            sessions_revoked: number;
+            success: boolean;
         };
         /**
          * @description Standard sort inputs for admin list endpoints. Flatten this into a
@@ -2682,6 +2719,30 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserResponse"][];
+                };
+            };
+        };
+    };
+    set_password: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetPasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description Password set */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetPasswordResponse"];
                 };
             };
         };

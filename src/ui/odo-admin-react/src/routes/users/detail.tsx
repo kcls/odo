@@ -1,4 +1,4 @@
-import { PencilIcon, RotateCcwIcon, UserXIcon } from "lucide-react"
+import { KeyRoundIcon, PencilIcon, RotateCcwIcon, UserXIcon } from "lucide-react"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { useLoaderData, useRevalidator, type LoaderFunctionArgs } from "react-router"
@@ -23,6 +23,7 @@ import type { RouteHandle } from "@/lib/route-handle"
 import { EditUserDialog } from "./edit-user-dialog"
 import { EffectivePermissions } from "./effective-permissions"
 import { RoleAssignments } from "./role-assignments"
+import { SetPasswordDialog } from "./set-password-dialog"
 
 export async function loader({ params }: LoaderFunctionArgs) {
   const id = requireIdParam(params.userId)
@@ -61,6 +62,7 @@ export function Component() {
   const revalidator = useRevalidator()
   const reportError = useReportError()
   const [editing, setEditing] = useState(false)
+  const [settingPassword, setSettingPassword] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
 
   const user = detail.user
@@ -103,6 +105,13 @@ export function Component() {
                 <PencilIcon data-icon="inline-start" />
                 {t("detail.edit")}
               </Button>
+              {/* A deleted account must be restored before it gets a password. */}
+              {!user.deleted_at && (
+                <Button variant="outline" onClick={() => setSettingPassword(true)}>
+                  <KeyRoundIcon data-icon="inline-start" />
+                  {t("detail.setPassword")}
+                </Button>
+              )}
               {user.deleted_at ? (
                 <Button variant="outline" onClick={() => void setDeleted(false)}>
                   <RotateCcwIcon data-icon="inline-start" />
@@ -138,6 +147,12 @@ export function Component() {
         user={editing ? user : null}
         onOpenChange={setEditing}
         onSaved={() => void revalidator.revalidate()}
+      />
+      <SetPasswordDialog
+        user={settingPassword ? user : null}
+        onOpenChange={setSettingPassword}
+        // The account section shows lockout and failed attempts.
+        onDone={() => void revalidator.revalidate()}
       />
       <ConfirmDialog
         open={confirmingDelete}
