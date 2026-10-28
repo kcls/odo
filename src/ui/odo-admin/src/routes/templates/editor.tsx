@@ -327,6 +327,7 @@ function Editor({ template, canWrite }: { template: TemplateRow | null; canWrite
         title={t("leave.title")}
         description={t("leave.body")}
         confirmLabel={t("leave.discard")}
+        cancelLabel={t("leave.stay")}
         destructive
         onConfirm={() => {
           if (blocker.state === "blocked") blocker.proceed()

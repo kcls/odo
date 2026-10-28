@@ -22,6 +22,7 @@ export function ConfirmDialog({
   title,
   description,
   confirmLabel,
+  cancelLabel,
   destructive = false,
   onConfirm,
 }: {
@@ -30,6 +31,8 @@ export function ConfirmDialog({
   title: ReactNode
   description: ReactNode
   confirmLabel: ReactNode
+  /** Defaults to "Cancel". */
+  cancelLabel?: ReactNode
   destructive?: boolean
   onConfirm: () => Promise<void> | void
 }) {
@@ -55,7 +58,7 @@ export function ConfirmDialog({
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={pending}>{t("actions.cancel")}</AlertDialogCancel>
+          <AlertDialogCancel disabled={pending}>{cancelLabel ?? t("actions.cancel")}</AlertDialogCancel>
           <AlertDialogAction
             variant={destructive ? "destructive" : "default"}
             disabled={pending}
