@@ -12,6 +12,7 @@
   "errors": {
     "credentials": "Sign-in failed. Check your username and password.",
     "generic": "Sign-in failed. Please try again.",
+    "account_inactive": "SSO authentication succeeded, but your account is inactive. Please contact your administrator.",
     "no_roles": "SSO authentication succeeded, but your account has not been granted application access. Please contact your administrator.",
     "saml_auth_failed": "SSO authentication failed. Please try again or use username and password.",
     "saml_no_token": "SSO authentication completed but no session token was received. Please try again.",

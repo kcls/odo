@@ -284,6 +284,9 @@ pub async fn login(
         .inner_join(local_account::Entity)
         .filter(usr::Column::Username.eq(params.username.clone()))
         .filter(usr::Column::DeletedAt.is_null())
+        // An inactive account is refused like a wrong password, so login
+        // doesn't reveal which accounts exist.
+        .filter(usr::Column::Status.eq("active"))
         .limit(1)
         .into_model::<LoginLookup>()
         .one(&state.db)
@@ -604,16 +607,21 @@ pub async fn refresh_token(
     let org_unit_i32 = resolve_org_ref(&state.db, None, requested).await?;
     let user_id: i64 = claims.sub.parse().unwrap_or(0);
 
+    // Deactivating an account ends its sessions; this also covers one
+    // switched off outside the admin API (e.g. odo-registration by SQL).
+    let user = usr::Entity::find_by_id(user_id as i32)
+        .one(&state.db)
+        .await?
+        .filter(|u| u.status.as_deref() == Some("active"))
+        .ok_or(LocalError::unauthenticated())?;
+
     let org_unit_claim = org_unit_uuid_claim(&state.db, org_unit_i32.map(|n| n as i64)).await?;
-    // Carry the user's uuid forward; older refresh tokens without it fall
-    // back to a lookup so rotated tokens gain the claim.
-    let sub_uuid = match claims.sub_uuid.clone() {
-        Some(u) => Some(u),
-        None => usr::Entity::find_by_id(user_id as i32)
-            .one(&state.db)
-            .await?
-            .map(|u| u.uuid.to_string()),
-    };
+    // Carry the user's uuid forward; older refresh tokens without it gain
+    // the claim.
+    let sub_uuid = claims
+        .sub_uuid
+        .clone()
+        .or_else(|| Some(user.uuid.to_string()));
     let (new_access_token, new_refresh_token, refresh_expires_at) =
         state.tokens.generate_token_pair(
             user_id,

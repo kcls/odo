@@ -13,7 +13,7 @@ import { loadNamespaces } from "@/i18n"
 import { safeRedirectTarget } from "@/lib/loader"
 
 /** SAML callback failures arrive as ?error=<code>. */
-const SAML_ERRORS = ["no_roles", "saml_auth_failed", "saml_no_token", "saml_token_invalid"] as const
+const SAML_ERRORS = ["account_inactive", "no_roles", "saml_auth_failed", "saml_no_token", "saml_token_invalid"] as const
 type SamlError = (typeof SAML_ERRORS)[number]
 type LoginError = SamlError | "generic"
 
