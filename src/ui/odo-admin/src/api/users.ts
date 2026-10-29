@@ -11,11 +11,15 @@ export type UserSummary = S["UserResponse"]
 export type UserAccount = S["UserAccountRow"]
 export type UserDetail = S["UserDetailResponse"]
 export type UserSession = S["SessionRow"]
+export type AccountStatus = S["AccountStatus"]
 
 const BASE = "/api/v1/odo/auth/user"
 
 export const usersApi = {
-  /** Active users matching every keyword, ordered by display name. */
+  /**
+   * Users matching every keyword, ordered by display name. Only those
+   * with the given status (default active); there's no "any".
+   */
   search(params: S["UserSearchRequest"]): Promise<UserSummary[]> {
     return apiPost(`${BASE}/search`, params)
   },
@@ -40,7 +44,10 @@ export const usersApi = {
     return apiPost(`${BASE}/set-password`, { id, password } satisfies S["SetPasswordRequest"])
   },
 
-  /** Local accounts only; SAML accounts are refused server-side. */
+  /**
+   * A SAML account accepts only `status`; its profile belongs to the
+   * identity provider. Deactivating ends the user's sessions.
+   */
   update(id: number, params: Omit<S["UpdateUserRequest"], "id">): Promise<UserAccount> {
     return apiPost(`${BASE}/update`, { id, ...params })
   },

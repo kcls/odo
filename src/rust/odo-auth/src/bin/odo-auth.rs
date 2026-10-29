@@ -155,6 +155,7 @@ use utoipa::OpenApi;
         user_admin::SamlUserAttrRow,
         user_admin::SessionRow,
         user_admin::UpdateUserRequest,
+        user_admin::AccountStatus,
         user_admin::CreateUserRequest,
         user_admin::SetPasswordRequest,
         user_admin::SetPasswordResponse,

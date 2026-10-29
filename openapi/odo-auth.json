@@ -1642,6 +1642,14 @@
   },
   "components": {
     "schemas": {
+      "AccountStatus": {
+        "type": "string",
+        "description": "The statuses an admin can set. `auth.usr` also allows `suspended` and\n`deleted`, which nothing sets; soft deletion is `deleted_at`.",
+        "enum": [
+          "active",
+          "inactive"
+        ]
+      },
       "AssignmentIdRequest": {
         "type": "object",
         "required": [
@@ -3694,6 +3702,17 @@
             "type": [
               "string",
               "null"
+            ]
+          },
+          "status": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AccountStatus",
+                "description": "Whether the account may sign in. Deactivating ends its sessions.\nThe only field a SAML account accepts."
+              }
             ]
           }
         }

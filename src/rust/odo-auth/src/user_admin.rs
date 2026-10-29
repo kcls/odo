@@ -1,13 +1,13 @@
 //! Admin detail view over auth.usr and auth.local_account, aggregating role
 //! assignments (with SAML-managed flags), SAML identities, captured SAML
 //! attribute values, and recent sessions — plus a narrow update endpoint
-//! for local accounts (names and soft deletion).
+//! (names and soft deletion for local accounts; active/inactive for any).
 //!
 //! Reads require `auth.user.detail.read` — deliberately stronger than
 //! `auth.user.read` (which incident staff hold for user search) because
 //! sessions expose IP addresses and user agents. Updates require
-//! `auth.user.write` and are refused for SAML accounts (the IdP owns
-//! them). Secrets (password hashes, token hashes) never leave the database.
+//! `auth.user.write`; a SAML account's profile belongs to the IdP, so only
+//! its status can change here. Secrets (password hashes, token hashes) never leave the database.
 
 use axum::Json;
 use axum::extract::State;
@@ -130,6 +130,28 @@ pub struct UpdateUserRequest {
     /// deleted_at/deleted_by), `false` restores it. Omitted leaves it as-is.
     #[serde(default)]
     deleted: Option<bool>,
+    /// Whether the account may sign in. Deactivating ends its sessions.
+    /// The only field a SAML account accepts.
+    #[serde(default)]
+    status: Option<AccountStatus>,
+}
+
+/// The statuses an admin can set. `auth.usr` also allows `suspended` and
+/// `deleted`, which nothing sets; soft deletion is `deleted_at`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum AccountStatus {
+    Active,
+    Inactive,
+}
+
+impl AccountStatus {
+    fn as_str(self) -> &'static str {
+        match self {
+            AccountStatus::Active => "active",
+            AccountStatus::Inactive => "inactive",
+        }
+    }
 }
 
 // ===========================================================================
@@ -297,11 +319,15 @@ pub async fn update_user(
         .await?
         .ok_or_else(|| LocalError::not_found(format!("user {}", params.id)))?;
 
-    if existing.auth_method != "local" {
+    let touches_local_only = params.first_given_name.is_some()
+        || params.second_given_name.is_some()
+        || params.family_name.is_some()
+        || params.deleted.is_some();
+    if existing.auth_method != "local" && touches_local_only {
         return Err(LocalError::conflict(
             "NOT_LOCAL_ACCOUNT",
             None,
-            "Only local accounts can be edited here; SAML accounts are managed by the identity provider.",
+            "Only a SAML account's status can be changed here; its profile is managed by the identity provider.",
         )
         .into());
     }
@@ -309,9 +335,15 @@ pub async fn update_user(
     if params.deleted == Some(true) && existing.id == caller_id {
         return Err(LocalError::invalid_input("You may not delete your own account.").into());
     }
+    if params.status == Some(AccountStatus::Inactive) && existing.id == caller_id {
+        return Err(LocalError::invalid_input("You may not deactivate your own account.").into());
+    }
 
-    tracing::info!(id = params.id, "UpdateUser");
+    tracing::info!(id = params.id, status = ?params.status, "UpdateUser");
 
+    let deactivating = params.status == Some(AccountStatus::Inactive)
+        && existing.status.as_deref() != Some(AccountStatus::Inactive.as_str());
+    let user_id = existing.id;
     let mut model = usr::ActiveModel::from(existing);
     if params.first_given_name.is_some() {
         model.first_given_name = Set(clean_optional(params.first_given_name.as_deref()));
@@ -333,7 +365,15 @@ pub async fn update_user(
             model.deleted_by = Set(None);
         }
     }
-    model.update(&state.db).await?;
+    if let Some(status) = params.status {
+        model.status = Set(Some(status.as_str().to_string()));
+    }
+    let txn = state.db.begin().await?;
+    model.update(&txn).await?;
+    if deactivating {
+        end_sessions(&txn, user_id, caller_id).await?;
+    }
+    txn.commit().await?;
 
     // Re-fetch: a DB trigger recomputes display_name from the name fields.
     let updated = usr::Entity::find_by_id(params.id)
@@ -625,25 +665,33 @@ pub async fn set_password(
         }
     }
 
-    // End the user's sessions, sparing only the one making this request
-    // when an admin sets their own password.
-    let mut sessions = session::Entity::update_many()
-        .col_expr(session::Column::IsActive, Expr::value(false))
-        .col_expr(session::Column::ExpiresAt, Expr::value(now))
-        .filter(session::Column::Usr.eq(user.id))
-        .filter(session::Column::IsActive.eq(true));
-    if user.id == caller_id
-        && let Some(claims) = RequestContext::claims()
-    {
-        sessions = sessions.filter(session::Column::Uuid.ne(claims.session_id));
-    }
-    let revoked = sessions.exec(&txn).await?.rows_affected;
+    let revoked = end_sessions(&txn, user.id, caller_id).await?;
     txn.commit().await?;
 
     Ok(Json(SetPasswordResponse {
         success: true,
         sessions_revoked: revoked,
     }))
+}
+
+/// End a user's active sessions, sparing only the one making this request
+/// when the caller acts on their own account. Returns how many ended.
+async fn end_sessions(
+    txn: &impl ConnectionTrait,
+    user_id: i32,
+    caller_id: i32,
+) -> Result<u64, DbErr> {
+    let mut sessions = session::Entity::update_many()
+        .col_expr(session::Column::IsActive, Expr::value(false))
+        .col_expr(session::Column::ExpiresAt, Expr::value(Utc::now()))
+        .filter(session::Column::Usr.eq(user_id))
+        .filter(session::Column::IsActive.eq(true));
+    if user_id == caller_id
+        && let Some(claims) = RequestContext::claims()
+    {
+        sessions = sessions.filter(session::Column::Uuid.ne(claims.session_id));
+    }
+    Ok(sessions.exec(txn).await?.rows_affected)
 }
 
 #[cfg(test)]

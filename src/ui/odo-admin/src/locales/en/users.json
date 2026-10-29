@@ -46,12 +46,27 @@
       "client": "Client",
       "status": "Status"
     },
-    "setPassword": "Set password"
+    "setPassword": "Set password",
+    "deactivate": "Deactivate",
+    "reactivate": "Reactivate",
+    "selfDeactivate": "You can't deactivate your own account."
   },
   "status": {
     "active": "Active",
+    "inactive": "Inactive",
     "deleted": "Deleted",
     "sessionActive": "Active"
+  },
+  "statusFilter": {
+    "label": "Status",
+    "active": "Active",
+    "inactive": "Inactive"
+  },
+  "deactivate": {
+    "title": "Deactivate account?",
+    "body": "{{name}} will be signed out everywhere and blocked from signing in, by password or SSO, until the account is reactivated. Roles and history are kept.",
+    "done": "Deactivated {{name}}",
+    "reactivated": "Reactivated {{name}}"
   },
   "edit": {
     "title": "Edit user",

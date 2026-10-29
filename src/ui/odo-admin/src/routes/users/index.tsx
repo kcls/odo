@@ -3,27 +3,34 @@ import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { Link, useLoaderData, useNavigate, useSearchParams, type LoaderFunctionArgs } from "react-router"
 
-import { usersApi, type UserSummary } from "@/api/users"
+import { usersApi, type AccountStatus, type UserSummary } from "@/api/users"
 import { PERMS } from "@/auth/perms"
 import { checkPerms } from "@/auth/session"
 import { DataTable, type Column } from "@/components/data-table/data-table"
 import { PageHeader } from "@/components/page-header"
 import { SearchInput } from "@/components/search-input"
-import { StatusBadge } from "@/components/status-badge"
 import { Button } from "@/components/ui/button"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia } from "@/components/ui/empty"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { useBusy } from "@/hooks/use-busy"
 import { loadNamespaces } from "@/i18n"
+import { AccountStatusBadge } from "./account-status"
 import { CreateUserDialog } from "./create-user-dialog"
 
 /** odo-auth's search has no total, so ask for one extra to detect more. */
 const MAX_RESULTS = 50
 
+/** `?status=inactive` searches deactivated accounts instead of active ones. */
+function statusParam(params: URLSearchParams): AccountStatus {
+  return params.get("status") === "inactive" ? "inactive" : "active"
+}
+
 export async function loader({ request }: LoaderFunctionArgs) {
-  const q = new URL(request.url).searchParams.get("q")?.trim() ?? ""
+  const params = new URL(request.url).searchParams
+  const q = params.get("q")?.trim() ?? ""
   const [found, perms] = await Promise.all([
     // The backend requires keywords; an empty search shows the prompt.
-    q ? usersApi.search({ keywords: q, limit: MAX_RESULTS + 1 }) : null,
+    q ? usersApi.search({ keywords: q, status: statusParam(params), limit: MAX_RESULTS + 1 }) : null,
     checkPerms({ canCreate: PERMS.USER_WRITE }),
     loadNamespaces("users"),
   ])
@@ -42,6 +49,7 @@ export function Component() {
   const [creating, setCreating] = useState(false)
   const busy = useBusy()
   const q = params.get("q") ?? ""
+  const status = statusParam(params)
 
   const columns: Column<UserSummary>[] = [
     {
@@ -62,12 +70,7 @@ export function Component() {
     {
       id: "status",
       header: t("columns.status"),
-      cell: (u) =>
-        u.status === "active" ? (
-          <StatusBadge tone="success">{t("status.active")}</StatusBadge>
-        ) : (
-          u.status && <StatusBadge tone="neutral">{u.status}</StatusBadge>
-        ),
+      cell: (u) => <AccountStatusBadge status={u.status} />,
     },
   ]
 
@@ -85,22 +88,50 @@ export function Component() {
           )
         }
       />
-      <SearchInput
-        className="max-w-sm"
-        value={q}
-        label={t("search")}
-        placeholder={t("search")}
-        onCommit={(value) =>
-          setParams(
-            (prev) => {
-              if (value.trim()) prev.set("q", value)
-              else prev.delete("q")
-              return prev
-            },
-            { replace: true }
-          )
-        }
-      />
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+        <SearchInput
+          className="max-w-sm"
+          value={q}
+          label={t("search")}
+          placeholder={t("search")}
+          onCommit={(value) =>
+            setParams(
+              (prev) => {
+                if (value.trim()) prev.set("q", value)
+                else prev.delete("q")
+                return prev
+              },
+              { replace: true }
+            )
+          }
+        />
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          size="sm"
+          value={status}
+          aria-label={t("statusFilter.label")}
+          // Single select that can't be cleared: ignore a deselect.
+          onValueChange={(v) =>
+            v &&
+            setParams(
+              (prev) => {
+                if (v === "inactive") prev.set("status", v)
+                else prev.delete("status")
+                return prev
+              },
+              { replace: true }
+            )
+          }
+        >
+          <ToggleGroupItem value="active" className="px-3">
+            {t("statusFilter.active")}
+          </ToggleGroupItem>
+          <ToggleGroupItem value="inactive" className="px-3">
+            {t("statusFilter.inactive")}
+          </ToggleGroupItem>
+        </ToggleGroup>
+      </div>
       {users === null ? (
         <Empty className="border">
           <EmptyHeader>

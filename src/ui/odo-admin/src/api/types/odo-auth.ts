@@ -801,6 +801,12 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * @description The statuses an admin can set. `auth.usr` also allows `suspended` and
+         *     `deleted`, which nothing sets; soft deletion is `deleted_at`.
+         * @enum {string}
+         */
+        AccountStatus: "active" | "inactive";
         AssignmentIdRequest: {
             /** Format: int32 */
             id: number;
@@ -1472,6 +1478,7 @@ export interface components {
             /** Format: int32 */
             id: number;
             second_given_name?: string | null;
+            status?: null | components["schemas"]["AccountStatus"];
         };
         UserAccountRow: {
             auth_method: string;
