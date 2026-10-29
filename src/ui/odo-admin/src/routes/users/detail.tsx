@@ -1,16 +1,17 @@
-import { KeyRoundIcon, PencilIcon, RotateCcwIcon, UserXIcon } from "lucide-react"
+import { BanIcon, KeyRoundIcon, PencilIcon, RotateCcwIcon, UserCheckIcon, UserXIcon } from "lucide-react"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { useLoaderData, useRevalidator, type LoaderFunctionArgs } from "react-router"
 import { toast } from "sonner"
 
 import { authzApi } from "@/api/authz"
-import { usersApi, type UserDetail, type UserSession } from "@/api/users"
+import { usersApi, type AccountStatus, type UserDetail, type UserSession } from "@/api/users"
 import { PERMS } from "@/auth/perms"
-import { checkPerms } from "@/auth/session"
+import { checkPerms, useCurrentUser } from "@/auth/session"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import { DataTable, type Column } from "@/components/data-table/data-table"
 import { DetailHeader } from "@/components/detail-header"
+import { DisabledReason } from "@/components/disabled-reason"
 import { Section } from "@/components/section"
 import { StatusBadge } from "@/components/status-badge"
 import { Button } from "@/components/ui/button"
@@ -20,6 +21,7 @@ import { loadNamespaces } from "@/i18n"
 import { useFormatters } from "@/lib/format"
 import { orNotFound, requireIdParam } from "@/lib/loader"
 import type { RouteHandle } from "@/lib/route-handle"
+import { AccountStatusBadge } from "./account-status"
 import { EditUserDialog } from "./edit-user-dialog"
 import { EffectivePermissions } from "./effective-permissions"
 import { RoleAssignments } from "./role-assignments"
@@ -64,10 +66,14 @@ export function Component() {
   const [editing, setEditing] = useState(false)
   const [settingPassword, setSettingPassword] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [confirmingDeactivate, setConfirmingDeactivate] = useState(false)
+  const currentUser = useCurrentUser()
 
   const user = detail.user
-  // SAML accounts belong to the identity provider.
+  // SAML accounts belong to the identity provider, apart from their status.
   const editable = canEdit && user.auth_method === "local"
+  // A deleted account is already blocked from signing in.
+  const canSetStatus = canEdit && !user.deleted_at
 
   const setDeleted = async (deleted: boolean) => {
     try {
@@ -79,14 +85,47 @@ export function Component() {
     }
   }
 
+  const setStatus = async (status: AccountStatus) => {
+    try {
+      await usersApi.update(user.id, { status })
+      const key = status === "inactive" ? "deactivate.done" : "deactivate.reactivated"
+      toast.success(t(key, { name: user.display_name }))
+      await revalidator.revalidate()
+    } catch (err) {
+      reportError(err, "Failed to update account status")
+    }
+  }
+
+  let statusAction = null
+  if (canSetStatus && user.status === "inactive") {
+    statusAction = (
+      <Button variant="outline" onClick={() => void setStatus("active")}>
+        <UserCheckIcon data-icon="inline-start" />
+        {t("detail.reactivate")}
+      </Button>
+    )
+  } else if (canSetStatus && currentUser?.id === user.id) {
+    statusAction = (
+      <DisabledReason label={t("detail.deactivate")} reason={t("detail.selfDeactivate")}>
+        <Button variant="outline" disabled aria-hidden tabIndex={-1}>
+          <BanIcon data-icon="inline-start" />
+          {t("detail.deactivate")}
+        </Button>
+      </DisabledReason>
+    )
+  } else if (canSetStatus) {
+    statusAction = (
+      <Button variant="outline" onClick={() => setConfirmingDeactivate(true)}>
+        <BanIcon data-icon="inline-start" />
+        {t("detail.deactivate")}
+      </Button>
+    )
+  }
+
   const summary = [
     user.username && <span className="font-mono text-xs">{user.username}</span>,
     user.email,
-    user.status === "active" ? (
-      <StatusBadge tone="success">{t("status.active")}</StatusBadge>
-    ) : (
-      user.status && <StatusBadge tone="neutral">{user.status}</StatusBadge>
-    ),
+    user.status && <AccountStatusBadge status={user.status} />,
     <StatusBadge tone="info">{user.auth_method}</StatusBadge>,
     user.deleted_at && <StatusBadge tone="danger">{t("status.deleted")}</StatusBadge>,
   ].filter(Boolean)
@@ -99,30 +138,34 @@ export function Component() {
         title={user.display_name}
         summary={summary}
         actions={
-          editable && (
+          (editable || statusAction) && (
             <>
-              <Button variant="outline" onClick={() => setEditing(true)}>
-                <PencilIcon data-icon="inline-start" />
-                {t("detail.edit")}
-              </Button>
+              {editable && (
+                <Button variant="outline" onClick={() => setEditing(true)}>
+                  <PencilIcon data-icon="inline-start" />
+                  {t("detail.edit")}
+                </Button>
+              )}
               {/* A deleted account must be restored before it gets a password. */}
-              {!user.deleted_at && (
+              {editable && !user.deleted_at && (
                 <Button variant="outline" onClick={() => setSettingPassword(true)}>
                   <KeyRoundIcon data-icon="inline-start" />
                   {t("detail.setPassword")}
                 </Button>
               )}
-              {user.deleted_at ? (
-                <Button variant="outline" onClick={() => void setDeleted(false)}>
-                  <RotateCcwIcon data-icon="inline-start" />
-                  {t("detail.restore")}
-                </Button>
-              ) : (
-                <Button variant="destructive" onClick={() => setConfirmingDelete(true)}>
-                  <UserXIcon data-icon="inline-start" />
-                  {t("detail.markDeleted")}
-                </Button>
-              )}
+              {statusAction}
+              {editable &&
+                (user.deleted_at ? (
+                  <Button variant="outline" onClick={() => void setDeleted(false)}>
+                    <RotateCcwIcon data-icon="inline-start" />
+                    {t("detail.restore")}
+                  </Button>
+                ) : (
+                  <Button variant="destructive" onClick={() => setConfirmingDelete(true)}>
+                    <UserXIcon data-icon="inline-start" />
+                    {t("detail.markDeleted")}
+                  </Button>
+                ))}
             </>
           )
         }
@@ -162,6 +205,15 @@ export function Component() {
         confirmLabel={t("detail.markDeleted")}
         destructive
         onConfirm={() => setDeleted(true)}
+      />
+      <ConfirmDialog
+        open={confirmingDeactivate}
+        onOpenChange={setConfirmingDeactivate}
+        title={t("deactivate.title")}
+        description={t("deactivate.body", { name: user.display_name })}
+        confirmLabel={t("detail.deactivate")}
+        destructive
+        onConfirm={() => setStatus("inactive")}
       />
     </div>
   )

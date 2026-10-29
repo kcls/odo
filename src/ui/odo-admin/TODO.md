@@ -72,6 +72,12 @@
       skipped email delivery's page puts it back in the queue with a
       fresh retry budget, from `delivery/retry` behind the new
       `odo.notify.delivery.write` (sqitch `009_notify_delivery_write`).
+- [x] **Deactivate or reactivate an account** from the user's page,
+      SAML accounts included (their profile still belongs to the IdP, but
+      access is odo's): `user/update` takes `status` (`active` or
+      `inactive`), refuses your own account, and ends the user's sessions
+      on deactivation. The Users list searches active or inactive accounts
+      (`?status=inactive`), since `user/search` matches one status.
 
 ## Known issues found while porting
 
@@ -118,6 +124,17 @@
 - [ ] The Users page's org-unit picker uses `@odo/core`'s per-session
       tree cache, so units added or renamed in Org Units don't appear
       there until a reload. Org Units itself always reads fresh.
+- [x] **Account status wasn't enforced.** Password login, SAML login, and
+      token refresh never checked `auth.usr.status`; only the unused (and
+      broken: it reads a nonexistent `is_deleted`) SQL function
+      `auth.verify_user_credentials` did, so the `odo-registration`
+      account's documented `inactive` lockdown did nothing. odo-auth now
+      requires `active` on all three (SAML refusals redirect with
+      `?error=account_inactive`), and sqitch
+      `010_drop_verify_user_credentials` drops the function.
+- [ ] **A soft-deleted SAML account can still sign in**: the SAML login
+      finds the user by email without checking `deleted_at`. (Password
+      login does check it.)
 - [ ] `@odo/core`'s `userHasPerm` returns false on any error, and the
       result is cached for the session, so a transient failure hides a
       tool until the next sign-in. Same as the Angular app.

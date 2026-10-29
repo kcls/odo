@@ -579,3 +579,113 @@ async fn set_password_refused_for_saml_accounts() {
     let err: serde_json::Value = resp.json().await.unwrap();
     assert_eq!(err["code"], "NOT_LOCAL_ACCOUNT");
 }
+
+// ---------------------------------------------------------------------------
+// user/update status: deactivating and reactivating accounts
+// ---------------------------------------------------------------------------
+
+async fn update_user(c: &reqwest::Client, token: &str, body: serde_json::Value) -> reqwest::Response {
+    c.post(update_url())
+        .headers(auth_header(token))
+        .json(&body)
+        .send()
+        .await
+        .unwrap()
+}
+
+#[tokio::test]
+async fn deactivating_blocks_sign_in_until_reactivated() {
+    let c = client();
+    let admin = odo_admin_token(&c).await;
+    let (id, username) = create_login_user(&c, &admin, "status", "status-password-1").await;
+
+    // A cookie-jar client holds the session's refresh token, which
+    // deactivating must end.
+    let jar = std::sync::Arc::new(reqwest::cookie::Jar::default());
+    let session = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .cookie_provider(jar)
+        .build()
+        .unwrap();
+    assert_eq!(login_status(&session, &username, "status-password-1").await, 200);
+
+    let resp = update_user(&c, &admin, json!({"id": id, "status": "inactive"})).await;
+    assert_eq!(resp.status(), 200);
+    let updated: serde_json::Value = resp.json().await.unwrap();
+    assert_eq!(updated["status"], "inactive");
+
+    assert_eq!(login_status(&c, &username, "status-password-1").await, 401, "login while inactive");
+    let refresh = session
+        .post(format!("{}/api/v1/odo/auth/token/refresh", auth_base()))
+        .json(&json!({}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(refresh.status(), 401, "refresh while inactive");
+
+    let resp = update_user(&c, &admin, json!({"id": id, "status": "active"})).await;
+    assert_eq!(resp.status(), 200);
+    assert_eq!(resp.json::<serde_json::Value>().await.unwrap()["status"], "active");
+    assert_eq!(login_status(&c, &username, "status-password-1").await, 200, "login after reactivating");
+}
+
+#[tokio::test]
+async fn saml_account_status_can_change_but_not_its_profile() {
+    let c = client();
+    let admin = odo_admin_token(&c).await;
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let username = format!("itest-samlstatus-{nanos}");
+    let resp = c
+        .post(create_url())
+        .headers(auth_header(&admin))
+        .json(&json!({
+            "username": username,
+            "email": format!("{username}@odo.example.org"),
+            "auth_method": "saml",
+        }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+    let id = resp.json::<serde_json::Value>().await.unwrap()["id"].clone();
+
+    let resp = update_user(&c, &admin, json!({"id": id, "status": "inactive"})).await;
+    assert_eq!(resp.status(), 200);
+    assert_eq!(resp.json::<serde_json::Value>().await.unwrap()["status"], "inactive");
+
+    // Status alongside a profile field is still refused whole.
+    let resp = update_user(&c, &admin, json!({"id": id, "status": "active", "family_name": "Nope"})).await;
+    assert_eq!(resp.status(), 409);
+    let err: serde_json::Value = resp.json().await.unwrap();
+    assert_eq!(err["code"], "NOT_LOCAL_ACCOUNT");
+}
+
+#[tokio::test]
+async fn self_deactivation_refused() {
+    let c = client();
+    let token = odo_admin_token(&c).await;
+    let resp = update_user(&c, &token, json!({"id": token_user_id(&token), "status": "inactive"})).await;
+    assert_eq!(resp.status(), 400);
+}
+
+#[tokio::test]
+async fn only_active_and_inactive_can_be_set() {
+    let c = client();
+    let admin = odo_admin_token(&c).await;
+    let (id, _) = create_login_user(&c, &admin, "badstatus", "status-password-1").await;
+    let resp = update_user(&c, &admin, json!({"id": id, "status": "suspended"})).await;
+    assert!(resp.status().is_client_error(), "{}", resp.status());
+}
+
+#[tokio::test]
+async fn staff_denied_status_change() {
+    let c = client();
+    let token = staff_token(&c).await;
+    // An id that doesn't exist: the permission check comes first, and a
+    // regression can't switch off an account other tests sign in with.
+    let resp = update_user(&c, &token, json!({"id": i32::MAX, "status": "inactive"})).await;
+    assert_eq!(resp.status(), 403);
+}
