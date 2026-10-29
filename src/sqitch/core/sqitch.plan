@@ -11,3 +11,4 @@
 007_drop_make_ban_email_template [001_odo_baseline] 2026-09-24T00:00:00Z Bill Erickson <bserickson@kcls.org> # Drop the dead, pre-split ban email template builder
 008_notify_delivery_read [002_odo_seed] 2026-10-28T00:00:00Z Bill Erickson <bserickson@kcls.org> # Notification delivery history: odo.notify.delivery.read for odo-admin, and a created_at index
 009_notify_delivery_write [008_notify_delivery_read] 2026-10-28T00:10:00Z Bill Erickson <bserickson@kcls.org> # Retry notification deliveries: odo.notify.delivery.write for odo-admin
+010_drop_verify_user_credentials [001_odo_baseline] 2026-10-29T11:46:02Z Bill Erickson <bserickson@kcls.org> # Drop the dead auth.verify_user_credentials(); odo-auth enforces account status

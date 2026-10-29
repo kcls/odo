@@ -747,8 +747,8 @@ pub async fn assertion_consumer_service_form(
 ) -> Result<axum::response::Response, odo_client::error::ApiError> {
     let result = acs_core(&state, &params.saml_response, params.relay_state.as_deref()).await?;
 
-    if let Some(no_roles_redirect) = result.no_roles_redirect {
-        return Ok(Redirect::to(&no_roles_redirect).into_response());
+    if let Some(refused_redirect) = result.refused_redirect {
+        return Ok(Redirect::to(&refused_redirect).into_response());
     }
 
     let base_redirect = result.relay_state.unwrap_or_else(|| "/".to_string());
@@ -781,7 +781,9 @@ struct AcsResult {
     refresh_token: String,
     refresh_expires_at_ms: i64,
     relay_state: Option<String>,
-    no_roles_redirect: Option<String>,
+    /// Where to send a user the IdP authenticated but odo refuses, with
+    /// the reason as `?error=` (`account_inactive`, `no_roles`).
+    refused_redirect: Option<String>,
 }
 
 /// Core SAML ACS processing: decode and validate the SAML response,
@@ -894,29 +896,42 @@ async fn acs_core(
         .await
         .map_err(|e| LocalError::internal(format!("User upsert failed: {e}")))?;
 
+    let refuse = |error: &str| {
+        let base = relay_state.unwrap_or("/login");
+        let sep = if base.contains('?') { "&" } else { "?" };
+        AcsResult {
+            refresh_token: String::new(),
+            refresh_expires_at_ms: 0,
+            relay_state: relay_state.map(|s| s.to_string()),
+            refused_redirect: Some(format!("{base}{sep}error={error}")),
+        }
+    };
+
+    let user = usr::Entity::find_by_id(user_id)
+        .one(&state.db)
+        .await?
+        .ok_or_else(|| LocalError::internal("user vanished after SAML upsert"))?;
+    if user.status.as_deref() != Some("active") {
+        info!(
+            user_id = user_id,
+            "User authenticated via SAML but the account is inactive"
+        );
+        return Ok(refuse("account_inactive"));
+    }
+
     // Check auth.session permission
     if !authz::user_has_perm(&state.db, user_id, "odo.auth.session", None).await? {
         info!(
             user_id = user_id,
             "User authenticated via SAML but has no roles"
         );
-        let base = relay_state.unwrap_or("/login");
-        let sep = if base.contains('?') { "&" } else { "?" };
-        return Ok(AcsResult {
-            refresh_token: String::new(),
-            refresh_expires_at_ms: 0,
-            relay_state: relay_state.map(|s| s.to_string()),
-            no_roles_redirect: Some(format!("{base}{sep}error=no_roles")),
-        });
+        return Ok(refuse("no_roles"));
     }
 
     let session_uuid = generate_session_id();
     // Working location is resolved on session restore (see refresh), so
     // the initial SAML token carries no org unit in either form.
-    let user_uuid = usr::Entity::find_by_id(user_id)
-        .one(&state.db)
-        .await?
-        .map(|u| u.uuid.to_string());
+    let user_uuid = Some(user.uuid.to_string());
     let (access_token, refresh_token, refresh_expires_at_ms) = state.tokens.generate_token_pair(
         user_id as i64,
         user_uuid,
@@ -973,7 +988,7 @@ async fn acs_core(
         refresh_token,
         refresh_expires_at_ms,
         relay_state: relay_state.map(|s| s.to_string()),
-        no_roles_redirect: None,
+        refused_redirect: None,
     })
 }
 
