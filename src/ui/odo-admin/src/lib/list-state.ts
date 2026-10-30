@@ -28,6 +28,15 @@ const DEFAULT_PAGE_SIZE = 25
 
 export type ListDefaults = { sort: SortState; sortKeys: readonly string[] }
 
+/** Shorter searches aren't sent: one or two letters match most of a list. */
+export const MIN_SEARCH_LENGTH = 3
+
+/** The search to send for `q`, or undefined when it's too short to send. */
+export function searchTerm(q: string): string | undefined {
+  const term = q.trim()
+  return term.length >= MIN_SEARCH_LENGTH ? term : undefined
+}
+
 export function readListState(params: URLSearchParams, defaults: ListDefaults): ListState {
   const key = params.get("sort")
   const sort: SortState =
@@ -47,7 +56,7 @@ export function readListState(params: URLSearchParams, defaults: ListDefaults): 
 /** The odo admin list request fields (Page + Sort + search) for a state. */
 export function listRequest(state: ListState) {
   return {
-    search: state.q.trim() || undefined,
+    search: searchTerm(state.q),
     sort_by: state.sort.key,
     sort_dir: state.sort.dir,
     limit: state.pageSize,

@@ -91,6 +91,10 @@
   "combobox": {
     "noMatches": "No matches."
   },
+  "search": {
+    "minLength_one": "Type at least {{count}} character",
+    "minLength_other": "Type at least {{count}} characters"
+  },
   "none": "—",
   "errors": {
     "notFoundTitle": "Not found",

@@ -4,6 +4,7 @@ import {
   listRequest,
   readListState,
   redirectPastLastPage,
+  searchTerm,
   writeListState,
   type ListDefaults,
 } from "./list-state"
@@ -89,5 +90,23 @@ describe("redirectPastLastPage", () => {
 
   it("does nothing on a page that exists", () => {
     expect(redirectFor(101)).toBeNull()
+  })
+})
+
+describe("searchTerm", () => {
+  it("sends three or more characters, trimmed", () => {
+    expect(searchTerm("  circ ")).toBe("circ")
+    expect(searchTerm("abc")).toBe("abc")
+  })
+
+  it("sends nothing for shorter text", () => {
+    expect(searchTerm("")).toBeUndefined()
+    expect(searchTerm("ab")).toBeUndefined()
+    expect(searchTerm("  ab  ")).toBeUndefined()
+  })
+
+  it("keeps a short query out of the list request", () => {
+    const state = readListState(new URLSearchParams("q=ci"), LIST)
+    expect(listRequest(state).search).toBeUndefined()
   })
 })
