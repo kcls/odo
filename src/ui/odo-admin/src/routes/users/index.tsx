@@ -14,6 +14,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyMedia } from "@/components/u
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { useBusy } from "@/hooks/use-busy"
 import { loadNamespaces } from "@/i18n"
+import { searchTerm } from "@/lib/list-state"
 import { AccountStatusBadge } from "./account-status"
 import { CreateUserDialog } from "./create-user-dialog"
 
@@ -27,9 +28,9 @@ function statusParam(params: URLSearchParams): AccountStatus {
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const params = new URL(request.url).searchParams
-  const q = params.get("q")?.trim() ?? ""
+  const q = searchTerm(params.get("q") ?? "")
   const [found, perms] = await Promise.all([
-    // The backend requires keywords; an empty search shows the prompt.
+    // The backend requires keywords; without a search, show the prompt.
     q ? usersApi.search({ keywords: q, status: statusParam(params), limit: MAX_RESULTS + 1 }) : null,
     checkPerms({ canCreate: PERMS.USER_WRITE }),
     loadNamespaces("users"),

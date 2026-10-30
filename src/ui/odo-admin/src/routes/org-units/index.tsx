@@ -79,6 +79,8 @@ export function Component() {
         label={t("search")}
         placeholder={t("search")}
         delay={150}
+        // A client-side filter over the loaded tree: no minimum.
+        minLength={1}
         onCommit={(value) =>
           setParams(
             (prev) => {
