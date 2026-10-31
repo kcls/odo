@@ -84,6 +84,14 @@
       Not delivery retry, and no other writes. The UI hides each write
       action without its permission, so the role sees every tool read-only
       apart from Email Groups and Email Templates.
+- [x] **Email template history**: every write to a template is kept as a
+      version (sqitch `012_notify_template_history`; a trigger, so app
+      registration and direct SQL are captured too, with the author when
+      the writer names one). A template's History page lists its
+      versions; a version's page shows what it changed and how it differs
+      from the template now, and restores it (itself a new version). Backed
+      by odo-notify `template/{versions,version,restore}`. Live templates
+      only: a deleted template's versions are kept but not shown.
 
 ## Known issues found while porting
 

@@ -1,7 +1,7 @@
-import { Loader2Icon, RefreshCwIcon, Trash2Icon, TriangleAlertIcon } from "lucide-react"
+import { HistoryIcon, Loader2Icon, RefreshCwIcon, Trash2Icon, TriangleAlertIcon } from "lucide-react"
 import { useEffect, useRef, useState, type FormEvent } from "react"
 import { useTranslation } from "react-i18next"
-import { useBlocker, useLoaderData, useNavigate, type LoaderFunctionArgs } from "react-router"
+import { Link, useBlocker, useLoaderData, useNavigate, useRevalidator, useRouteLoaderData } from "react-router"
 import { toast } from "sonner"
 
 import { ApiRequestError } from "@/api/client"
@@ -20,30 +20,20 @@ import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLab
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { loadNamespaces } from "@/i18n"
-import { orNotFound, requireIdParam } from "@/lib/loader"
-import type { RouteHandle } from "@/lib/route-handle"
 import { formatJsonText, parseJsonText } from "@/lib/json-text"
+import type { loader as templateLoader } from "./template-route"
 import { useTemplatePreview } from "./use-template-preview"
 
-export async function loader({ params }: LoaderFunctionArgs) {
-  // The "new" route has no :templateId.
-  const id = params.templateId === undefined ? null : requireIdParam(params.templateId)
-  const [template, perms] = await Promise.all([
-    id === null ? null : orNotFound(templatesApi.get(id)),
-    checkPerms({ canWrite: PERMS.TEMPLATE_WRITE }),
-    loadNamespaces("templates"),
-  ])
-  return { template, ...perms }
+export async function loader() {
+  const [perms] = await Promise.all([checkPerms({ canWrite: PERMS.TEMPLATE_WRITE }), loadNamespaces("templates")])
+  return perms
 }
 
-export const handle: RouteHandle = {
-  crumb: (match, t) =>
-    (match.loaderData as Awaited<ReturnType<typeof loader>> | undefined)?.template?.name ??
-    t("editor.newTitle", { ns: "templates" }),
-}
-
+/** Creates a template at /templates/new; edits the :templateId route's template. */
 export function Component() {
-  const { template, canWrite } = useLoaderData<typeof loader>()
+  const { canWrite } = useLoaderData<typeof loader>()
+  const template =
+    (useRouteLoaderData("template") as Awaited<ReturnType<typeof templateLoader>> | undefined)?.template ?? null
   // A fresh editor per template, so switching between them resets the form.
   return <Editor key={template?.id ?? "new"} template={template} canWrite={canWrite} />
 }
@@ -81,6 +71,7 @@ const sameDraft = (a: Draft, b: Draft) => (Object.keys(a) as (keyof Draft)[]).ev
 function Editor({ template, canWrite }: { template: TemplateRow | null; canWrite: boolean }) {
   const { t } = useTranslation(["templates", "common"])
   const navigate = useNavigate()
+  const revalidator = useRevalidator()
   const [saved, setSaved] = useState(() => draftOf(template))
   const [draft, setDraft] = useState(saved)
   const [codeError, setCodeError] = useState<string | null>(null)
@@ -133,6 +124,8 @@ function Editor({ template, canWrite }: { template: TemplateRow | null; canWrite
         const updated = await templatesApi.update(template.id, fields)
         setSaved(draft)
         toast.success(t("editor.saved", { name: updated.name }))
+        // The crumb and history read the template route's copy.
+        void revalidator.revalidate()
       } else {
         const created = await templatesApi.create(fields)
         toast.success(t("editor.created", { name: created.name }))
@@ -181,19 +174,29 @@ function Editor({ template, canWrite }: { template: TemplateRow | null; canWrite
             : undefined
         }
         actions={
-          canWrite && (
+          (canWrite || template) && (
             <>
-              {dirty && <StatusBadge tone="warning">{t("editor.unsaved")}</StatusBadge>}
+              {canWrite && dirty && <StatusBadge tone="warning">{t("editor.unsaved")}</StatusBadge>}
               {template && (
+                <Button asChild variant="outline">
+                  <Link to="history">
+                    <HistoryIcon data-icon="inline-start" />
+                    {t("editor.history")}
+                  </Link>
+                </Button>
+              )}
+              {canWrite && template && (
                 <Button type="button" variant="destructive" onClick={() => setDeleting(true)}>
                   <Trash2Icon data-icon="inline-start" />
                   {t("editor.delete")}
                 </Button>
               )}
-              <Button type="submit" disabled={!canSave || !sampleOk || (template !== null && !dirty)}>
-                {pending && <Loader2Icon data-icon="inline-start" className="animate-spin" />}
-                {t("editor.save")}
-              </Button>
+              {canWrite && (
+                <Button type="submit" disabled={!canSave || !sampleOk || (template !== null && !dirty)}>
+                  {pending && <Loader2Icon data-icon="inline-start" className="animate-spin" />}
+                  {t("editor.save")}
+                </Button>
+              )}
             </>
           )
         }

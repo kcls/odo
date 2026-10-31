@@ -10,6 +10,9 @@ type S = components["schemas"]
 export type TemplateRow = S["TemplateRow"]
 export type TemplatePage = S["TemplatePage"]
 export type PreviewResponse = S["PreviewResponse"]
+export type TemplateVersionSummary = S["TemplateVersionSummary"]
+export type TemplateVersionPage = S["TemplateVersionPage"]
+export type TemplateVersionRow = S["TemplateVersionRow"]
 
 const TEMPLATE = "/api/v1/odo/notify/template"
 
@@ -35,6 +38,18 @@ export const templatesApi = {
   /** Render (possibly unsaved) template text against sample variables. */
   preview(params: S["PreviewRequest"]): Promise<PreviewResponse> {
     return apiPost(`${TEMPLATE}/preview`, params)
+  },
+  /** One page of a live template's versions, newest first. */
+  versions(template: number, page: { limit: number; offset: number }): Promise<TemplateVersionPage> {
+    return apiPost(`${TEMPLATE}/versions`, { template, ...page } satisfies S["ListTemplateVersionsRequest"])
+  },
+  /** The template as it stood at one version. */
+  version(template: number, version: number): Promise<TemplateVersionRow> {
+    return apiPost(`${TEMPLATE}/version`, { template, version } satisfies S["TemplateVersionRequest"])
+  },
+  /** Put the template back as it was at a version; recorded as a new version. */
+  restore(template: number, version: number): Promise<TemplateRow> {
+    return apiPost(`${TEMPLATE}/restore`, { template, version } satisfies S["TemplateVersionRequest"])
   },
 }
 

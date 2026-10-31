@@ -36,7 +36,8 @@
     "sampleDataHint": "JSON object of template variables, used for the preview.",
     "invalidJson": "Sample data must be valid JSON.",
     "created": "Created {{name}}",
-    "saved": "Saved {{name}}"
+    "saved": "Saved {{name}}",
+    "history": "History"
   },
   "preview": {
     "title": "Preview",
@@ -60,5 +61,48 @@
     "body": "Your edits to this template haven't been saved.",
     "stay": "Keep editing",
     "discard": "Discard changes"
+  },
+  "history": {
+    "crumb": "History",
+    "title": "History of {{name}}",
+    "subtitle": "Every saved version, newest first. Open one to see what changed or to restore it.",
+    "empty": "No versions recorded.",
+    "columns": {
+      "version": "Version",
+      "action": "Change",
+      "fields": "Fields changed",
+      "by": "By",
+      "at": "When"
+    },
+    "versionLabel": "Version {{version}}",
+    "current": "Current",
+    "noFieldChanges": "—",
+    "unknownAuthor": "Unknown",
+    "deleted": "Deleted",
+    "actions": {
+      "baseline": "History began",
+      "create": "Created",
+      "update": "Edited",
+      "restore": "Restored version {{version}}",
+      "delete": "Deleted"
+    },
+    "compareLabel": "Compare with",
+    "comparePrevious": "Previous version",
+    "compareCurrent": "Current template",
+    "comparePreviousTitle": "Changes in this version",
+    "comparePreviousHint": "What this version changed from version {{version}}.",
+    "firstVersionHint": "The first recorded version, in full.",
+    "compareCurrentTitle": "Compared with the current template",
+    "compareCurrentHint": "What restoring this version would change.",
+    "identical": "No differences.",
+    "unchanged": "Unchanged: {{fields}}.",
+    "activeChange": "{{before}} → {{after}}",
+    "added": "Added:",
+    "removed": "Removed:",
+    "restore": "Restore this version",
+    "isCurrent": "The template already matches this version.",
+    "restoreTitle": "Restore version {{version}}?",
+    "restoreBody": "{{name}} will be put back as it was at version {{version}}: its code, name, description, subject, bodies, sample data, and active setting. The current content stays in the history, so this can be undone.",
+    "restored": "Restored {{name}} to version {{version}}"
   }
 }

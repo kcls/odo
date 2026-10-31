@@ -75,8 +75,24 @@ export const ADMIN_TOOLS: AdminTool[] = [
     readPerm: PERMS.TEMPLATE_READ,
     children: [
       { index: true, lazy: () => import("@/routes/templates") },
-      { path: "new", lazy: () => import("@/routes/templates/editor") },
-      { path: ":templateId", lazy: () => import("@/routes/templates/editor") },
+      { path: "new", lazy: () => import("@/routes/templates/new") },
+      {
+        // Loads the template for the editor and its history pages.
+        id: "template",
+        path: ":templateId",
+        lazy: () => import("@/routes/templates/template-route"),
+        children: [
+          { index: true, lazy: () => import("@/routes/templates/editor") },
+          {
+            path: "history",
+            lazy: () => import("@/routes/templates/history-route"),
+            children: [
+              { index: true, lazy: () => import("@/routes/templates/history") },
+              { path: ":version", lazy: () => import("@/routes/templates/version") },
+            ],
+          },
+        ],
+      },
     ],
   },
   {
