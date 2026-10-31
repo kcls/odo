@@ -5,4 +5,5 @@ pub use super::email_group::Entity as EmailGroup;
 pub use super::email_group_member::Entity as EmailGroupMember;
 pub use super::event::Entity as Event;
 pub use super::template::Entity as Template;
+pub use super::template_version::Entity as TemplateVersion;
 pub use super::user_state::Entity as UserState;

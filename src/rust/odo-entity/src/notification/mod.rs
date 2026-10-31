@@ -7,4 +7,5 @@ pub mod email_group;
 pub mod email_group_member;
 pub mod event;
 pub mod template;
+pub mod template_version;
 pub mod user_state;

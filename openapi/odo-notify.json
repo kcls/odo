@@ -829,6 +829,42 @@
         ]
       }
     },
+    "/api/v1/odo/notify/template/restore": {
+      "post": {
+        "tags": [
+          "template-admin"
+        ],
+        "summary": "Put a template back as it stood at an earlier version: its code, name,\ndescription, subject, bodies, sample data, and active flag. Recorded\nas a new `restore` version, so a restore can itself be undone.\nRestoring the content the template already has changes nothing.",
+        "operationId": "restore_version",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TemplateVersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The template after the restore",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateRow"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/odo/notify/template/update": {
       "post": {
         "tags": [
@@ -852,6 +888,76 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TemplateRow"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/notify/template/version": {
+      "post": {
+        "tags": [
+          "template-admin"
+        ],
+        "operationId": "get_version",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TemplateVersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The template as it stood at that version",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateVersionRow"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/odo/notify/template/versions": {
+      "post": {
+        "tags": [
+          "template-admin"
+        ],
+        "operationId": "list_versions",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ListTemplateVersionsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The template's versions, newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateVersionPage"
                 }
               }
             }
@@ -1820,6 +1926,25 @@
           }
         }
       },
+      "ListTemplateVersionsRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Page"
+          },
+          {
+            "type": "object",
+            "required": [
+              "template"
+            ],
+            "properties": {
+              "template": {
+                "type": "integer",
+                "format": "int32"
+              }
+            }
+          }
+        ]
+      },
       "ListTemplatesRequest": {
         "allOf": [
           {
@@ -2301,6 +2426,178 @@
           "updated_at": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "TemplateVersionPage": {
+        "type": "object",
+        "description": "One page of a template's versions, newest first.",
+        "required": [
+          "rows",
+          "total"
+        ],
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TemplateVersionSummary"
+            },
+            "description": "The rows on this page."
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Total rows matching the filter, ignoring limit/offset."
+          }
+        }
+      },
+      "TemplateVersionRequest": {
+        "type": "object",
+        "required": [
+          "template",
+          "version"
+        ],
+        "properties": {
+          "template": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "TemplateVersionRow": {
+        "type": "object",
+        "description": "A template as it stood at one version.",
+        "required": [
+          "template",
+          "version",
+          "action",
+          "code",
+          "name",
+          "subject_template",
+          "body_template",
+          "is_active",
+          "changed_at"
+        ],
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "body_template": {
+            "type": "string"
+          },
+          "body_template_html": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "changed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "changed_by": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "changed_by_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "code": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "is_active": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "restored_from": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "sample_data": {},
+          "subject_template": {
+            "type": "string"
+          },
+          "template": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "TemplateVersionSummary": {
+        "type": "object",
+        "description": "One version in a template's history, without its content.",
+        "required": [
+          "version",
+          "action",
+          "changed_fields",
+          "changed_at"
+        ],
+        "properties": {
+          "action": {
+            "type": "string",
+            "description": "`baseline` (content when history began), `create`, `update`,\n`restore`, or `delete`."
+          },
+          "changed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "changed_by": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Null when unknown: the baseline, or a change made outside odo-notify."
+          },
+          "changed_by_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "changed_fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Fields that differ from the previous version (none for the first)."
+          },
+          "restored_from": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "The version a restore brought back."
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },

@@ -5,7 +5,8 @@
 //! events and deliveries reference templates by code string, so history
 //! stays intact. Handlebars syntax is validated server-side on every write
 //! using the same renderer the enqueue path uses, and a preview endpoint
-//! renders drafts against sample data without saving anything.
+//! renders drafts against sample data without saving anything. Every
+//! write is kept as a version (see `template_history`).
 
 use axum::Json;
 use axum::extract::State;
@@ -20,16 +21,17 @@ use odo_service::admin::{
 };
 use odo_service::template::{render, render_text};
 use sea_orm::prelude::*;
-use sea_orm::{Condition, Order, QueryOrder, QuerySelect, Set};
+use sea_orm::{Condition, Order, QueryOrder, QuerySelect, Set, TransactionTrait};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use utoipa::ToSchema;
 
 use crate::AppState;
 use crate::inbox::SuccessResponse;
+use crate::template_history::set_actor;
 
-const READ_PERM: &str = "odo.notify.template.read";
-const WRITE_PERM: &str = "odo.notify.template.write";
+pub(crate) const READ_PERM: &str = "odo.notify.template.read";
+pub(crate) const WRITE_PERM: &str = "odo.notify.template.write";
 
 // ===========================================================================
 // Types
@@ -288,7 +290,10 @@ pub async fn create_template(
         model.is_active = Set(is_active);
     }
 
-    let inserted = model.insert(&state.db).await.map_err(map_code_taken)?;
+    let txn = state.db.begin().await?;
+    set_actor(&txn, user_id, None).await?;
+    let inserted = model.insert(&txn).await.map_err(map_code_taken)?;
+    txn.commit().await?;
 
     Ok(Json(inserted.into()))
 }
@@ -305,7 +310,7 @@ pub async fn update_template(
     State(state): State<Arc<AppState>>,
     Json(params): Json<UpdateTemplateRequest>,
 ) -> ApiResult<Json<TemplateRow>> {
-    RequestContext::user_id().ok_or(LocalError::unauthenticated())?;
+    let user_id = RequestContext::user_id().ok_or(LocalError::unauthenticated())? as i32;
     state
         .auth_client
         .permission_required(WRITE_PERM, None)
@@ -368,7 +373,10 @@ pub async fn update_template(
     }
     model.updated_at = Set(Utc::now().into());
 
-    let updated = model.update(&state.db).await.map_err(map_code_taken)?;
+    let txn = state.db.begin().await?;
+    set_actor(&txn, user_id, None).await?;
+    let updated = model.update(&txn).await.map_err(map_code_taken)?;
+    txn.commit().await?;
 
     Ok(Json(updated.into()))
 }
@@ -385,7 +393,7 @@ pub async fn delete_template(
     State(state): State<Arc<AppState>>,
     Json(params): Json<TemplateIdRequest>,
 ) -> ApiResult<Json<SuccessResponse>> {
-    RequestContext::user_id().ok_or(LocalError::unauthenticated())?;
+    let user_id = RequestContext::user_id().ok_or(LocalError::unauthenticated())? as i32;
     state
         .auth_client
         .permission_required(WRITE_PERM, None)
@@ -397,7 +405,10 @@ pub async fn delete_template(
 
     let mut model = template::ActiveModel::from(existing);
     model.deleted_at = Set(Some(Utc::now().into()));
-    model.update(&state.db).await?;
+    let txn = state.db.begin().await?;
+    set_actor(&txn, user_id, None).await?;
+    model.update(&txn).await?;
+    txn.commit().await?;
 
     Ok(Json(SuccessResponse { success: true }))
 }
@@ -448,7 +459,10 @@ pub async fn preview_template(
 // Helpers
 // ===========================================================================
 
-async fn find_template(db: &DatabaseConnection, id: i32) -> Result<template::Model, LocalError> {
+pub(crate) async fn find_template(
+    db: &DatabaseConnection,
+    id: i32,
+) -> Result<template::Model, LocalError> {
     template::Entity::find_by_id(id)
         .filter(template::Column::DeletedAt.is_null())
         .one(db)
@@ -476,13 +490,17 @@ async fn root_org_unit(db: &DatabaseConnection) -> Result<i32, LocalError> {
 
 /// Compile-check a handlebars template against sample variables; render
 /// errors surface as 400s naming the offending field.
-fn validate_template(field: &str, text: &str, vars: &serde_json::Value) -> Result<(), LocalError> {
+pub(crate) fn validate_template(
+    field: &str,
+    text: &str,
+    vars: &serde_json::Value,
+) -> Result<(), LocalError> {
     render(text, vars)
         .map(|_| ())
         .map_err(|e| LocalError::invalid_input(format!("{field}: {e}")))
 }
 
-fn map_code_taken(e: DbErr) -> LocalError {
+pub(crate) fn map_code_taken(e: DbErr) -> LocalError {
     map_unique_violation(
         e,
         "TEMPLATE_CODE_TAKEN",

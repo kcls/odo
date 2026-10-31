@@ -3,7 +3,7 @@ use axum::middleware;
 use axum::routing::{get, post};
 use odo_client::auth::TokenManager;
 use odo_notify::AppState;
-use odo_notify::{delivery_admin, email_group, enqueue, inbox, template_admin};
+use odo_notify::{delivery_admin, email_group, enqueue, inbox, template_admin, template_history};
 use odo_service::health;
 use odo_service::middleware::{log_access, request_tracing, require_auth};
 use std::env;
@@ -34,6 +34,9 @@ use utoipa::OpenApi;
         template_admin::update_template,
         template_admin::delete_template,
         template_admin::preview_template,
+        template_history::list_versions,
+        template_history::get_version,
+        template_history::restore_version,
         delivery_admin::list_deliveries,
         delivery_admin::get_delivery,
         delivery_admin::delivery_summary,
@@ -70,6 +73,11 @@ use utoipa::OpenApi;
         template_admin::UpdateTemplateRequest,
         template_admin::TemplateIdRequest,
         template_admin::PreviewRequest,
+        template_history::TemplateVersionSummary,
+        template_history::TemplateVersionPage,
+        template_history::TemplateVersionRow,
+        template_history::ListTemplateVersionsRequest,
+        template_history::TemplateVersionRequest,
         delivery_admin::RecipientKind,
         delivery_admin::DeliveryRecipient,
         delivery_admin::DeliveryRow,
@@ -226,6 +234,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route(
             "/api/v1/odo/notify/template/preview",
             post(template_admin::preview_template),
+        )
+        .route(
+            "/api/v1/odo/notify/template/versions",
+            post(template_history::list_versions),
+        )
+        .route(
+            "/api/v1/odo/notify/template/version",
+            post(template_history::get_version),
+        )
+        .route(
+            "/api/v1/odo/notify/template/restore",
+            post(template_history::restore_version),
         )
         .route(
             "/api/v1/odo/notify/delivery/list",

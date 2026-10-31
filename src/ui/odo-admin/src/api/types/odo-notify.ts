@@ -388,6 +388,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/odo/notify/template/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Put a template back as it stood at an earlier version: its code, name,
+         *     description, subject, bodies, sample data, and active flag. Recorded
+         *     as a new `restore` version, so a restore can itself be undone.
+         *     Restoring the content the template already has changes nothing.
+         */
+        post: operations["restore_version"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/odo/notify/template/update": {
         parameters: {
             query?: never;
@@ -398,6 +420,38 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["update_template"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/odo/notify/template/version": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["get_version"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/odo/notify/template/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["list_versions"];
         delete?: never;
         options?: never;
         head?: never;
@@ -712,6 +766,10 @@ export interface components {
             /** Format: int64 */
             unread_count: number;
         };
+        ListTemplateVersionsRequest: components["schemas"]["Page"] & {
+            /** Format: int32 */
+            template: number;
+        };
         ListTemplatesRequest: components["schemas"]["Page"] & components["schemas"]["Sort"] & {
             search?: string | null;
         };
@@ -891,6 +949,70 @@ export interface components {
             subject_template: string;
             /** Format: date-time */
             updated_at: string;
+        };
+        /** @description One page of a template's versions, newest first. */
+        TemplateVersionPage: {
+            /** @description The rows on this page. */
+            rows: components["schemas"]["TemplateVersionSummary"][];
+            /**
+             * Format: int64
+             * @description Total rows matching the filter, ignoring limit/offset.
+             */
+            total: number;
+        };
+        TemplateVersionRequest: {
+            /** Format: int32 */
+            template: number;
+            /** Format: int32 */
+            version: number;
+        };
+        /** @description A template as it stood at one version. */
+        TemplateVersionRow: {
+            action: string;
+            body_template: string;
+            body_template_html?: string | null;
+            /** Format: date-time */
+            changed_at: string;
+            /** Format: int32 */
+            changed_by?: number | null;
+            changed_by_name?: string | null;
+            code: string;
+            description?: string | null;
+            is_active: boolean;
+            name: string;
+            /** Format: int32 */
+            restored_from?: number | null;
+            sample_data?: unknown;
+            subject_template: string;
+            /** Format: int32 */
+            template: number;
+            /** Format: int32 */
+            version: number;
+        };
+        /** @description One version in a template's history, without its content. */
+        TemplateVersionSummary: {
+            /**
+             * @description `baseline` (content when history began), `create`, `update`,
+             *     `restore`, or `delete`.
+             */
+            action: string;
+            /** Format: date-time */
+            changed_at: string;
+            /**
+             * Format: int32
+             * @description Null when unknown: the baseline, or a change made outside odo-notify.
+             */
+            changed_by?: number | null;
+            changed_by_name?: string | null;
+            /** @description Fields that differ from the previous version (none for the first). */
+            changed_fields: string[];
+            /**
+             * Format: int32
+             * @description The version a restore brought back.
+             */
+            restored_from?: number | null;
+            /** Format: int32 */
+            version: number;
         };
         UpdateEmailGroupMemberRequest: {
             email?: string | null;
@@ -1495,6 +1617,30 @@ export interface operations {
             };
         };
     };
+    restore_version: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TemplateVersionRequest"];
+            };
+        };
+        responses: {
+            /** @description The template after the restore */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateRow"];
+                };
+            };
+        };
+    };
     update_template: {
         parameters: {
             query?: never;
@@ -1515,6 +1661,54 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TemplateRow"];
+                };
+            };
+        };
+    };
+    get_version: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TemplateVersionRequest"];
+            };
+        };
+        responses: {
+            /** @description The template as it stood at that version */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateVersionRow"];
+                };
+            };
+        };
+    };
+    list_versions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ListTemplateVersionsRequest"];
+            };
+        };
+        responses: {
+            /** @description The template's versions, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateVersionPage"];
                 };
             };
         };

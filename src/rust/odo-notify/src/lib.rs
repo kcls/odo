@@ -4,6 +4,7 @@ pub mod enqueue;
 pub mod inbox;
 pub mod processor;
 pub mod template_admin;
+pub mod template_history;
 
 use odo_client::auth::TokenManager;
 use odo_client::client::AuthServiceClient;
