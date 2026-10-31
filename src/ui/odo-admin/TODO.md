@@ -78,6 +78,12 @@
       `inactive`), refuses your own account, and ends the user's sessions
       on deactivation. The Users list searches active or inactive accounts
       (`?status=inactive`), since `user/search` matches one status.
+- [x] **odo-manager role** (sqitch `011_odo_manager_role`): every
+      platform read permission, user detail included, plus
+      `odo.notify.email_group.write` and `odo.notify.template.write`.
+      Not delivery retry, and no other writes. The UI hides each write
+      action without its permission, so the role sees every tool read-only
+      apart from Email Groups and Email Templates.
 
 ## Known issues found while porting
 
