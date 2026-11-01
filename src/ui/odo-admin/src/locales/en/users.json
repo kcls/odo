@@ -73,7 +73,7 @@
     "description": "Only local accounts can be edited here; SAML accounts come from the identity provider.",
     "firstName": "First name",
     "middleName": "Middle name",
-    "familyName": "Family name",
+    "familyName": "Last name",
     "saved": "Saved {{name}}"
   },
   "delete": {
@@ -141,7 +141,7 @@
     "email": "Email",
     "firstName": "First name",
     "middleName": "Middle name",
-    "familyName": "Family name",
+    "familyName": "Last name",
     "password": "Password",
     "passwordHint": "At least 8 characters. Share it with the user securely.",
     "passwordShort": "Use at least 8 characters.",

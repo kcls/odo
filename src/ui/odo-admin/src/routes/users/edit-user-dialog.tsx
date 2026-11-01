@@ -17,11 +17,7 @@ import {
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 
-/**
- * Edit a local user's name. The middle name is deliberately absent:
- * UserAccountRow doesn't carry it, so the form can't show the current
- * value, and sending one would overwrite it (an empty string clears it).
- */
+/** Edit a local user's name. A blank field clears that name. */
 export function EditUserDialog({
   user,
   onOpenChange,
@@ -51,6 +47,7 @@ export function EditUserDialog({
 function EditUserForm({ user, onDone }: { user: UserAccount; onDone: (user: UserAccount) => void }) {
   const { t } = useTranslation(["users", "common"])
   const [firstName, setFirstName] = useState(user.first_given_name ?? "")
+  const [middleName, setMiddleName] = useState(user.second_given_name ?? "")
   const [familyName, setFamilyName] = useState(user.family_name ?? "")
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
@@ -62,6 +59,7 @@ function EditUserForm({ user, onDone }: { user: UserAccount; onDone: (user: User
     try {
       const saved = await usersApi.update(user.id, {
         first_given_name: firstName.trim(),
+        second_given_name: middleName.trim(),
         family_name: familyName.trim(),
       })
       toast.success(t("edit.saved", { name: saved.display_name }))
@@ -82,6 +80,10 @@ function EditUserForm({ user, onDone }: { user: UserAccount; onDone: (user: User
         <Field>
           <FieldLabel htmlFor="user-first-name">{t("edit.firstName")}</FieldLabel>
           <Input id="user-first-name" autoFocus value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="user-middle-name">{t("edit.middleName")}</FieldLabel>
+          <Input id="user-middle-name" value={middleName} onChange={(e) => setMiddleName(e.target.value)} />
         </Field>
         <Field>
           <FieldLabel htmlFor="user-family-name">{t("edit.familyName")}</FieldLabel>

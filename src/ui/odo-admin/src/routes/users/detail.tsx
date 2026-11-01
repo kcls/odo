@@ -224,7 +224,7 @@ function AccountSection({ detail }: { detail: UserDetail }) {
   const fmt = useFormatters()
   const u = detail.user
   const local = detail.local_account
-  const name = [u.first_given_name, u.family_name].filter(Boolean).join(" ")
+  const name = [u.first_given_name, u.second_given_name, u.family_name].filter(Boolean).join(" ")
   return (
     <Section title={t("detail.account")}>
       <Card size="sm">

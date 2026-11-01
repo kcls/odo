@@ -115,11 +115,10 @@
 - [x] Template lookup by id paged through the whole list (odo-notify
       had no `template/get`, and the Angular editor's `limit: 1000` was
       clamped to 200). Fixed: `template/get`, which the editor uses.
-- [ ] `UserAccountRow` (user/detail) lacks `second_given_name`, so the
-      edit dialog can't show the middle name. The Angular dialog
-      always sent `second_given_name: ""`, which clears it on every
-      save. The React dialog leaves middle name out until the backend
-      returns it.
+- [x] `UserAccountRow` (user/detail) lacked `second_given_name`, so the
+      edit dialog couldn't show the middle name, and the Angular dialog
+      cleared it on every save by sending `""`. Fixed: user/detail,
+      update and create return it, and the dialog edits it.
 - [x] odo-auth `UserResponse` (user/search, user/get) Debug-formatted
       the status, so it arrived as `"\"active\""`. Fixed: the stored value
       is returned as is. Nothing depended on the quoted form; kcls/current
