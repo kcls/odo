@@ -1503,6 +1503,7 @@ export interface components {
             id: number;
             /** Format: date-time */
             last_login_at?: string | null;
+            second_given_name?: string | null;
             status?: string | null;
             /** Format: date-time */
             updated_at?: string | null;

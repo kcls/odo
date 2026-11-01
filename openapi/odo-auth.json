@@ -3781,6 +3781,12 @@
             ],
             "format": "date-time"
           },
+          "second_given_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "status": {
             "type": [
               "string",

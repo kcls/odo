@@ -151,6 +151,7 @@ async fn update_local_user_names_and_deletion() {
     assert_eq!(resp.status(), 200);
     let updated: serde_json::Value = resp.json().await.unwrap();
     assert_eq!(updated["first_given_name"], "Edited");
+    assert_eq!(updated["second_given_name"], "Q");
     assert_eq!(updated["family_name"], "Person");
     assert!(updated["display_name"].as_str().unwrap().contains("Edited"));
 
@@ -183,6 +184,7 @@ async fn update_local_user_names_and_deletion() {
     let restored: serde_json::Value = resp.json().await.unwrap();
     assert!(restored["deleted_at"].is_null(), "restore clears deleted_at");
     assert_eq!(restored["first_given_name"], "E2E");
+    assert!(restored["second_given_name"].is_null(), "blank clears the middle name");
 }
 
 #[tokio::test]
@@ -261,6 +263,7 @@ async fn create_user_lifecycle() {
             "username": username,
             "email": email,
             "first_given_name": "Itest",
+            "second_given_name": "Middle",
             "family_name": "User",
             "password": "itest-password-1",
             "uuid": uuid,
@@ -272,6 +275,7 @@ async fn create_user_lifecycle() {
     let created: serde_json::Value = resp.json().await.unwrap();
     let user_id = created["id"].as_i64().unwrap();
     assert_eq!(created["auth_method"], "local");
+    assert_eq!(created["second_given_name"], "Middle");
     assert!(created["display_name"].as_str().unwrap().contains("Itest"));
 
     // Pinned uuid resolves via get_user-by-uuid.
