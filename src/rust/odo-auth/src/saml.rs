@@ -542,6 +542,7 @@ async fn validate_and_consume_request_id(
 
 /// Create or update a user account from SAML assertion data.
 /// Updates profile attributes and last_login_at on existing users.
+/// Deleted accounts are ignored; the caller refuses those first.
 async fn upsert_user_account(
     db: &impl ConnectionTrait,
     email: &str,
@@ -549,6 +550,7 @@ async fn upsert_user_account(
 ) -> LocalResult<i32> {
     let existing = usr::Entity::find()
         .filter(usr::Column::Email.eq(email))
+        .filter(usr::Column::DeletedAt.is_null())
         .one(db)
         .await?;
 
@@ -606,6 +608,15 @@ async fn upsert_user_account(
         let created = new_usr.insert(db).await?;
         Ok(created.id)
     }
+}
+
+/// Whether the only accounts with this email are deleted ones.
+async fn is_deleted_account(db: &impl ConnectionTrait, email: &str) -> LocalResult<bool> {
+    let accounts = usr::Entity::find()
+        .filter(usr::Column::Email.eq(email))
+        .all(db)
+        .await?;
+    Ok(!accounts.is_empty() && accounts.iter().all(|u| u.deleted_at.is_some()))
 }
 
 /// Create or update the SAML identity record linking a user to an IdP.
@@ -875,6 +886,27 @@ async fn acs_core(
 
     let profile_attrs = extract_user_attributes(&assertion_data);
 
+    let refuse = |error: &str| {
+        let base = relay_state.unwrap_or("/login");
+        let sep = if base.contains('?') { "&" } else { "?" };
+        AcsResult {
+            refresh_token: String::new(),
+            refresh_expires_at_ms: 0,
+            relay_state: relay_state.map(|s| s.to_string()),
+            refused_redirect: Some(format!("{base}{sep}error={error}")),
+        }
+    };
+
+    // Email is unique only among live accounts. A deleted account stays
+    // deleted: refuse it rather than create a fresh one in its place.
+    if is_deleted_account(&state.db, &assertion_data.email).await? {
+        info!(
+            email = assertion_data.email,
+            "User authenticated via SAML but the account is deleted"
+        );
+        return Ok(refuse("account_inactive"));
+    }
+
     // Upsert user + SAML identity in a transaction
     let user_id = state
         .db
@@ -895,17 +927,6 @@ async fn acs_core(
         })
         .await
         .map_err(|e| LocalError::internal(format!("User upsert failed: {e}")))?;
-
-    let refuse = |error: &str| {
-        let base = relay_state.unwrap_or("/login");
-        let sep = if base.contains('?') { "&" } else { "?" };
-        AcsResult {
-            refresh_token: String::new(),
-            refresh_expires_at_ms: 0,
-            relay_state: relay_state.map(|s| s.to_string()),
-            refused_redirect: Some(format!("{base}{sep}error={error}")),
-        }
-    };
 
     let user = usr::Entity::find_by_id(user_id)
         .one(&state.db)

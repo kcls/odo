@@ -343,6 +343,7 @@ pub async fn update_user(
 
     let deactivating = params.status == Some(AccountStatus::Inactive)
         && existing.status.as_deref() != Some(AccountStatus::Inactive.as_str());
+    let deleting = params.deleted == Some(true) && existing.deleted_at.is_none();
     let user_id = existing.id;
     let mut model = usr::ActiveModel::from(existing);
     if params.first_given_name.is_some() {
@@ -370,7 +371,7 @@ pub async fn update_user(
     }
     let txn = state.db.begin().await?;
     model.update(&txn).await?;
-    if deactivating {
+    if deactivating || deleting {
         end_sessions(&txn, user_id, caller_id).await?;
     }
     txn.commit().await?;

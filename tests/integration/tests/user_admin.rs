@@ -630,6 +630,32 @@ async fn deactivating_blocks_sign_in_until_reactivated() {
 }
 
 #[tokio::test]
+async fn deleting_ends_sessions() {
+    let c = client();
+    let admin = odo_admin_token(&c).await;
+    let (id, username) = create_login_user(&c, &admin, "delsess", "delete-password-1").await;
+
+    let jar = std::sync::Arc::new(reqwest::cookie::Jar::default());
+    let session = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .cookie_provider(jar)
+        .build()
+        .unwrap();
+    assert_eq!(login_status(&session, &username, "delete-password-1").await, 200);
+
+    let resp = update_user(&c, &admin, json!({"id": id, "deleted": true})).await;
+    assert_eq!(resp.status(), 200);
+
+    let refresh = session
+        .post(format!("{}/api/v1/odo/auth/token/refresh", auth_base()))
+        .json(&json!({}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(refresh.status(), 401, "refresh after delete");
+}
+
+#[tokio::test]
 async fn saml_account_status_can_change_but_not_its_profile() {
     let c = client();
     let admin = odo_admin_token(&c).await;

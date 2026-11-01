@@ -607,12 +607,13 @@ pub async fn refresh_token(
     let org_unit_i32 = resolve_org_ref(&state.db, None, requested).await?;
     let user_id: i64 = claims.sub.parse().unwrap_or(0);
 
-    // Deactivating an account ends its sessions; this also covers one
-    // switched off outside the admin API (e.g. odo-registration by SQL).
+    // Deactivating or deleting an account ends its sessions; this also
+    // covers one switched off outside the admin API (e.g. odo-registration
+    // by SQL).
     let user = usr::Entity::find_by_id(user_id as i32)
         .one(&state.db)
         .await?
-        .filter(|u| u.status.as_deref() == Some("active"))
+        .filter(|u| u.status.as_deref() == Some("active") && u.deleted_at.is_none())
         .ok_or(LocalError::unauthenticated())?;
 
     let org_unit_claim = org_unit_uuid_claim(&state.db, org_unit_i32.map(|n| n as i64)).await?;

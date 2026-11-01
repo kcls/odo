@@ -146,9 +146,12 @@
       requires `active` on all three (SAML refusals redirect with
       `?error=account_inactive`), and sqitch
       `010_drop_verify_user_credentials` drops the function.
-- [ ] **A soft-deleted SAML account can still sign in**: the SAML login
-      finds the user by email without checking `deleted_at`. (Password
-      login does check it.)
+- [x] **A soft-deleted account could keep signing in**: SAML login found
+      the user by email without checking `deleted_at`, and token refresh
+      didn't check it either (nor did deleting end sessions). Fixed: SAML
+      refuses an email whose only accounts are deleted
+      (`?error=account_inactive`) rather than recreating it, refresh
+      requires a live account, and deleting ends the user's sessions.
 - [ ] `@odo/core`'s `userHasPerm` returns false on any error, and the
       result is cached for the session, so a transient failure hides a
       tool until the next sign-in. Same as the Angular app.
