@@ -1,7 +1,13 @@
 import { BanIcon, KeyRoundIcon, PencilIcon, RotateCcwIcon, UserCheckIcon, UserXIcon } from "lucide-react"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
-import { useLoaderData, useRevalidator, type LoaderFunctionArgs } from "react-router"
+import {
+  useLoaderData,
+  useRevalidator,
+  useSearchParams,
+  type LoaderFunctionArgs,
+  type ShouldRevalidateFunctionArgs,
+} from "react-router"
 import { toast } from "sonner"
 
 import { authzApi } from "@/api/authz"
@@ -16,18 +22,20 @@ import { Section } from "@/components/section"
 import { StatusBadge } from "@/components/status-badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useReportError } from "@/hooks/use-report-error"
 import { loadNamespaces } from "@/i18n"
 import { useFormatters } from "@/lib/format"
 import { orNotFound, requireIdParam } from "@/lib/loader"
 import type { RouteHandle } from "@/lib/route-handle"
 import { AccountStatusBadge } from "./account-status"
+import { readTab, tabParams, type UserTab } from "./detail-tabs"
 import { EditUserDialog } from "./edit-user-dialog"
 import { EffectivePermissions } from "./effective-permissions"
 import { RoleAssignments } from "./role-assignments"
 import { SetPasswordDialog } from "./set-password-dialog"
 
-export async function loader({ params }: LoaderFunctionArgs) {
+export async function loader({ params, request }: LoaderFunctionArgs) {
   const id = requireIdParam(params.userId)
   const [detail, perms] = await Promise.all([
     orNotFound(usersApi.getDetail(id)),
@@ -38,15 +46,41 @@ export async function loader({ params }: LoaderFunctionArgs) {
     }),
     loadNamespaces("users"),
   ])
-  // Effective scope is supplementary: a failure shows in its section
+  // Effective scope is the page's costliest read, so it's fetched only
+  // for its own tab. It's supplementary: a failure shows in the tab
   // instead of failing the page.
-  const permScopes = perms.canReadRoles
-    ? await authzApi.permScopes(id).catch((err) => {
+  const tab = readTab(new URL(request.url).searchParams, shownTabs(detail, perms.canReadRoles))
+  const permScopes =
+    tab === "permissions"
+      ? await authzApi.permScopes(id).catch((err) => {
         console.error("Failed to load effective permissions", err)
-        return "failed" as const
-      })
-    : null
+          return "failed" as const
+        })
+      : null
   return { detail, permScopes, ...perms }
+}
+
+/**
+ * Switching tabs reuses the loaded user. Only the permissions tab has
+ * data of its own, so it reloads on opening (fresh after role changes).
+ */
+export function shouldRevalidate({ currentUrl, nextUrl, defaultShouldRevalidate }: ShouldRevalidateFunctionArgs) {
+  if (currentUrl.pathname === nextUrl.pathname && currentUrl.search !== nextUrl.search) {
+    return nextUrl.searchParams.get("tab") === "permissions"
+  }
+  return defaultShouldRevalidate
+}
+
+/** Effective permissions need the role read perm; SAML only shows when there's SAML to show. */
+function shownTabs(detail: UserDetail, canReadRoles: boolean): UserTab[] {
+  const hasSaml =
+    detail.user.auth_method === "saml" || detail.saml_identities.length > 0 || detail.saml_attributes.length > 0
+  return [
+    "overview",
+    ...(canReadRoles ? (["permissions"] as const) : []),
+    "sessions",
+    ...(hasSaml ? (["saml"] as const) : []),
+  ]
 }
 
 export const handle: RouteHandle = {
@@ -54,9 +88,10 @@ export const handle: RouteHandle = {
 }
 
 /**
- * Everything about one user on one page: account facts, role
- * assignments (managed here; there is no separate user-roles tool),
- * effective permissions, SAML identity, and recent sessions.
+ * Everything about one user, in tabs below a header that keeps their
+ * status and actions in view: account facts and role assignments
+ * (managed here; there is no separate user-roles tool), effective
+ * permissions, recent sessions, and SAML identity. The tab is `?tab=`.
  */
 export function Component() {
   const { detail, permScopes, canEdit, canReadRoles, canAssignRoles } = useLoaderData<typeof loader>()
@@ -68,6 +103,10 @@ export function Component() {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [confirmingDeactivate, setConfirmingDeactivate] = useState(false)
   const currentUser = useCurrentUser()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tabs = shownTabs(detail, canReadRoles)
+  const tab = readTab(searchParams, tabs)
+  const showTab = (next: UserTab) => setSearchParams((prev) => tabParams(prev, next))
 
   const user = detail.user
   // SAML accounts belong to the identity provider, apart from their status.
@@ -171,20 +210,39 @@ export function Component() {
         }
       />
 
-      <AccountSection detail={detail} />
+      <Tabs value={tab} onValueChange={(v) => showTab(v as UserTab)} className="gap-6">
+        <TabsList aria-label={t("detail.tabs.label")}>
+          {tabs.map((id) => (
+            <TabsTrigger key={id} value={id}>
+              {id === "sessions" ? t("detail.tabs.sessions", { count: detail.sessions.length }) : t(`detail.tabs.${id}`)}
+            </TabsTrigger>
+          ))}
+        </TabsList>
 
-      <RoleAssignments
-        user={user}
-        assignments={detail.roles}
-        canAssign={canAssignRoles}
-        onChanged={() => void revalidator.revalidate()}
-      />
-
-      {canReadRoles && <EffectivePermissions scopes={permScopes} />}
-
-      <SamlSection detail={detail} />
-
-      <SessionsSection sessions={detail.sessions} />
+        <TabsContent value="overview" className="flex flex-col gap-8">
+          <AccountSection detail={detail} />
+          <RoleAssignments
+            user={user}
+            assignments={detail.roles}
+            canAssign={canAssignRoles}
+            onChanged={() => void revalidator.revalidate()}
+            onViewPermissions={canReadRoles ? () => showTab("permissions") : undefined}
+          />
+        </TabsContent>
+        {canReadRoles && (
+          <TabsContent value="permissions">
+            <EffectivePermissions scopes={permScopes} />
+          </TabsContent>
+        )}
+        <TabsContent value="sessions">
+          <SessionsSection sessions={detail.sessions} />
+        </TabsContent>
+        {tabs.includes("saml") && (
+          <TabsContent value="saml">
+            <SamlSection detail={detail} />
+          </TabsContent>
+        )}
+      </Tabs>
 
       <EditUserDialog
         user={editing ? user : null}

@@ -3,9 +3,9 @@ import { apiToken, loginAs } from '../support';
 import { ADMIN_USERS } from '../test-users';
 
 /**
- * A user's page: effective permissions, and assigning and removing roles
- * in place (there is no separate User Roles tool). Ids aren't fixed, so
- * users are found through the search.
+ * A user's page: its tabs, effective permissions, and assigning and
+ * removing roles in place (there is no separate User Roles tool). Ids
+ * aren't fixed, so users are found through the search.
  */
 
 const ROLE = { code: 'e2e-ui-role', label: 'E2E UI role' };
@@ -28,15 +28,28 @@ test.describe('user page', () => {
     await loginAs(page);
   });
 
-  test('shows effective permissions with their scope', async ({ page }) => {
+  test('shows effective permissions with their scope on their own tab', async ({ page }) => {
     await page.goto(`/odo/admin/users?q=${ADMIN_USERS.admin.username}`);
     await page.getByRole('table', { name: 'Users' }).getByRole('link').first().click();
 
+    const tabs = page.getByRole('tablist', { name: 'User details' });
+    await expect(tabs.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true');
+    await tabs.getByRole('tab', { name: 'Permissions' }).click();
+    await expect(page).toHaveURL(/[?&]tab=permissions/);
     await expect(page.getByRole('heading', { name: 'Effective permissions' })).toBeVisible();
     const perms = page.getByRole('table', { name: 'Effective permissions' });
     await expect(perms.getByText('odo.auth.role.read', { exact: true })).toBeVisible();
     // odo-admin is held at the root, so its grants apply everywhere.
     await expect(perms.getByText('All org units').first()).toBeVisible();
+
+    // The tab is in the URL: back returns to the overview, and a reload
+    // keeps the tab.
+    await page.goBack();
+    await expect(tabs.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByRole('table', { name: 'Roles' })).toBeVisible();
+    await page.goForward();
+    await page.reload();
+    await expect(perms.getByText('odo.auth.role.read', { exact: true })).toBeVisible();
   });
 
   test('assigns and removes a role', async ({ page }) => {

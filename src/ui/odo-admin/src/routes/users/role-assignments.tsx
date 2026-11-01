@@ -37,23 +37,27 @@ export function RoleAssignments({
   assignments,
   canAssign,
   onChanged,
+  onViewPermissions,
 }: {
   user: UserAccount
   assignments: AssignmentRow[]
   canAssign: boolean
   onChanged: () => void
+  /** Offered on the success toast, as the permissions are on another tab. */
+  onViewPermissions?: () => void
 }) {
   const { t } = useTranslation(["users", "common"])
   const fmt = useFormatters()
   const reportError = useReportError()
   const [assigning, setAssigning] = useState(false)
   const [removing, setRemoving] = useState<AssignmentRow | null>(null)
+  const viewPermissions = onViewPermissions && { label: t("roles.viewPermissions"), onClick: onViewPermissions }
 
   const remove = async (a: AssignmentRow) => {
     const names = { role: a.role_label, orgUnit: a.org_unit_label }
     try {
       await authzApi.deleteAssignment(a.id)
-      toast.success(t("roles.removed", names))
+      toast.success(t("roles.removed", names), { action: viewPermissions })
       onChanged()
     } catch (err) {
       if (err instanceof ApiRequestError && err.status === 403) toast.error(t("roles.forbiddenRemove"))
@@ -130,6 +134,7 @@ export function RoleAssignments({
           {assigning && (
             <AssignForm
               userId={user.id}
+              toastAction={viewPermissions}
               onDone={() => {
                 setAssigning(false)
                 onChanged()
@@ -159,7 +164,15 @@ export function RoleAssignments({
 
 type Pickers = { roles: RoleRow[]; units: OrgOption[] }
 
-function AssignForm({ userId, onDone }: { userId: number; onDone: () => void }) {
+function AssignForm({
+  userId,
+  toastAction,
+  onDone,
+}: {
+  userId: number
+  toastAction?: { label: string; onClick: () => void }
+  onDone: () => void
+}) {
   const { t } = useTranslation(["users", "common"])
   const [pickers, setPickers] = useState<Pickers | "failed" | null>(null)
   const [role, setRole] = useState("")
@@ -189,7 +202,9 @@ function AssignForm({ userId, onDone }: { userId: number; onDone: () => void }) 
     setError(null)
     try {
       const created = await authzApi.createAssignment({ usr: userId, role, org_unit: Number(orgUnit) })
-      toast.success(t("roles.assigned", { role: created.role_label, orgUnit: created.org_unit_label }))
+      toast.success(t("roles.assigned", { role: created.role_label, orgUnit: created.org_unit_label }), {
+        action: toastAction,
+      })
       onDone()
     } catch (err) {
       setError(

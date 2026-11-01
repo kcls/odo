@@ -7,7 +7,10 @@ import { Section } from "@/components/section"
 import { StatusBadge } from "@/components/status-badge"
 import { Button } from "@/components/ui/button"
 
-/** What the user can do and where; read-only, derived from their roles. */
+/**
+ * What the user can do and where; read-only, derived from their roles.
+ * `null` while the scopes load.
+ */
 export function EffectivePermissions({ scopes }: { scopes: PermScopeRow[] | "failed" | null }) {
   const { t } = useTranslation("users")
   // Perms whose full scope list is expanded, by code.
@@ -59,10 +62,14 @@ export function EffectivePermissions({ scopes }: { scopes: PermScopeRow[] | "fai
     <Section title={t("effective.title")} description={t("effective.description")}>
       {scopes === "failed" ? (
         <p className="text-sm text-destructive">{t("effective.failed")}</p>
+      ) : scopes === null ? (
+        <p role="status" className="text-sm text-muted-foreground">
+          {t("effective.loading")}
+        </p>
       ) : (
         <DataTable
           label={t("effective.title")}
-          rows={scopes ?? []}
+          rows={scopes}
           columns={columns}
           rowKey={(p) => p.perm}
           empty={t("effective.none")}

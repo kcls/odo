@@ -49,7 +49,14 @@
     "setPassword": "Set password",
     "deactivate": "Deactivate",
     "reactivate": "Reactivate",
-    "selfDeactivate": "You can't deactivate your own account."
+    "selfDeactivate": "You can't deactivate your own account.",
+    "tabs": {
+      "label": "User details",
+      "overview": "Overview",
+      "permissions": "Permissions",
+      "sessions": "Sessions ({{count, number}})",
+      "saml": "SAML"
+    }
   },
   "status": {
     "active": "Active",
@@ -110,12 +117,14 @@
     "removeLabel": "Remove {{role}} at {{orgUnit}}",
     "removeTitle": "Remove role assignment?",
     "removeBody": "{{role}} at {{orgUnit}} will be removed from {{name}}.",
-    "removed": "Removed {{role}} at {{orgUnit}}"
+    "removed": "Removed {{role}} at {{orgUnit}}",
+    "viewPermissions": "View permissions"
   },
   "effective": {
     "title": "Effective permissions",
     "description": "What this user can do and where, combined across all of their role assignments.",
     "none": "This user has no permissions.",
+    "loading": "Loading permissions…",
     "failed": "Could not load the effective permissions.",
     "columns": {
       "permission": "Permission",
