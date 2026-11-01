@@ -224,9 +224,8 @@ npm run dev    # http://localhost:5173, API proxied to the dev cluster
 ```
 
 Add unit tests for any pure logic (parsing, mapping, rules) beside it as
-`*.test.ts`. Try the pseudo-locales from the account menu: `en-XA` shows
-hard-coded or truncated text, `ar-XB` shows layout that isn't
-direction-aware.
+`*.test.ts`. Try the `ar-XB` pseudo-locale from the account menu: it
+shows layout that isn't direction-aware.
 
 ## 7. E2E
 

@@ -3,7 +3,7 @@ import LanguageDetector from "i18next-browser-languagedetector"
 import resourcesToBackend from "i18next-resources-to-backend"
 import { initReactI18next } from "react-i18next"
 
-import { pseudoResource, type PseudoLocale } from "./pseudo"
+import { pseudoResource } from "./pseudo"
 
 // Gotcha: interpolation variables share an object with t() options, so
 // names like `lng`, `ns`, and `context` are not values. t("k", { ns })
@@ -11,10 +11,10 @@ import { pseudoResource, type PseudoLocale } from "./pseudo"
 // and `namespace` instead.
 
 /** Languages the app's own interface is available in. */
-export const UI_LANGUAGES = ["en", "en-XA", "ar-XB"] as const
+export const UI_LANGUAGES = ["en", "ar-XB"] as const
 export type UiLanguage = (typeof UI_LANGUAGES)[number]
 
-export const PSEUDO_LOCALES: readonly string[] = ["en-XA", "ar-XB"]
+export const PSEUDO_LOCALES: readonly string[] = ["ar-XB"]
 
 // Each namespace is its own chunk, fetched the first time a route needs
 // it.
@@ -27,7 +27,7 @@ async function loadBundle(lng: string, ns: string) {
   const load = bundles[`../locales/${isPseudo ? "en" : lng}/${ns}.json`]
   if (!load) throw new Error(`No ${ns} strings for ${lng}`)
   const { default: data } = await load()
-  return isPseudo ? pseudoResource(data, lng as PseudoLocale) : data
+  return isPseudo ? pseudoResource(data) : data
 }
 
 function applyDocumentLanguage(lng: string) {

@@ -58,6 +58,5 @@ are immutable.
 
 ## Localization
 
-English is the only real locale. The account menu also offers two
-pseudo-locales: `en-XA` (accented and 30% longer, to show hard-coded
-text and truncation) and `ar-XB` (mirrored right-to-left).
+English is the only real locale. The account menu also offers the
+`ar-XB` pseudo-locale (mirrored right-to-left).
