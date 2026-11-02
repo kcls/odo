@@ -49,7 +49,7 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
   // Effective scope is the page's costliest read, so it's fetched only
   // for its own tab. It's supplementary: a failure shows in the tab
   // instead of failing the page.
-  const tab = readTab(new URL(request.url).searchParams, shownTabs(detail, perms.canReadRoles))
+  const tab = readTab(new URL(request.url).searchParams, shownTabs(perms.canReadRoles))
   const permScopes =
     tab === "permissions"
       ? await authzApi.permScopes(id).catch((err) => {
@@ -71,16 +71,14 @@ export function shouldRevalidate({ currentUrl, nextUrl, defaultShouldRevalidate 
   return defaultShouldRevalidate
 }
 
-/** Effective permissions need the role read perm; SAML only shows when there's SAML to show. */
-function shownTabs(detail: UserDetail, canReadRoles: boolean): UserTab[] {
-  const hasSaml =
-    detail.user.auth_method === "saml" || detail.saml_identities.length > 0 || detail.saml_attributes.length > 0
-  return [
-    "overview",
-    ...(canReadRoles ? (["permissions"] as const) : []),
-    "sessions",
-    ...(hasSaml ? (["saml"] as const) : []),
-  ]
+/** Effective permissions need the role read perm. */
+function shownTabs(canReadRoles: boolean): UserTab[] {
+  return ["overview", ...(canReadRoles ? (["permissions"] as const) : []), "sessions"]
+}
+
+/** Local accounts get no SAML section unless something links them to an IdP. */
+function hasSaml(detail: UserDetail): boolean {
+  return detail.user.auth_method === "saml" || detail.saml_identities.length > 0 || detail.saml_attributes.length > 0
 }
 
 export const handle: RouteHandle = {
@@ -89,9 +87,10 @@ export const handle: RouteHandle = {
 
 /**
  * Everything about one user, in tabs below a header that keeps their
- * status and actions in view: account facts and role assignments
- * (managed here; there is no separate user-roles tool), effective
- * permissions, recent sessions, and SAML identity. The tab is `?tab=`.
+ * status and actions in view: account facts, any SAML identity, and
+ * role assignments (managed here; there is no separate user-roles
+ * tool), then effective permissions and recent sessions. The tab is
+ * `?tab=`.
  */
 export function Component() {
   const { detail, permScopes, canEdit, canReadRoles, canAssignRoles } = useLoaderData<typeof loader>()
@@ -104,7 +103,7 @@ export function Component() {
   const [confirmingDeactivate, setConfirmingDeactivate] = useState(false)
   const currentUser = useCurrentUser()
   const [searchParams, setSearchParams] = useSearchParams()
-  const tabs = shownTabs(detail, canReadRoles)
+  const tabs = shownTabs(canReadRoles)
   const tab = readTab(searchParams, tabs)
   const showTab = (next: UserTab) => setSearchParams((prev) => tabParams(prev, next))
 
@@ -221,6 +220,7 @@ export function Component() {
 
         <TabsContent value="overview" className="flex flex-col gap-8">
           <AccountSection detail={detail} />
+          {hasSaml(detail) && <SamlSection detail={detail} />}
           <RoleAssignments
             user={user}
             assignments={detail.roles}
@@ -237,11 +237,6 @@ export function Component() {
         <TabsContent value="sessions">
           <SessionsSection sessions={detail.sessions} />
         </TabsContent>
-        {tabs.includes("saml") && (
-          <TabsContent value="saml">
-            <SamlSection detail={detail} />
-          </TabsContent>
-        )}
       </Tabs>
 
       <EditUserDialog

@@ -1,5 +1,5 @@
 /** The user page's tabs, in display order. Overview is the default. */
-export const USER_TABS = ["overview", "permissions", "sessions", "saml"] as const
+export const USER_TABS = ["overview", "permissions", "sessions"] as const
 export type UserTab = (typeof USER_TABS)[number]
 
 /**

@@ -54,8 +54,7 @@
       "label": "User details",
       "overview": "Overview",
       "permissions": "Permissions",
-      "sessions": "Sessions ({{count, number}})",
-      "saml": "SAML"
+      "sessions": "Sessions ({{count, number}})"
     }
   },
   "status": {
