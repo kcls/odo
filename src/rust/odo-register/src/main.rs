@@ -561,41 +561,133 @@ impl Section {
         c
     }
 
-    /// A summary line, then one line per item worth reading: everything but
-    /// the unchanged, which are only counted.
-    fn render(&self, mode: Mode) -> Vec<String> {
-        if self.items.is_empty() {
-            return Vec::new();
-        }
-        let mut lines = vec![format!("{}: {}", self.title, self.counts().summary(mode))];
+    /// One line per item worth reading: everything but the unchanged,
+    /// which the table only counts.
+    fn details(&self, mode: Mode) -> Vec<String> {
+        let mut lines = Vec::new();
         for (item, action) in &self.items {
             match action {
                 Action::Create { after } => match (mode, after) {
                     (Mode::Plan, Some(after)) => {
-                        lines.push(format!("  + {item} (after {after})"));
+                        lines.push(format!("+ {item} (after {after})"));
                     }
-                    _ => lines.push(format!("  + {item}")),
+                    _ => lines.push(format!("+ {item}")),
                 },
                 Action::ExistedUnseen => lines.push(format!(
-                    "  = {item}: already registered, though the read beforehand did not show it"
+                    "= {item}: already registered, though the read beforehand did not show it"
                 )),
                 Action::Unchanged => {}
                 Action::Differs(diffs) => {
-                    lines.push(format!("  ~ {item}"));
+                    lines.push(format!("~ {item}"));
                     for d in diffs {
                         lines.push(format!(
-                            "      {}: {} -> {}",
+                            "    {}: {} -> {}",
                             d.field,
                             show_value(&d.have),
                             show_value(&d.want)
                         ));
                     }
                 }
-                Action::Skipped(reason) => lines.push(format!("  - {item}: {reason}")),
+                Action::Skipped(reason) => lines.push(format!("- {item}: {reason}")),
             }
         }
         lines
     }
+}
+
+/// The longest fixed section title ("notification templates"). Every table
+/// is at least this wide, so the tables of several manifests line up.
+const MIN_TITLE_WIDTH: usize = 22;
+
+/// How a count is read out of `Counts`, for one table column.
+type Column = (&'static str, fn(&Counts) -> usize);
+
+/// Section totals as an aligned grid, one row per section, so a long run
+/// can be scanned down a column. Zero is "-" to keep the eye on the rest.
+/// The "existed" column appears only when some section has one, since it
+/// takes a create that unexpectedly met an existing row.
+fn table(sections: &[Section], mode: Mode) -> Vec<String> {
+    if sections.is_empty() {
+        return Vec::new();
+    }
+    let counts: Vec<Counts> = sections.iter().map(Section::counts).collect();
+    let created = match mode {
+        Mode::Plan => "create",
+        Mode::Apply => "created",
+    };
+    let mut columns: Vec<Column> = vec![
+        (created, |c| c.create),
+        ("unchanged", |c| c.unchanged),
+        ("differ", |c| c.differs),
+        ("skipped", |c| c.skipped),
+    ];
+    if counts.iter().any(|c| c.existed_unseen > 0) {
+        columns.insert(1, ("existed", |c| c.existed_unseen));
+    }
+
+    let title_width = sections
+        .iter()
+        .map(|s| s.title.chars().count())
+        .chain(std::iter::once(MIN_TITLE_WIDTH))
+        .max()
+        .unwrap_or_default();
+    let widths: Vec<usize> = columns
+        .iter()
+        .map(|(name, get)| {
+            counts
+                .iter()
+                .map(|c| get(c).to_string().len())
+                .chain(std::iter::once(name.len()))
+                .max()
+                .unwrap_or_default()
+        })
+        .collect();
+
+    let row = |title: &str, cells: Vec<String>| {
+        let mut line = format!("{title:<title_width$}");
+        for (cell, width) in cells.iter().zip(&widths) {
+            line.push_str(&format!("  {cell:>width$}"));
+        }
+        line.trim_end().to_string()
+    };
+    let mut lines = vec![row(
+        "section",
+        columns.iter().map(|(name, _)| name.to_string()).collect(),
+    )];
+    for (section, c) in sections.iter().zip(&counts) {
+        let cells = columns
+            .iter()
+            .map(|(_, get)| match get(c) {
+                0 => "-".to_string(),
+                n => n.to_string(),
+            })
+            .collect();
+        lines.push(row(&section.title, cells));
+    }
+    lines
+}
+
+/// One manifest's report: the table, then each section's details under its
+/// title, then any notes.
+fn report(sections: &[Section], notes: &[String], mode: Mode) -> Vec<String> {
+    let mut lines: Vec<String> = table(sections, mode)
+        .into_iter()
+        .map(|l| format!("  {l}"))
+        .collect();
+    for section in sections {
+        let details = section.details(mode);
+        if details.is_empty() {
+            continue;
+        }
+        lines.push(String::new());
+        lines.push(format!("  {}", section.title));
+        lines.extend(details.into_iter().map(|l| format!("    {l}")));
+    }
+    if !notes.is_empty() {
+        lines.push(String::new());
+        lines.extend(notes.iter().map(|n| format!("  {n}")));
+    }
+    lines
 }
 
 /// What this run creates, by natural key. A plan creates nothing, so later
@@ -693,6 +785,10 @@ struct Run<'a> {
     mode: Mode,
     planned: Planned,
     totals: Counts,
+    /// The current manifest's finished sections and notes, printed as one
+    /// report when it is done (or has failed).
+    sections: Vec<Section>,
+    notes: Vec<String>,
 }
 
 impl<'a> Run<'a> {
@@ -702,14 +798,25 @@ impl<'a> Run<'a> {
             mode,
             planned: Planned::default(),
             totals: Counts::default(),
+            sections: Vec::new(),
+            notes: Vec::new(),
         }
     }
 
     fn finish(&mut self, section: Section) {
-        for line in section.render(self.mode) {
-            println!("{line}");
+        if section.items.is_empty() {
+            return;
         }
         self.totals.add(&section.counts());
+        self.sections.push(section);
+    }
+
+    /// The report for everything finished since the last call.
+    fn take_report(&mut self) -> Vec<String> {
+        let lines = report(&self.sections, &self.notes, self.mode);
+        self.sections.clear();
+        self.notes.clear();
+        lines
     }
 
     /// Create a missing item through its create endpoint, or, in a plan,
@@ -1219,11 +1326,11 @@ impl<'a> Run<'a> {
                 }
                 self.finish(section);
             } else {
-                println!(
+                self.notes.push(format!(
                     "saml maps: no IdP defines attribute '{}' - skipped {} maps",
                     saml.attr_key,
                     saml.maps.len()
-                );
+                ));
             }
             return Ok(());
         }
@@ -1670,7 +1777,14 @@ async fn main() -> ExitCode {
             Mode::Plan => println!("planning {path}"),
             Mode::Apply => println!("applying {path}"),
         }
-        if let Err(e) = run.manifest(manifest).await {
+        // The report comes before any failure, so what was read (or
+        // created) up to that point is still on screen.
+        let result = run.manifest(manifest).await;
+        for line in run.take_report() {
+            println!("{line}");
+        }
+        println!();
+        if let Err(e) = result {
             eprintln!("FAILED: {e}");
             return ExitCode::FAILURE;
         }
@@ -1959,30 +2073,90 @@ mod tests {
         s
     }
 
+    fn unchanged_section(title: &str, n: usize) -> Section {
+        let mut s = Section::new(title);
+        for i in 0..n {
+            s.push(i.to_string(), Action::Unchanged);
+        }
+        s
+    }
+
     #[test]
-    fn a_plan_lists_creates_with_dependencies_and_diffs() {
+    fn a_plan_report_is_a_table_then_details() {
+        let sections = vec![
+            unchanged_section("permissions", 24),
+            sample_section(),
+            unchanged_section("notification templates", 7),
+        ];
         assert_eq!(
-            sample_section().render(Mode::Plan),
+            report(&sections, &[], Mode::Plan),
             vec![
-                "roles: 2 to create, 1 unchanged, 1 differ",
-                "  + app-new",
-                "  + app-child (after role app-new)",
-                "  ~ app-old",
-                "      label: \"Old\" -> \"New\"",
+                "  section                 create  unchanged  differ  skipped",
+                "  permissions                  -         24       -        -",
+                "  roles                        2          1       1        -",
+                "  notification templates       -          7       -        -",
+                "",
+                "  roles",
+                "    + app-new",
+                "    + app-child (after role app-new)",
+                "    ~ app-old",
+                "        label: \"Old\" -> \"New\"",
             ]
         );
     }
 
     #[test]
-    fn an_apply_reports_creates_as_done() {
-        let lines = sample_section().render(Mode::Apply);
-        assert_eq!(lines[0], "roles: 2 created, 1 unchanged, 1 differ");
-        assert_eq!(lines[2], "  + app-child");
+    fn an_apply_report_says_created_and_drops_dependencies() {
+        let lines = report(&[sample_section()], &[], Mode::Apply);
+        assert_eq!(
+            lines[0],
+            "  section                 created  unchanged  differ  skipped"
+        );
+        assert!(lines.contains(&"    + app-child".to_string()));
     }
 
     #[test]
-    fn an_empty_section_prints_nothing() {
-        assert!(Section::new("users").render(Mode::Plan).is_empty());
+    fn the_existed_column_appears_only_when_needed() {
+        let mut s = Section::new("templates");
+        s.push("t", Action::ExistedUnseen);
+        let lines = table(&[s], Mode::Apply);
+        assert_eq!(
+            lines[0],
+            "section                 created  existed  unchanged  differ  skipped"
+        );
+        assert_eq!(
+            lines[1],
+            "templates                     -        1          -       -        -"
+        );
+        assert!(!table(&[sample_section()], Mode::Plan)[0].contains("existed"));
+    }
+
+    #[test]
+    fn wide_counts_widen_their_column() {
+        let mut s = Section::new("maps");
+        for i in 0..1_000_000 {
+            s.push(i.to_string(), Action::Create { after: None });
+        }
+        let lines = table(&[s], Mode::Plan);
+        assert_eq!(
+            lines[0],
+            "section                  create  unchanged  differ  skipped"
+        );
+        assert_eq!(
+            lines[1],
+            "maps                    1000000          -       -        -"
+        );
+    }
+
+    #[test]
+    fn notes_follow_the_details() {
+        let lines = report(&[], &["saml maps: skipped".into()], Mode::Plan);
+        assert_eq!(lines, vec!["", "  saml maps: skipped"]);
+    }
+
+    #[test]
+    fn nothing_finished_reports_nothing() {
+        assert!(report(&[], &[], Mode::Plan).is_empty());
     }
 
     #[test]
