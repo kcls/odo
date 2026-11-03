@@ -4,6 +4,11 @@
 # Node 24: React Router 8 needs Node >= 22.22, Vite 8 >= 22.12.
 FROM node:24-alpine AS builder
 
+# The release tag (vX.Y.Z), or the branch name on a branch build, shown
+# beside the app name; release-build.yml passes it. Unset locally.
+ARG VERSION
+ENV VITE_VERSION=$VERSION
+
 # Substituted with ODO_ADMIN_BASE_PATH when the container starts;
 # see docker-entrypoint.d/40-base-path.sh.
 ENV VITE_BASE_PATH=/__ODO_ADMIN_BASE_PATH__/

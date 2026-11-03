@@ -60,7 +60,12 @@ export function AppSidebar({ tools }: { tools: AdminTool[] }) {
                 <div className="flex aspect-square size-8 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
                   <ShieldCheckIcon className="size-4" />
                 </div>
-                <span className="truncate font-semibold">{t("app.name")}</span>
+                <span className="flex min-w-0 items-baseline gap-2">
+                  <span className="truncate font-semibold">{t("app.name")}</span>
+                  {import.meta.env.VITE_VERSION && (
+                    <span className="truncate text-xs opacity-70">{import.meta.env.VITE_VERSION}</span>
+                  )}
+                </span>
               </NavLink>
             </SidebarMenuButton>
           </SidebarMenuItem>
