@@ -5,15 +5,23 @@
 //! and dev/test fixtures (users, role assignments) by describing them in a
 //! JSON manifest and running this tool with the `odo-registration` machine
 //! account. Installations use the same mechanism for their own org
-//! structure. Upsert-only semantics: rows that already exist (409
-//! conflicts) count as OK; nothing is ever deleted. Re-running is always
-//! safe.
+//! structure. Upsert-only semantics: nothing is ever updated or deleted,
+//! and items that already exist are left as they are. Re-running is
+//! always safe.
+//!
+//! Every section reads what is already registered before it writes, so
+//! each item is reported as created, unchanged, or present with values
+//! other than the manifest's (`~`; registration does not change those).
+//! `--plan` stops there: it makes the same reads, prints what a run would
+//! do, and writes nothing.
 //!
 //! Ordering within a manifest is fixed and dependency-correct:
 //! org unit types -> org units -> permissions -> roles -> grants ->
-//! templates -> directories -> SAML maps -> users -> user role
-//! assignments. (Directories reference permission codes; maps and
-//! assignments reference roles; assignments reference org units.)
+//! templates -> directories -> SAML IdPs -> SPs -> attributes -> maps ->
+//! users -> user role assignments. (Directories reference permission
+//! codes; maps and assignments reference roles; assignments reference org
+//! units.) A plan cannot look up what an earlier section has yet to
+//! create, so such items are reported as "create, after <dependency>".
 //!
 //! SAML maps apply to every active IdP that defines the manifest's
 //! `attr_key`; installs without SSO (or without the attribute) skip them
@@ -26,7 +34,7 @@
 //! list a parent before its children.
 //!
 //! Usage:
-//!   odo-register <manifest.json> [more-manifests...]
+//!   odo-register [--plan] <manifest.json> [more-manifests...]
 //!
 //! All calls go through the Envoy gateway (every endpoint this tool uses
 //! is gateway-routed), so one base URL suffices.
@@ -49,7 +57,7 @@
 
 use serde::Deserialize;
 use serde_json::{Value, json};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::process::ExitCode;
 
 #[derive(Deserialize)]
@@ -168,6 +176,18 @@ struct Assignment {
     org_unit_code: String,
 }
 
+/// The largest page the admin list endpoints return (odo-service
+/// MAX_PAGE_LIMIT); asking for more is silently clamped.
+const PAGE_LIMIT: usize = 200;
+
+const UNIT_TYPE_LIST: &str = "/api/v1/odo/org/admin/unit-type/list";
+const IDP_LIST: &str = "/api/v1/odo/auth/saml/admin/idp/list";
+const ATTRIBUTE_LIST: &str = "/api/v1/odo/auth/saml/admin/attribute/list";
+
+/// Every user status (auth.usr's check constraint). User search filters on
+/// exactly one, so finding a username means asking for each.
+const USER_STATUSES: [&str; 4] = ["active", "inactive", "suspended", "deleted"];
+
 struct Client {
     http: reqwest::Client,
     base: String,
@@ -206,6 +226,10 @@ impl Client {
         Ok(Self { http, base, token })
     }
 
+    fn api(&self, path: &str) -> String {
+        format!("{}{path}", self.base)
+    }
+
     async fn post(&self, url: String, body: &Value) -> Result<(u16, Value), String> {
         let resp = self
             .http
@@ -235,6 +259,50 @@ impl Client {
             (200, body) => Ok(body),
             (status, detail) => Err(http_error(&display, status, &detail)),
         }
+    }
+
+    /// POST read that may legitimately find nothing: 404 is `None`.
+    async fn post_found(&self, url: String, body: &Value) -> Result<Option<Value>, String> {
+        let display = url.clone();
+        match self.post(url, body).await? {
+            (200, body) => Ok(Some(body)),
+            (404, _) => Ok(None),
+            (status, detail) => Err(http_error(&display, status, &detail)),
+        }
+    }
+
+    /// Every row of a paginated admin list (`{rows, total}`). Reading only
+    /// the first page would report the rest as missing.
+    async fn list_all(&self, path: &str) -> Result<Vec<Value>, String> {
+        let mut rows: Vec<Value> = Vec::new();
+        loop {
+            let page = self
+                .post_ok(
+                    self.api(path),
+                    &json!({"limit": PAGE_LIMIT, "offset": rows.len()}),
+                )
+                .await?;
+            let batch = page["rows"]
+                .as_array()
+                .ok_or(format!("{path}: response had no rows"))?;
+            if batch.is_empty() {
+                break;
+            }
+            rows.extend(batch.iter().cloned());
+            if rows.len() as u64 >= page["total"].as_u64().unwrap_or(0) {
+                break;
+            }
+        }
+        Ok(rows)
+    }
+
+    /// The array under `key` in an unpaginated list response.
+    async fn list_key(&self, path: &str, key: &str) -> Result<Vec<Value>, String> {
+        let body = self.post_ok(self.api(path), &json!({})).await?;
+        body[key]
+            .as_array()
+            .cloned()
+            .ok_or(format!("{path}: response had no {key}"))
     }
 
     async fn get(&self, url: String) -> Result<Value, String> {
@@ -298,39 +366,254 @@ fn env_or(key: &str, default: &str) -> String {
     std::env::var(key).unwrap_or_else(|_| default.to_string())
 }
 
-struct Tally {
-    created: usize,
-    exists: usize,
+// ---------------------------------------------------------------------------
+// Deciding and reporting
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Mode {
+    /// Read only: report what an apply would do.
+    Plan,
+    Apply,
 }
 
-impl Tally {
-    fn new() -> Self {
+/// A field whose registered value is not the manifest's.
+#[derive(Debug, PartialEq)]
+struct FieldDiff {
+    field: String,
+    have: Value,
+    want: Value,
+}
+
+/// What happens to one manifest item.
+#[derive(Debug, PartialEq)]
+enum Action {
+    /// Not registered: created by an apply, or to be created by one. In a
+    /// plan, `after` names what this run creates first and the item
+    /// depends on, which is why the plan could not look the item up.
+    Create {
+        after: Option<String>,
+    },
+    /// The create came back 409 although the read beforehand did not show
+    /// the item, e.g. a soft-deleted template still holding its code.
+    ExistedUnseen,
+    Unchanged,
+    /// Registered with other values. Registration never updates a row, so
+    /// these stay as they are.
+    Differs(Vec<FieldDiff>),
+    /// Not applicable on this install; the reason says why.
+    Skipped(String),
+}
+
+/// Whether a live value matches the manifest's. Strings compare without
+/// leading and trailing whitespace: stored templates have turned up without
+/// the leading newline their manifest bodies carry, a difference nobody
+/// can see in a rendered email and not worth reporting on every run.
+fn same_value(want: &Value, have: &Value) -> bool {
+    match (want, have) {
+        (Value::String(w), Value::String(h)) => w.trim() == h.trim(),
+        _ => want == have,
+    }
+}
+
+/// Fields of `want` (manifest) whose value differs from `have` (live row).
+/// Nulls in the manifest mean "not specified", and fields the row does not
+/// carry cannot be compared (passwords, for one), so both are passed over.
+fn diff_fields(want: &Value, have: &Value) -> Vec<FieldDiff> {
+    let (Some(want), Some(have)) = (want.as_object(), have.as_object()) else {
+        return Vec::new();
+    };
+    want.iter()
+        .filter(|(_, w)| !w.is_null())
+        .filter_map(|(field, w)| {
+            let h = have.get(field)?;
+            (!same_value(w, h)).then(|| FieldDiff {
+                field: field.clone(),
+                have: h.clone(),
+                want: w.clone(),
+            })
+        })
+        .collect()
+}
+
+fn compare(want: &Value, have: &Value) -> Action {
+    let diffs = diff_fields(want, have);
+    if diffs.is_empty() {
+        Action::Unchanged
+    } else {
+        Action::Differs(diffs)
+    }
+}
+
+/// An object without its null fields.
+fn strip_nulls(v: &Value) -> Value {
+    Value::Object(
+        v.as_object()
+            .cloned()
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|(_, v)| !v.is_null())
+            .collect(),
+    )
+}
+
+/// Longest value shown in a diff line; template bodies would otherwise
+/// fill the screen.
+const DIFF_VALUE_MAX_CHARS: usize = 60;
+
+fn show_value(v: &Value) -> String {
+    let text = v.to_string();
+    if text.chars().count() > DIFF_VALUE_MAX_CHARS {
+        let cut: String = text.chars().take(DIFF_VALUE_MAX_CHARS).collect();
+        format!("{cut}...")
+    } else {
+        text
+    }
+}
+
+/// Join two "after" notes; an item can wait on more than one thing.
+fn and_after(a: Option<String>, b: String) -> Option<String> {
+    Some(match a {
+        Some(a) => format!("{a}, {b}"),
+        None => b,
+    })
+}
+
+#[derive(Default, Debug, PartialEq)]
+struct Counts {
+    create: usize,
+    existed_unseen: usize,
+    unchanged: usize,
+    differs: usize,
+    skipped: usize,
+}
+
+impl Counts {
+    fn add(&mut self, other: &Counts) {
+        self.create += other.create;
+        self.existed_unseen += other.existed_unseen;
+        self.unchanged += other.unchanged;
+        self.differs += other.differs;
+        self.skipped += other.skipped;
+    }
+
+    fn summary(&self, mode: Mode) -> String {
+        let created = match mode {
+            Mode::Plan => "to create",
+            Mode::Apply => "created",
+        };
+        let parts: Vec<String> = [
+            (self.create, created),
+            (self.existed_unseen, "already registered"),
+            (self.unchanged, "unchanged"),
+            (self.differs, "differ"),
+            (self.skipped, "skipped"),
+        ]
+        .iter()
+        .filter(|(n, _)| *n > 0)
+        .map(|(n, what)| format!("{n} {what}"))
+        .collect();
+        if parts.is_empty() {
+            "nothing".to_string()
+        } else {
+            parts.join(", ")
+        }
+    }
+}
+
+/// One manifest section's items and what happens to each.
+struct Section {
+    title: String,
+    items: Vec<(String, Action)>,
+}
+
+impl Section {
+    fn new(title: impl Into<String>) -> Self {
         Self {
-            created: 0,
-            exists: 0,
+            title: title.into(),
+            items: Vec::new(),
         }
     }
-    fn add(&mut self, outcome: Outcome) {
-        match outcome {
-            Outcome::Created => self.created += 1,
-            Outcome::Exists => self.exists += 1,
-        }
+
+    fn push(&mut self, item: impl Into<String>, action: Action) {
+        self.items.push((item.into(), action));
     }
-    fn report(&self, section: &str) {
-        if self.created + self.exists > 0 {
-            println!(
-                "{section}: {} created, {} already registered",
-                self.created, self.exists
-            );
+
+    fn counts(&self) -> Counts {
+        let mut c = Counts::default();
+        for (_, action) in &self.items {
+            match action {
+                Action::Create { .. } => c.create += 1,
+                Action::ExistedUnseen => c.existed_unseen += 1,
+                Action::Unchanged => c.unchanged += 1,
+                Action::Differs(_) => c.differs += 1,
+                Action::Skipped(_) => c.skipped += 1,
+            }
         }
+        c
     }
+
+    /// A summary line, then one line per item worth reading: everything but
+    /// the unchanged, which are only counted.
+    fn render(&self, mode: Mode) -> Vec<String> {
+        if self.items.is_empty() {
+            return Vec::new();
+        }
+        let mut lines = vec![format!("{}: {}", self.title, self.counts().summary(mode))];
+        for (item, action) in &self.items {
+            match action {
+                Action::Create { after } => match (mode, after) {
+                    (Mode::Plan, Some(after)) => {
+                        lines.push(format!("  + {item} (after {after})"));
+                    }
+                    _ => lines.push(format!("  + {item}")),
+                },
+                Action::ExistedUnseen => lines.push(format!(
+                    "  = {item}: already registered, though the read beforehand did not show it"
+                )),
+                Action::Unchanged => {}
+                Action::Differs(diffs) => {
+                    lines.push(format!("  ~ {item}"));
+                    for d in diffs {
+                        lines.push(format!(
+                            "      {}: {} -> {}",
+                            d.field,
+                            show_value(&d.have),
+                            show_value(&d.want)
+                        ));
+                    }
+                }
+                Action::Skipped(reason) => lines.push(format!("  - {item}: {reason}")),
+            }
+        }
+        lines
+    }
+}
+
+/// What this run creates, by natural key. A plan creates nothing, so later
+/// sections (and later manifests in the same run) check here for what
+/// they depend on before declaring it missing.
+#[derive(Default)]
+struct Planned {
+    unit_types: HashSet<String>,
+    units: HashSet<String>,
+    permissions: HashSet<String>,
+    roles: HashSet<String>,
+    idps: HashSet<String>,
+    attr_keys: HashSet<String>,
+    users: HashSet<String>,
 }
 
 /// An org unit as the tree reports it: the uuid is what callers store, the
-/// id is what the create API wants for a parent.
+/// id is what the create API wants for a parent. The rest is for comparing
+/// with the manifest.
 struct UnitRef {
     id: i64,
     uuid: String,
+    label: Option<String>,
+    parent: Option<i64>,
+    unit_type: Option<i64>,
+    timezone: Option<String>,
 }
 
 /// Walk the org tree into a code -> UnitRef map.
@@ -345,6 +628,10 @@ fn walk_tree(node: &Value, map: &mut HashMap<String, UnitRef>) {
             UnitRef {
                 id,
                 uuid: uuid.to_string(),
+                label: node["label"].as_str().map(str::to_string),
+                parent: node["parent"].as_i64(),
+                unit_type: node["unit_type"].as_i64(),
+                timezone: node["timezone"].as_str().map(str::to_string),
             },
         );
     }
@@ -357,9 +644,7 @@ fn walk_tree(node: &Value, map: &mut HashMap<String, UnitRef>) {
 
 /// Fetch the whole org tree as code -> UnitRef.
 async fn load_units(client: &Client) -> Result<HashMap<String, UnitRef>, String> {
-    let tree = client
-        .get(format!("{}/api/v1/odo/org/tree", client.base))
-        .await?;
+    let tree = client.get(client.api("/api/v1/odo/org/tree")).await?;
     let mut units = HashMap::new();
     // The tree endpoint returns either a bare root node or {tree: [...]}.
     if let Some(roots) = tree["tree"].as_array() {
@@ -372,532 +657,921 @@ async fn load_units(client: &Client) -> Result<HashMap<String, UnitRef>, String>
     Ok(units)
 }
 
-/// Create org unit types, resolving each parent label to the id of a type
-/// that already exists or was created earlier in this run.
-async fn apply_unit_types(client: &Client, specs: &[OrgUnitTypeSpec]) -> Result<(), String> {
-    // Existing types first: a label already present is "already registered",
-    // and its id may be needed as a parent below.
-    let page = client
-        .post_ok(
-            format!("{}/api/v1/odo/org/admin/unit-type/list", client.base),
-            &json!({"limit": 200}),
-        )
-        .await?;
-    let mut ids: HashMap<String, i64> = HashMap::new();
-    if let Some(rows) = page["rows"].as_array() {
-        for row in rows {
-            if let (Some(label), Some(id)) = (row["label"].as_str(), row["id"].as_i64()) {
-                ids.insert(label.to_string(), id);
-            }
-        }
-    }
-
-    let mut t = Tally::new();
-    for spec in specs {
-        if ids.contains_key(&spec.label) {
-            t.add(Outcome::Exists);
-            continue;
-        }
-
-        let mut body = json!({"label": spec.label});
-        if let Some(parent) = &spec.parent {
-            let parent_id = ids.get(parent).ok_or(format!(
-                "org unit type '{}': parent type '{parent}' does not exist yet. \
-                 List a parent type before the types beneath it.",
-                spec.label
-            ))?;
-            body["parent"] = json!(parent_id);
-        }
-        if let Some(v) = spec.can_have_staff {
-            body["can_have_staff"] = json!(v);
-        }
-        if let Some(v) = spec.can_have_patrons {
-            body["can_have_patrons"] = json!(v);
-        }
-
-        let label = format!("org unit type {}", spec.label);
-        let url = format!("{}/api/v1/odo/org/admin/unit-type/create", client.base);
-        match client.post(url, &body).await? {
-            (200, created) => {
-                let id = created["id"]
-                    .as_i64()
-                    .ok_or(format!("{label}: create response had no id"))?;
-                ids.insert(spec.label.clone(), id);
-                t.add(Outcome::Created);
-            }
-            (status, detail) => return Err(http_error(&label, status, &detail)),
-        }
-    }
-    t.report("org unit types");
-    Ok(())
+/// Rows keyed by one of their string fields.
+fn index_by(rows: Vec<Value>, key: &str) -> HashMap<String, Value> {
+    rows.into_iter()
+        .filter_map(|r| Some((r[key].as_str()?.to_string(), r)))
+        .collect()
 }
 
-/// Create org units, resolving parents by code and types by label. Units
-/// created here join the map, so a manifest can build a whole subtree in one
-/// pass as long as parents come first.
-async fn apply_units(client: &Client, specs: &[OrgUnitSpec]) -> Result<(), String> {
-    let mut units = load_units(client).await?;
-
-    let types = client
-        .post_ok(
-            format!("{}/api/v1/odo/org/admin/unit-type/list", client.base),
-            &json!({"limit": 200}),
-        )
-        .await?;
-    let mut type_ids: HashMap<String, i64> = HashMap::new();
-    if let Some(rows) = types["rows"].as_array() {
-        for row in rows {
-            if let (Some(label), Some(id)) = (row["label"].as_str(), row["id"].as_i64()) {
-                type_ids.insert(label.to_string(), id);
-            }
-        }
-    }
-
-    let mut t = Tally::new();
-    for spec in specs {
-        if units.contains_key(&spec.code) {
-            t.add(Outcome::Exists);
-            continue;
-        }
-
-        let parent = units.get(&spec.parent).ok_or(format!(
-            "org unit '{}': parent code '{}' is not in the tree. List a parent \
-             before its children; the root unit is seeded, not registered.",
-            spec.code, spec.parent
-        ))?;
-        let unit_type = type_ids.get(&spec.unit_type).ok_or(format!(
-            "org unit '{}': unknown unit type '{}'. Register it under \
-             org_unit_types first.",
-            spec.code, spec.unit_type
-        ))?;
-
-        let mut body = json!({
-            "label": spec.label,
-            "code": spec.code,
-            "parent": parent.id,
-            "unit_type": unit_type,
-        });
-        if let Some(tz) = &spec.timezone {
-            body["timezone"] = json!(tz);
-        }
-
-        let label = format!("org unit {}", spec.code);
-        let url = format!("{}/api/v1/odo/org/admin/unit/create", client.base);
-        match client.post(url, &body).await? {
-            (200, created) => {
-                let id = created["id"]
-                    .as_i64()
-                    .ok_or(format!("{label}: create response had no id"))?;
-                // The create response carries no uuid; nothing in this run
-                // needs one, and the next run reads it from the tree.
-                units.insert(
-                    spec.code.clone(),
-                    UnitRef {
-                        id,
-                        uuid: String::new(),
-                    },
-                );
-                t.add(Outcome::Created);
-            }
-            (status, detail) => return Err(http_error(&label, status, &detail)),
-        }
-    }
-    t.report("org units");
-    Ok(())
+/// An item listed again in the same manifest section. Registration would
+/// create it once and skip the repeat, so the plan says so rather than
+/// counting it twice.
+fn repeated() -> Action {
+    Action::Skipped("repeats an earlier entry in this manifest".into())
 }
 
-async fn apply(client: &Client, manifest: &Manifest) -> Result<(), String> {
-    // Org structure first: role assignments below resolve org units by code,
-    // and an app's fixtures may land in units this manifest creates.
-    if !manifest.org_unit_types.is_empty() {
-        apply_unit_types(client, &manifest.org_unit_types).await?;
-    }
-    if !manifest.org_units.is_empty() {
-        apply_units(client, &manifest.org_units).await?;
+/// A SAML map's role and attribute value: with the attribute, its key.
+fn map_key(m: &Value) -> (&str, &str) {
+    (
+        m["role"].as_str().unwrap_or_default(),
+        m["attr_value"].as_str().unwrap_or_default(),
+    )
+}
+
+/// One run over one or more manifests, planning or applying.
+struct Run<'a> {
+    client: &'a Client,
+    mode: Mode,
+    planned: Planned,
+    totals: Counts,
+}
+
+impl<'a> Run<'a> {
+    fn new(client: &'a Client, mode: Mode) -> Self {
+        Self {
+            client,
+            mode,
+            planned: Planned::default(),
+            totals: Counts::default(),
+        }
     }
 
-    let mut t = Tally::new();
-    for p in &manifest.permissions {
-        let label = format!("permission {}", p["code"]);
-        t.add(
-            client
-                .upsert(
-                    &label,
-                    format!("{}/api/v1/odo/auth/authz/permission/create", client.base),
-                    p,
-                )
-                .await?,
-        );
+    fn finish(&mut self, section: Section) {
+        for line in section.render(self.mode) {
+            println!("{line}");
+        }
+        self.totals.add(&section.counts());
     }
-    t.report("permissions");
 
-    let mut t = Tally::new();
-    for r in &manifest.roles {
-        let label = format!("role {}", r["code"]);
-        t.add(
-            client
-                .upsert(
-                    &label,
-                    format!("{}/api/v1/odo/auth/authz/role/create", client.base),
-                    r,
-                )
-                .await?,
-        );
+    /// Create a missing item through its create endpoint, or, in a plan,
+    /// record that it would be. A 409 here means the item exists after all.
+    async fn create(
+        &self,
+        section: &mut Section,
+        item: String,
+        after: Option<String>,
+        path: &str,
+        body: &Value,
+    ) -> Result<(), String> {
+        if self.mode == Mode::Plan {
+            section.push(item, Action::Create { after });
+            return Ok(());
+        }
+        let label = format!("{} {item}", section.title);
+        let action = match self
+            .client
+            .upsert(&label, self.client.api(path), body)
+            .await?
+        {
+            Outcome::Created => Action::Create { after: None },
+            Outcome::Exists => Action::ExistedUnseen,
+        };
+        section.push(item, action);
+        Ok(())
     }
-    t.report("roles");
 
-    let mut t = Tally::new();
-    for g in &manifest.role_permissions {
-        let label = format!("grant {} <- {}", g["role"], g["perm"]);
-        t.add(
-            client
-                .upsert(
-                    &label,
-                    format!(
-                        "{}/api/v1/odo/auth/authz/role-permission/create",
-                        client.base
-                    ),
-                    g,
-                )
-                .await?,
-        );
+    /// The common case: items keyed by one string field, compared field
+    /// for field with the row of the same key, created when missing.
+    /// Returns the keys of the items that are (or would be) created.
+    async fn keyed_section(
+        &mut self,
+        title: &str,
+        specs: &[Value],
+        key: &str,
+        existing: Vec<Value>,
+        create_path: &str,
+        body_of: fn(&Value) -> Value,
+    ) -> Result<Vec<String>, String> {
+        let existing = index_by(existing, key);
+        let mut section = Section::new(title);
+        let mut created = Vec::new();
+        let mut seen = HashSet::new();
+        for spec in specs {
+            let id = spec[key]
+                .as_str()
+                .ok_or(format!("{title}: an item has no \"{key}\""))?
+                .to_string();
+            if !seen.insert(id.clone()) {
+                section.push(id, repeated());
+                continue;
+            }
+            let body = body_of(spec);
+            if let Some(row) = existing.get(&id) {
+                section.push(id, compare(&body, row));
+                continue;
+            }
+            self.create(&mut section, id.clone(), None, create_path, &body)
+                .await?;
+            created.push(id);
+        }
+        self.finish(section);
+        Ok(created)
     }
-    t.report("role grants");
 
-    let mut t = Tally::new();
-    for tmpl in &manifest.notification_templates {
-        let label = format!("template {}", tmpl["code"]);
-        // Strip explicit nulls: the create API treats absent and null the
-        // same, but this keeps request logs tidy.
-        let body = Value::Object(
-            tmpl.as_object()
-                .cloned()
-                .unwrap_or_default()
-                .into_iter()
-                .filter(|(_, v)| !v.is_null())
-                .collect(),
-        );
-        t.add(
-            client
-                .upsert(
-                    &label,
-                    format!("{}/api/v1/odo/notify/template/create", client.base),
+    /// Create org unit types, resolving each parent label to the id of a
+    /// type that already exists or was created earlier in this run.
+    async fn unit_types(&mut self, specs: &[OrgUnitTypeSpec]) -> Result<(), String> {
+        let rows = self.client.list_all(UNIT_TYPE_LIST).await?;
+        let mut ids: HashMap<String, i64> = rows
+            .iter()
+            .filter_map(|r| Some((r["label"].as_str()?.to_string(), r["id"].as_i64()?)))
+            .collect();
+        let by_label = index_by(rows, "label");
+
+        let mut section = Section::new("org unit types");
+        for spec in specs {
+            if let Some(row) = by_label.get(&spec.label) {
+                let want = json!({
+                    "parent_label": spec.parent,
+                    "can_have_staff": spec.can_have_staff,
+                    "can_have_patrons": spec.can_have_patrons,
+                });
+                section.push(spec.label.clone(), compare(&want, row));
+                continue;
+            }
+
+            let mut body = json!({"label": spec.label});
+            let mut after = None;
+            if let Some(parent) = &spec.parent {
+                if let Some(id) = ids.get(parent) {
+                    body["parent"] = json!(id);
+                } else if self.planned.unit_types.contains(parent) {
+                    after = Some(format!("org unit type {parent}"));
+                } else {
+                    return Err(format!(
+                        "org unit type '{}': parent type '{parent}' does not exist yet. \
+                         List a parent type before the types beneath it.",
+                        spec.label
+                    ));
+                }
+            }
+            if let Some(v) = spec.can_have_staff {
+                body["can_have_staff"] = json!(v);
+            }
+            if let Some(v) = spec.can_have_patrons {
+                body["can_have_patrons"] = json!(v);
+            }
+            self.planned.unit_types.insert(spec.label.clone());
+
+            if self.mode == Mode::Plan {
+                section.push(spec.label.clone(), Action::Create { after });
+                continue;
+            }
+            // Not create(): the new id is needed for any child type below.
+            let label = format!("org unit type {}", spec.label);
+            let created = self
+                .client
+                .post_ok(
+                    self.client.api("/api/v1/odo/org/admin/unit-type/create"),
                     &body,
                 )
-                .await?,
-        );
-    }
-    t.report("notification templates");
-
-    let mut t = Tally::new();
-    for d in &manifest.asset_directories {
-        let label = format!("directory {}", d["path"]);
-        t.add(
-            client
-                .upsert(
-                    &label,
-                    format!("{}/api/v1/odo/asset/directory/create", client.base),
-                    d,
-                )
-                .await?,
-        );
-    }
-    t.report("asset directories");
-
-    let mut t = Tally::new();
-    for idp in &manifest.saml_idps {
-        let label = format!("saml idp {}", idp["name"]);
-        t.add(
-            client
-                .upsert(
-                    &label,
-                    format!("{}/api/v1/odo/auth/saml/admin/idp/create", client.base),
-                    idp,
-                )
-                .await?,
-        );
-    }
-    t.report("saml idps");
-
-    if !manifest.saml_sps.is_empty() {
-        // SPs reference their IdP by row id, which a manifest must not
-        // carry. Resolve entity_id -> id against what is deployed, which
-        // includes anything the loop above just created.
-        let (status, idps) = client
-            .post(
-                format!("{}/api/v1/odo/auth/saml/admin/idp/list", client.base),
-                &json!({}),
-            )
-            .await?;
-        if status != 200 {
-            return Err(http_error("saml idp list", status, &idps));
+                .await
+                .map_err(|e| format!("{label}: {e}"))?;
+            let id = created["id"]
+                .as_i64()
+                .ok_or(format!("{label}: create response had no id"))?;
+            ids.insert(spec.label.clone(), id);
+            section.push(spec.label.clone(), Action::Create { after: None });
         }
-        let by_entity: HashMap<&str, i64> = idps["idps"]
-            .as_array()
-            .map(|a| {
-                a.iter()
-                    .filter_map(|i| Some((i["entity_id"].as_str()?, i["id"].as_i64()?)))
-                    .collect()
-            })
-            .unwrap_or_default();
+        self.finish(section);
+        Ok(())
+    }
 
-        let mut t = Tally::new();
-        for sp in &manifest.saml_sps {
+    /// Create org units, resolving parents by code and types by label.
+    /// Units created here join the map, so a manifest can build a whole
+    /// subtree in one pass as long as parents come first.
+    async fn units(&mut self, specs: &[OrgUnitSpec]) -> Result<(), String> {
+        let mut units = load_units(self.client).await?;
+        let types = self.client.list_all(UNIT_TYPE_LIST).await?;
+        let type_ids: HashMap<String, i64> = types
+            .iter()
+            .filter_map(|r| Some((r["label"].as_str()?.to_string(), r["id"].as_i64()?)))
+            .collect();
+        let type_labels: HashMap<i64, String> =
+            type_ids.iter().map(|(l, id)| (*id, l.clone())).collect();
+        let mut codes: HashMap<i64, String> =
+            units.iter().map(|(code, u)| (u.id, code.clone())).collect();
+
+        let mut section = Section::new("org units");
+        for spec in specs {
+            if let Some(unit) = units.get(&spec.code) {
+                let have = json!({
+                    "label": unit.label,
+                    "parent": unit.parent.and_then(|p| codes.get(&p)),
+                    "unit_type": unit.unit_type.and_then(|t| type_labels.get(&t)),
+                    "timezone": unit.timezone,
+                });
+                let want = json!({
+                    "label": spec.label,
+                    "parent": spec.parent,
+                    "unit_type": spec.unit_type,
+                    "timezone": spec.timezone,
+                });
+                section.push(spec.code.clone(), compare(&want, &have));
+                continue;
+            }
+
+            let mut after = None;
+            let parent = match units.get(&spec.parent) {
+                Some(p) => Some(p.id),
+                None if self.planned.units.contains(&spec.parent) => {
+                    after = and_after(after, format!("org unit {}", spec.parent));
+                    None
+                }
+                None => {
+                    return Err(format!(
+                        "org unit '{}': parent code '{}' is not in the tree. List a parent \
+                         before its children; the root unit is seeded, not registered.",
+                        spec.code, spec.parent
+                    ));
+                }
+            };
+            let unit_type = match type_ids.get(&spec.unit_type) {
+                Some(t) => Some(*t),
+                None if self.planned.unit_types.contains(&spec.unit_type) => {
+                    after = and_after(after, format!("org unit type {}", spec.unit_type));
+                    None
+                }
+                None => {
+                    return Err(format!(
+                        "org unit '{}': unknown unit type '{}'. Register it under \
+                         org_unit_types first.",
+                        spec.code, spec.unit_type
+                    ));
+                }
+            };
+            self.planned.units.insert(spec.code.clone());
+
+            if self.mode == Mode::Plan {
+                section.push(spec.code.clone(), Action::Create { after });
+                continue;
+            }
             let mut body = json!({
-                "entity_id": sp.entity_id,
-                "acs_url": sp.acs_url,
+                "label": spec.label,
+                "code": spec.code,
+                "parent": parent,
+                "unit_type": unit_type,
             });
-            let obj = body.as_object_mut().expect("json object");
-            if let Some(v) = &sp.label {
-                obj.insert("label".into(), json!(v));
+            if let Some(tz) = &spec.timezone {
+                body["timezone"] = json!(tz);
             }
-            if let Some(v) = &sp.slo_url {
-                obj.insert("slo_url".into(), json!(v));
-            }
-            if let Some(v) = &sp.metadata_url {
-                obj.insert("metadata_url".into(), json!(v));
-            }
-            if let Some(v) = &sp.callback_url {
-                obj.insert("callback_url".into(), json!(v));
-            }
-            if let Some(v) = sp.is_active {
-                obj.insert("is_active".into(), json!(v));
+            let label = format!("org unit {}", spec.code);
+            let created = self
+                .client
+                .post_ok(self.client.api("/api/v1/odo/org/admin/unit/create"), &body)
+                .await
+                .map_err(|e| format!("{label}: {e}"))?;
+            let id = created["id"]
+                .as_i64()
+                .ok_or(format!("{label}: create response had no id"))?;
+            // The create response carries no uuid; nothing in this run
+            // needs one, and assignments re-read the tree.
+            codes.insert(id, spec.code.clone());
+            units.insert(
+                spec.code.clone(),
+                UnitRef {
+                    id,
+                    uuid: String::new(),
+                    label: Some(spec.label.clone()),
+                    parent,
+                    unit_type,
+                    timezone: spec.timezone.clone(),
+                },
+            );
+            section.push(spec.code.clone(), Action::Create { after: None });
+        }
+        self.finish(section);
+        Ok(())
+    }
+
+    async fn grants(&mut self, specs: &[Value]) -> Result<(), String> {
+        let perms: HashSet<String> = self
+            .client
+            .list_all("/api/v1/odo/auth/authz/permission/list")
+            .await?
+            .iter()
+            .filter_map(|r| r["code"].as_str().map(str::to_string))
+            .collect();
+        // role -> its grants by perm, or None when the role does not exist.
+        let mut roles: HashMap<String, Option<HashMap<String, Value>>> = HashMap::new();
+
+        let mut section = Section::new("role grants");
+        for g in specs {
+            let (Some(role), Some(perm)) = (g["role"].as_str(), g["perm"].as_str()) else {
+                return Err(format!("role grant without role and perm: {g}"));
+            };
+            let item = format!("{role} <- {perm}");
+
+            if !roles.contains_key(role) {
+                let found = self
+                    .client
+                    .post_found(
+                        self.client.api("/api/v1/odo/auth/authz/role/get"),
+                        &json!({"code": role}),
+                    )
+                    .await?;
+                let grants = found.map(|detail| {
+                    index_by(
+                        detail["grants"].as_array().cloned().unwrap_or_default(),
+                        "perm",
+                    )
+                });
+                roles.insert(role.to_string(), grants);
             }
 
-            if let Some(entity) = &sp.idp_entity_id {
-                match by_entity.get(entity.as_str()) {
-                    Some(id) => {
-                        obj.insert("idp".into(), json!(id));
-                    }
-                    None => {
-                        println!(
-                            "saml sp {}: no IdP with entity_id '{}' - skipped",
-                            sp.entity_id, entity
-                        );
+            let mut after = None;
+            match &roles[role] {
+                Some(grants) => {
+                    if let Some(row) = grants.get(perm) {
+                        let want = json!({"min_depth": g["min_depth"]});
+                        section.push(item, compare(&want, row));
                         continue;
                     }
                 }
+                None if self.planned.roles.contains(role) => {
+                    after = and_after(after, format!("role {role}"));
+                }
+                None => {
+                    return Err(format!(
+                        "role grant {item}: role '{role}' does not exist, and no \
+                         manifest in this run creates it"
+                    ));
+                }
             }
-
-            let label = format!("saml sp {}", sp.entity_id);
-            t.add(
-                client
-                    .upsert(
-                        &label,
-                        format!("{}/api/v1/odo/auth/saml/admin/sp/create", client.base),
-                        &body,
-                    )
-                    .await?,
-            );
-        }
-        t.report("saml sps");
-    }
-
-    if !manifest.saml_idp_attributes.is_empty() {
-        // Same entity_id -> id resolution the SPs use. Re-read rather
-        // than reuse: this run may have just created the IdP.
-        let (status, idps) = client
-            .post(
-                format!("{}/api/v1/odo/auth/saml/admin/idp/list", client.base),
-                &json!({}),
+            if !perms.contains(perm) {
+                if self.planned.permissions.contains(perm) {
+                    after = and_after(after, format!("permission {perm}"));
+                } else {
+                    return Err(format!(
+                        "role grant {item}: permission '{perm}' does not exist, and no \
+                         manifest in this run creates it"
+                    ));
+                }
+            }
+            self.create(
+                &mut section,
+                item,
+                after,
+                "/api/v1/odo/auth/authz/role-permission/create",
+                g,
             )
             .await?;
-        if status != 200 {
-            return Err(http_error("saml idp list", status, &idps));
+            if let Some(Some(grants)) = roles.get_mut(role) {
+                grants.insert(perm.to_string(), g.clone());
+            }
         }
-        let rows = idps["idps"].as_array().cloned().unwrap_or_default();
-        let by_entity: HashMap<&str, i64> = rows
+        self.finish(section);
+        Ok(())
+    }
+
+    async fn sps(&mut self, specs: &[SamlSpSpec]) -> Result<(), String> {
+        // SPs reference their IdP by row id, which a manifest must not
+        // carry. Resolve entity_id -> id against what is deployed, which
+        // includes anything this run just created.
+        let idps = self.client.list_key(IDP_LIST, "idps").await?;
+        let by_entity: HashMap<&str, i64> = idps
             .iter()
             .filter_map(|i| Some((i["entity_id"].as_str()?, i["id"].as_i64()?)))
             .collect();
+        // Only active SPs are unique by entity_id, so several rows can
+        // share one. The active row is the one that counts.
+        let mut existing: HashMap<String, Value> = HashMap::new();
+        for row in self
+            .client
+            .list_key("/api/v1/odo/auth/saml/admin/sp/list", "sps")
+            .await?
+        {
+            let Some(entity) = row["entity_id"].as_str().map(str::to_string) else {
+                continue;
+            };
+            let active = row["is_active"].as_bool().unwrap_or(false);
+            if active || !existing.contains_key(&entity) {
+                existing.insert(entity, row);
+            }
+        }
 
-        let mut t = Tally::new();
-        for attr in &manifest.saml_idp_attributes {
+        let mut section = Section::new("saml sps");
+        for sp in specs {
+            let mut body = json!({
+                "entity_id": sp.entity_id,
+                "acs_url": sp.acs_url,
+                "label": sp.label,
+                "slo_url": sp.slo_url,
+                "metadata_url": sp.metadata_url,
+                "callback_url": sp.callback_url,
+                "is_active": sp.is_active,
+            });
+            let mut after = None;
+            if let Some(entity) = &sp.idp_entity_id {
+                if let Some(id) = by_entity.get(entity.as_str()) {
+                    body["idp"] = json!(id);
+                } else if self.planned.idps.contains(entity) {
+                    after = Some(format!("saml idp {entity}"));
+                } else {
+                    section.push(
+                        sp.entity_id.clone(),
+                        Action::Skipped(format!("no IdP with entity_id '{entity}'")),
+                    );
+                    continue;
+                }
+            }
+            let body = strip_nulls(&body);
+
+            if let Some(row) = existing.get(&sp.entity_id) {
+                section.push(sp.entity_id.clone(), compare(&body, row));
+                continue;
+            }
+            self.create(
+                &mut section,
+                sp.entity_id.clone(),
+                after,
+                "/api/v1/odo/auth/saml/admin/sp/create",
+                &body,
+            )
+            .await?;
+            existing.insert(sp.entity_id.clone(), body);
+        }
+        self.finish(section);
+        Ok(())
+    }
+
+    async fn attributes(&mut self, specs: &[SamlAttrSpec]) -> Result<(), String> {
+        // Same entity_id -> id resolution the SPs use. Re-read rather
+        // than reuse: this run may have just created the IdP.
+        let idps = self.client.list_key(IDP_LIST, "idps").await?;
+        let by_entity: HashMap<&str, i64> = idps
+            .iter()
+            .filter_map(|i| Some((i["entity_id"].as_str()?, i["id"].as_i64()?)))
+            .collect();
+        // The unique constraint is on (idp, key, normalizer), and a NULL
+        // normalizer never equals itself in Postgres -- so an attribute
+        // without one can be created over and over and the database will
+        // not complain. Existence is decided here, never by a 409.
+        let mut existing = self.client.list_key(ATTRIBUTE_LIST, "attributes").await?;
+
+        let mut section = Section::new("saml attributes");
+        for attr in specs {
             // With one IdP and no entity named, the attribute is its.
             // Naming it is required as soon as there is more than one,
             // since guessing would silently attach it to the wrong IdP.
-            let idp_id = match &attr.idp_entity_id {
+            let idp_id: Result<i64, String> = match &attr.idp_entity_id {
                 Some(entity) => match by_entity.get(entity.as_str()) {
-                    Some(id) => *id,
+                    Some(id) => Ok(*id),
+                    None if self.planned.idps.contains(entity) => Err(format!("saml idp {entity}")),
                     None => {
-                        println!(
-                            "saml attribute {}: no IdP with entity_id '{}' - skipped",
-                            attr.key, entity
+                        section.push(
+                            attr.key.clone(),
+                            Action::Skipped(format!("no IdP with entity_id '{entity}'")),
                         );
                         continue;
                     }
                 },
-                None if rows.len() == 1 => rows[0]["id"].as_i64().unwrap_or_default(),
+                None if idps.len() == 1 => Ok(idps[0]["id"].as_i64().unwrap_or_default()),
+                None if idps.is_empty() && self.planned.idps.len() == 1 => {
+                    let entity = self.planned.idps.iter().next().cloned().unwrap_or_default();
+                    Err(format!("saml idp {entity}"))
+                }
                 None => {
-                    println!(
-                        "saml attribute {}: {} IdPs configured and no idp_entity_id - skipped",
-                        attr.key,
-                        rows.len()
+                    section.push(
+                        attr.key.clone(),
+                        Action::Skipped(format!(
+                            "{} IdPs configured and no idp_entity_id",
+                            idps.len()
+                        )),
                     );
                     continue;
                 }
             };
+            // Err carries the IdP this run creates first, so there is
+            // nothing to look the attribute up against yet.
+            let idp_id = match idp_id {
+                Ok(id) => id,
+                Err(after) => {
+                    self.planned.attr_keys.insert(attr.key.clone());
+                    section.push(attr.key.clone(), Action::Create { after: Some(after) });
+                    continue;
+                }
+            };
 
-            let mut body = json!({
+            let body = strip_nulls(&json!({
                 "idp": idp_id,
                 "key": attr.key,
                 "label": attr.label,
+                "is_location": attr.is_location,
+                "normalizer": attr.normalizer,
+            }));
+            let row = existing.iter().find(|e| {
+                e["idp"].as_i64() == Some(idp_id)
+                    && e["key"].as_str() == Some(attr.key.as_str())
+                    && e["normalizer"].as_str() == attr.normalizer.as_deref()
             });
-            let obj = body.as_object_mut().expect("json object");
-            if let Some(v) = attr.is_location {
-                obj.insert("is_location".into(), json!(v));
-            }
-            if let Some(v) = &attr.normalizer {
-                obj.insert("normalizer".into(), json!(v));
-            }
-
-            // The unique constraint is on (idp, key, normalizer), and a
-            // NULL normalizer never equals itself in Postgres -- so an
-            // attribute without one can be created over and over and the
-            // database will not complain. Check before creating rather
-            // than rely on a 409 that will not come.
-            let (status, existing) = client
-                .post(
-                    format!("{}/api/v1/odo/auth/saml/admin/attribute/list", client.base),
-                    &json!({}),
-                )
-                .await?;
-            if status != 200 {
-                return Err(http_error("saml attribute list", status, &existing));
-            }
-            let already = existing["attributes"]
-                .as_array()
-                .map(|a| {
-                    a.iter().any(|e| {
-                        e["idp"].as_i64() == Some(idp_id)
-                            && e["key"].as_str() == Some(attr.key.as_str())
-                            && e["normalizer"].as_str() == attr.normalizer.as_deref()
-                    })
-                })
-                .unwrap_or(false);
-            if already {
-                t.add(Outcome::Exists);
+            if let Some(row) = row {
+                section.push(attr.key.clone(), compare(&body, row));
                 continue;
             }
-
-            let label = format!("saml attribute {}", attr.key);
-            t.add(
-                client
-                    .upsert(
-                        &label,
-                        format!(
-                            "{}/api/v1/odo/auth/saml/admin/attribute/create",
-                            client.base
-                        ),
-                        &body,
-                    )
-                    .await?,
-            );
-        }
-        t.report("saml attributes");
-    }
-
-    if let Some(saml) = &manifest.saml_attr_role_maps {
-        // Resolve the attribute id per active IdP; skip with a notice when
-        // the install has no SSO or the IdP lacks the attribute.
-        let (status, attrs) = client
-            .post(
-                format!("{}/api/v1/odo/auth/saml/admin/attribute/list", client.base),
-                &json!({}),
+            self.create(
+                &mut section,
+                attr.key.clone(),
+                None,
+                "/api/v1/odo/auth/saml/admin/attribute/create",
+                &body,
             )
             .await?;
-        if status != 200 {
-            return Err(http_error("saml attribute list", status, &attrs));
+            self.planned.attr_keys.insert(attr.key.clone());
+            existing.push(body);
         }
-        let targets: Vec<&Value> = attrs["attributes"]
-            .as_array()
-            .map(|a| {
-                a.iter()
-                    .filter(|attr| attr["key"].as_str() == Some(saml.attr_key.as_str()))
-                    .collect()
-            })
-            .unwrap_or_default();
+        self.finish(section);
+        Ok(())
+    }
+
+    async fn attr_role_maps(&mut self, saml: &SamlMaps) -> Result<(), String> {
+        // Resolve the attribute id per IdP; skip with a notice when the
+        // install has no SSO or no IdP has the attribute.
+        let attrs = self.client.list_key(ATTRIBUTE_LIST, "attributes").await?;
+        let targets: Vec<&Value> = attrs
+            .iter()
+            .filter(|a| a["key"].as_str() == Some(saml.attr_key.as_str()))
+            .collect();
+
         if targets.is_empty() {
-            println!(
-                "saml maps: no IdP defines attribute '{}' - skipped {} maps",
-                saml.attr_key,
-                saml.maps.len()
-            );
-        }
-        for attr in targets {
-            let mut t = Tally::new();
-            for m in &saml.maps {
-                let mut body = m.as_object().cloned().unwrap_or_default();
-                body.insert("attr".into(), attr["id"].clone());
-                let label = format!("saml map {} <- {}", m["role"], m["attr_value"]);
-                t.add(
-                    client
-                        .upsert(
-                            &label,
-                            format!(
-                                "{}/api/v1/odo/auth/saml/admin/attr-role-map/create",
-                                client.base
-                            ),
-                            &Value::Object(body),
-                        )
-                        .await?,
+            if self.planned.attr_keys.contains(&saml.attr_key) {
+                let mut section = Section::new("saml maps");
+                let mut seen = HashSet::new();
+                for m in &saml.maps {
+                    let (role, value) = map_key(m);
+                    let action = if seen.insert((role, value)) {
+                        Action::Create {
+                            after: Some(format!("saml attribute {}", saml.attr_key)),
+                        }
+                    } else {
+                        repeated()
+                    };
+                    section.push(format!("{role} <- {value}"), action);
+                }
+                self.finish(section);
+            } else {
+                println!(
+                    "saml maps: no IdP defines attribute '{}' - skipped {} maps",
+                    saml.attr_key,
+                    saml.maps.len()
                 );
             }
-            t.report(&format!(
+            return Ok(());
+        }
+
+        // (attr id, role, attr_value) is the unique key.
+        let mut existing: HashMap<(i64, String, String), Value> = HashMap::new();
+        for row in self
+            .client
+            .list_all("/api/v1/odo/auth/saml/admin/attr-role-map/list")
+            .await?
+        {
+            if let (Some(attr), Some(role), Some(value)) = (
+                row["attr"].as_i64(),
+                row["role"].as_str(),
+                row["attr_value"].as_str(),
+            ) {
+                existing.insert((attr, role.to_string(), value.to_string()), row);
+            }
+        }
+
+        for attr in targets {
+            let attr_id = attr["id"].as_i64().unwrap_or_default();
+            let mut section = Section::new(format!(
                 "saml maps (idp {})",
                 attr["idp_name"].as_str().unwrap_or("?")
             ));
-        }
-    }
-
-    let mut t = Tally::new();
-    for u in &manifest.users {
-        let label = format!("user {}", u["username"]);
-        t.add(
-            client
-                .upsert(
-                    &label,
-                    format!("{}/api/v1/odo/auth/user/create", client.base),
-                    u,
+            let mut seen = HashSet::new();
+            for m in &saml.maps {
+                let (role, value) = map_key(m);
+                let item = format!("{role} <- {value}");
+                let key = (attr_id, role.to_string(), value.to_string());
+                if !seen.insert(key.clone()) {
+                    section.push(item, repeated());
+                    continue;
+                }
+                if let Some(row) = existing.get(&key) {
+                    let want = json!({"is_active": m["is_active"]});
+                    section.push(item, compare(&want, row));
+                    continue;
+                }
+                let mut body = m.as_object().cloned().unwrap_or_default();
+                body.insert("attr".into(), json!(attr_id));
+                let body = Value::Object(body);
+                self.create(
+                    &mut section,
+                    item,
+                    None,
+                    "/api/v1/odo/auth/saml/admin/attr-role-map/create",
+                    &body,
                 )
-                .await?,
-        );
-    }
-    t.report("users");
-
-    if !manifest.user_role_assignments.is_empty() {
-        // Re-read the tree rather than reusing anything from apply_units:
-        // this picks up units created above, with their generated uuids.
-        let units = load_units(client).await?;
-
-        let mut t = Tally::new();
-        for a in &manifest.user_role_assignments {
-            let org_unit_uuid = &units
-                .get(&a.org_unit_code)
-                .ok_or(format!(
-                    "org unit code '{}' not in the tree",
-                    a.org_unit_code
-                ))?
-                .uuid;
-            let label = format!("assignment {} @ {}", a.role, a.org_unit_code);
-            t.add(
-                client
-                    .upsert(
-                        &label,
-                        format!("{}/api/v1/odo/auth/authz/user-role/create", client.base),
-                        &json!({
-                            "usr_uuid": a.usr_uuid,
-                            "role": a.role,
-                            "org_unit_uuid": org_unit_uuid,
-                        }),
-                    )
-                    .await?,
-            );
+                .await?;
+                existing.insert(key, body);
+            }
+            self.finish(section);
         }
-        t.report("role assignments");
+        Ok(())
     }
 
-    Ok(())
+    /// The registered user a manifest user names, by uuid when it carries
+    /// one and by username otherwise. A uuid that is not registered but
+    /// whose username is taken finds that other user, which is the case
+    /// worth reporting: the create would 409 and leave the manifest's
+    /// uuid unregistered.
+    async fn find_user(&self, username: &str, uuid: Option<&str>) -> Result<Option<Value>, String> {
+        if let Some(uuid) = uuid {
+            // with_deleted: a soft-deleted user still holds its uuid, and
+            // a create would 409 on it.
+            let found = self
+                .client
+                .post_found(
+                    self.client.api("/api/v1/odo/auth/user/get"),
+                    &json!({"uuid": uuid, "options": {"with_deleted": true}}),
+                )
+                .await?;
+            if found.is_some() {
+                return Ok(found);
+            }
+        }
+        for status in USER_STATUSES {
+            let rows = self
+                .client
+                .post_ok(
+                    self.client.api("/api/v1/odo/auth/user/search"),
+                    &json!({"keywords": username, "status": status, "limit": 50}),
+                )
+                .await?;
+            if let Some(row) = rows
+                .as_array()
+                .into_iter()
+                .flatten()
+                .find(|r| r["username"].as_str() == Some(username))
+            {
+                return Ok(Some(row.clone()));
+            }
+        }
+        Ok(None)
+    }
+
+    async fn users(&mut self, specs: &[Value]) -> Result<(), String> {
+        let mut section = Section::new("users");
+        for u in specs {
+            let username = u["username"]
+                .as_str()
+                .ok_or(format!("user without a username: {}", u["email"]))?;
+            let uuid = u["uuid"].as_str();
+            if let Some(row) = self.find_user(username, uuid).await? {
+                // Never compared, and never shown in a diff.
+                let mut want = u.clone();
+                if let Some(obj) = want.as_object_mut() {
+                    obj.remove("password");
+                }
+                let mut diffs = diff_fields(&want, &row);
+                if !row["deleted_at"].is_null() {
+                    diffs.push(FieldDiff {
+                        field: "deleted_at".into(),
+                        have: row["deleted_at"].clone(),
+                        want: Value::Null,
+                    });
+                }
+                let action = if diffs.is_empty() {
+                    Action::Unchanged
+                } else {
+                    Action::Differs(diffs)
+                };
+                section.push(username, action);
+                continue;
+            }
+            self.create(
+                &mut section,
+                username.to_string(),
+                None,
+                "/api/v1/odo/auth/user/create",
+                u,
+            )
+            .await?;
+            if let Some(uuid) = uuid {
+                self.planned.users.insert(uuid.to_string());
+            }
+        }
+        self.finish(section);
+        Ok(())
+    }
+
+    async fn assignments(&mut self, specs: &[Assignment]) -> Result<(), String> {
+        // Re-read the tree: this picks up units created above, with the
+        // uuids their create responses did not carry.
+        let units = load_units(self.client).await?;
+        // usr_uuid -> the user's assignments, or None when there is no
+        // such user.
+        let mut held: HashMap<String, Option<Vec<Value>>> = HashMap::new();
+
+        let mut section = Section::new("role assignments");
+        for a in specs {
+            let item = format!("{} {} @ {}", a.usr_uuid, a.role, a.org_unit_code);
+            let mut after = None;
+            if self.planned.roles.contains(&a.role) {
+                after = and_after(after, format!("role {}", a.role));
+            }
+
+            let unit = units.get(&a.org_unit_code);
+            if unit.is_none() {
+                if self.planned.units.contains(&a.org_unit_code) {
+                    after = and_after(after, format!("org unit {}", a.org_unit_code));
+                } else {
+                    return Err(format!(
+                        "assignment {item}: org unit code '{}' not in the tree",
+                        a.org_unit_code
+                    ));
+                }
+            }
+
+            if !held.contains_key(&a.usr_uuid) {
+                let found = self
+                    .client
+                    .post_found(
+                        self.client.api("/api/v1/odo/auth/authz/user-role/list"),
+                        &json!({"usr_uuid": a.usr_uuid}),
+                    )
+                    .await?;
+                let rows = found.map(|b| b["assignments"].as_array().cloned().unwrap_or_default());
+                held.insert(a.usr_uuid.clone(), rows);
+            }
+            match (&held[&a.usr_uuid], unit) {
+                (Some(rows), Some(unit)) => {
+                    let exists = rows.iter().any(|r| {
+                        r["role"].as_str() == Some(a.role.as_str())
+                            && r["org_unit"].as_i64() == Some(unit.id)
+                            && r["is_managed_by_saml"].as_bool() == Some(false)
+                    });
+                    if exists {
+                        section.push(item, Action::Unchanged);
+                        continue;
+                    }
+                }
+                (Some(_), None) => {}
+                (None, _) if self.planned.users.contains(&a.usr_uuid) => {
+                    after = and_after(after, format!("user {}", a.usr_uuid));
+                }
+                (None, _) => {
+                    return Err(format!(
+                        "assignment {item}: no user with uuid '{}', and no manifest \
+                         in this run creates one",
+                        a.usr_uuid
+                    ));
+                }
+            }
+
+            let body = json!({
+                "usr_uuid": a.usr_uuid,
+                "role": a.role,
+                "org_unit_uuid": unit.map(|u| u.uuid.as_str()),
+            });
+            self.create(
+                &mut section,
+                item,
+                after,
+                "/api/v1/odo/auth/authz/user-role/create",
+                &body,
+            )
+            .await?;
+            if let (Some(Some(rows)), Some(unit)) = (held.get_mut(&a.usr_uuid), unit) {
+                rows.push(json!({
+                    "role": a.role,
+                    "org_unit": unit.id,
+                    "is_managed_by_saml": false,
+                }));
+            }
+        }
+        self.finish(section);
+        Ok(())
+    }
+
+    async fn manifest(&mut self, manifest: &Manifest) -> Result<(), String> {
+        // Org structure first: role assignments below resolve org units by
+        // code, and an app's fixtures may land in units this manifest
+        // creates.
+        if !manifest.org_unit_types.is_empty() {
+            self.unit_types(&manifest.org_unit_types).await?;
+        }
+        if !manifest.org_units.is_empty() {
+            self.units(&manifest.org_units).await?;
+        }
+
+        if !manifest.permissions.is_empty() {
+            let existing = self
+                .client
+                .list_all("/api/v1/odo/auth/authz/permission/list")
+                .await?;
+            let created = self
+                .keyed_section(
+                    "permissions",
+                    &manifest.permissions,
+                    "code",
+                    existing,
+                    "/api/v1/odo/auth/authz/permission/create",
+                    Value::clone,
+                )
+                .await?;
+            self.planned.permissions.extend(created);
+        }
+
+        if !manifest.roles.is_empty() {
+            let existing = self
+                .client
+                .list_all("/api/v1/odo/auth/authz/role/list")
+                .await?;
+            let created = self
+                .keyed_section(
+                    "roles",
+                    &manifest.roles,
+                    "code",
+                    existing,
+                    "/api/v1/odo/auth/authz/role/create",
+                    Value::clone,
+                )
+                .await?;
+            self.planned.roles.extend(created);
+        }
+
+        if !manifest.role_permissions.is_empty() {
+            self.grants(&manifest.role_permissions).await?;
+        }
+
+        if !manifest.notification_templates.is_empty() {
+            let existing = self
+                .client
+                .list_all("/api/v1/odo/notify/template/list")
+                .await?;
+            // Nulls stripped: the create API treats absent and null the
+            // same, and a null is "not specified" when comparing too.
+            self.keyed_section(
+                "notification templates",
+                &manifest.notification_templates,
+                "code",
+                existing,
+                "/api/v1/odo/notify/template/create",
+                strip_nulls,
+            )
+            .await?;
+        }
+
+        if !manifest.asset_directories.is_empty() {
+            // Unpaginated: the endpoint returns a bare array.
+            let existing = self
+                .client
+                .post_ok(
+                    self.client.api("/api/v1/odo/asset/directory/list"),
+                    &json!({}),
+                )
+                .await?
+                .as_array()
+                .cloned()
+                .ok_or("asset directory list: response was not an array")?;
+            self.keyed_section(
+                "asset directories",
+                &manifest.asset_directories,
+                "path",
+                existing,
+                "/api/v1/odo/asset/directory/create",
+                Value::clone,
+            )
+            .await?;
+        }
+
+        if !manifest.saml_idps.is_empty() {
+            let existing = self.client.list_key(IDP_LIST, "idps").await?;
+            let created = self
+                .keyed_section(
+                    "saml idps",
+                    &manifest.saml_idps,
+                    "entity_id",
+                    existing,
+                    "/api/v1/odo/auth/saml/admin/idp/create",
+                    Value::clone,
+                )
+                .await?;
+            self.planned.idps.extend(created);
+        }
+
+        if !manifest.saml_sps.is_empty() {
+            self.sps(&manifest.saml_sps).await?;
+        }
+        if !manifest.saml_idp_attributes.is_empty() {
+            self.attributes(&manifest.saml_idp_attributes).await?;
+        }
+        if let Some(saml) = &manifest.saml_attr_role_maps {
+            self.attr_role_maps(saml).await?;
+        }
+        if !manifest.users.is_empty() {
+            self.users(&manifest.users).await?;
+        }
+        if !manifest.user_role_assignments.is_empty() {
+            self.assignments(&manifest.user_role_assignments).await?;
+        }
+        Ok(())
+    }
 }
 
 /// What `--version` prints. A release build stamps the git tag in through
@@ -910,15 +1584,45 @@ fn build_version() -> &'static str {
 
 #[tokio::main]
 async fn main() -> ExitCode {
-    let paths: Vec<String> = std::env::args().skip(1).collect();
-    if paths.iter().any(|a| a == "--version" || a == "-V") {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.iter().any(|a| a == "--version" || a == "-V") {
         println!("odo-register {}", build_version());
         return ExitCode::SUCCESS;
     }
+    let mode = if args.iter().any(|a| a == "--plan") {
+        Mode::Plan
+    } else {
+        Mode::Apply
+    };
+    let paths: Vec<&String> = args.iter().filter(|a| *a != "--plan").collect();
+    if let Some(unknown) = paths.iter().find(|a| a.starts_with('-')) {
+        eprintln!("unknown option: {unknown}");
+        return ExitCode::from(2);
+    }
     if paths.is_empty() {
-        eprintln!("usage: odo-register <manifest.json> [more-manifests...]");
+        eprintln!("usage: odo-register [--plan] <manifest.json> [more-manifests...]");
         eprintln!("       odo-register --version");
         return ExitCode::from(2);
+    }
+
+    // Parse everything before logging in, so a broken manifest fails
+    // before anything is read or written.
+    let mut manifests: Vec<(&String, Manifest)> = Vec::new();
+    for path in paths {
+        let raw = match std::fs::read_to_string(path) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("FAILED reading {path}: {e}");
+                return ExitCode::FAILURE;
+            }
+        };
+        match serde_json::from_str(&raw) {
+            Ok(m) => manifests.push((path, m)),
+            Err(e) => {
+                eprintln!("FAILED parsing {path}: {e}");
+                return ExitCode::FAILURE;
+            }
+        }
     }
 
     let username = env_or("REGISTRATION_USERNAME", "odo-registration");
@@ -942,28 +1646,32 @@ async fn main() -> ExitCode {
         }
     };
 
-    for path in &paths {
-        println!("applying {path}");
-        let raw = match std::fs::read_to_string(path) {
-            Ok(s) => s,
-            Err(e) => {
-                eprintln!("FAILED reading {path}: {e}");
-                return ExitCode::FAILURE;
-            }
-        };
-        let manifest: Manifest = match serde_json::from_str(&raw) {
-            Ok(m) => m,
-            Err(e) => {
-                eprintln!("FAILED parsing {path}: {e}");
-                return ExitCode::FAILURE;
-            }
-        };
-        if let Err(e) = apply(&client, &manifest).await {
+    let mut run = Run::new(&client, mode);
+    for (path, manifest) in &manifests {
+        match mode {
+            Mode::Plan => println!("planning {path}"),
+            Mode::Apply => println!("applying {path}"),
+        }
+        if let Err(e) = run.manifest(manifest).await {
             eprintln!("FAILED: {e}");
             return ExitCode::FAILURE;
         }
     }
-    println!("registration complete");
+
+    if run.totals.differs > 0 {
+        println!(
+            "~ marks items registered with values other than the manifest's. \
+             Registration never changes existing rows; change them in the admin \
+             UI if the manifest is right."
+        );
+    }
+    match mode {
+        Mode::Plan => println!(
+            "plan complete: {}; nothing was changed",
+            run.totals.summary(mode)
+        ),
+        Mode::Apply => println!("registration complete: {}", run.totals.summary(mode)),
+    }
     ExitCode::SUCCESS
 }
 
@@ -1144,5 +1852,173 @@ mod tests {
         // Neither field exists on SamlSpSpec any more, so nothing
         // carries them to the API.
         assert_eq!(m.saml_sps.len(), 1);
+    }
+
+    #[test]
+    fn diff_fields_reports_only_specified_comparable_fields() {
+        let want = json!({
+            "code": "app.read",
+            "description": "New text",
+            "label": null,
+            "password": "secret",
+        });
+        let have = json!({"code": "app.read", "description": "Old text", "role_count": 2});
+        assert_eq!(
+            diff_fields(&want, &have),
+            vec![FieldDiff {
+                field: "description".into(),
+                have: json!("Old text"),
+                want: json!("New text"),
+            }]
+        );
+    }
+
+    #[test]
+    fn edge_whitespace_in_strings_is_not_a_difference() {
+        let want = json!({"body": "\n<html>x</html>\n", "n": 1});
+        assert!(diff_fields(&want, &json!({"body": "<html>x</html>", "n": 1})).is_empty());
+        assert_eq!(
+            diff_fields(&want, &json!({"body": "<html>y</html>", "n": 1})).len(),
+            1
+        );
+    }
+
+    #[test]
+    fn a_null_live_value_differs_from_a_specified_one() {
+        let diffs = diff_fields(&json!({"description": "x"}), &json!({"description": null}));
+        assert_eq!(diffs.len(), 1);
+    }
+
+    #[test]
+    fn compare_distinguishes_unchanged_from_differs() {
+        assert_eq!(
+            compare(&json!({"a": 1}), &json!({"a": 1, "b": 2})),
+            Action::Unchanged
+        );
+        assert!(matches!(
+            compare(&json!({"a": 1}), &json!({"a": 2})),
+            Action::Differs(_)
+        ));
+    }
+
+    #[test]
+    fn strip_nulls_drops_only_nulls() {
+        assert_eq!(
+            strip_nulls(&json!({"a": null, "b": false, "c": ""})),
+            json!({"b": false, "c": ""})
+        );
+    }
+
+    #[test]
+    fn long_diff_values_are_cut() {
+        let shown = show_value(&json!("x".repeat(500)));
+        assert_eq!(shown.chars().count(), DIFF_VALUE_MAX_CHARS + 3);
+        assert!(shown.ends_with("..."));
+        assert_eq!(show_value(&json!(true)), "true");
+    }
+
+    fn sample_section() -> Section {
+        let mut s = Section::new("roles");
+        s.push("app-new", Action::Create { after: None });
+        s.push(
+            "app-child",
+            Action::Create {
+                after: Some("role app-new".into()),
+            },
+        );
+        s.push("app-same", Action::Unchanged);
+        s.push(
+            "app-old",
+            Action::Differs(vec![FieldDiff {
+                field: "label".into(),
+                have: json!("Old"),
+                want: json!("New"),
+            }]),
+        );
+        s
+    }
+
+    #[test]
+    fn a_plan_lists_creates_with_dependencies_and_diffs() {
+        assert_eq!(
+            sample_section().render(Mode::Plan),
+            vec![
+                "roles: 2 to create, 1 unchanged, 1 differ",
+                "  + app-new",
+                "  + app-child (after role app-new)",
+                "  ~ app-old",
+                "      label: \"Old\" -> \"New\"",
+            ]
+        );
+    }
+
+    #[test]
+    fn an_apply_reports_creates_as_done() {
+        let lines = sample_section().render(Mode::Apply);
+        assert_eq!(lines[0], "roles: 2 created, 1 unchanged, 1 differ");
+        assert_eq!(lines[2], "  + app-child");
+    }
+
+    #[test]
+    fn an_empty_section_prints_nothing() {
+        assert!(Section::new("users").render(Mode::Plan).is_empty());
+    }
+
+    #[test]
+    fn counts_add_up_across_sections() {
+        let mut total = Counts::default();
+        total.add(&sample_section().counts());
+        let mut s = Section::new("users");
+        s.push("x", Action::Skipped("no IdP".into()));
+        s.push("y", Action::ExistedUnseen);
+        total.add(&s.counts());
+        assert_eq!(
+            total.summary(Mode::Plan),
+            "2 to create, 1 already registered, 1 unchanged, 1 differ, 1 skipped"
+        );
+        assert_eq!(Counts::default().summary(Mode::Apply), "nothing");
+    }
+
+    #[test]
+    fn and_after_joins_dependencies() {
+        assert_eq!(and_after(None, "a".into()).as_deref(), Some("a"));
+        assert_eq!(
+            and_after(Some("a".into()), "b".into()).as_deref(),
+            Some("a, b")
+        );
+    }
+
+    /// The tree walk keeps what a unit is compared on: its parent and type
+    /// ids, which the plan turns back into codes and labels.
+    #[test]
+    fn walk_tree_records_parent_type_and_timezone() {
+        let tree = json!({
+            "id": 1, "uuid": "u1", "code": "ROOT", "label": "Root",
+            "parent": null, "unit_type": 1, "timezone": null,
+            "children": [{
+                "id": 2, "uuid": "u2", "code": "MAIN", "label": "Main",
+                "parent": 1, "unit_type": 3, "timezone": "America/Los_Angeles",
+                "children": []
+            }]
+        });
+        let mut units = HashMap::new();
+        walk_tree(&tree, &mut units);
+        assert_eq!(units.len(), 2);
+        let main = &units["MAIN"];
+        assert_eq!(
+            (main.id, main.parent, main.unit_type),
+            (2, Some(1), Some(3))
+        );
+        assert_eq!(main.label.as_deref(), Some("Main"));
+        assert_eq!(main.timezone.as_deref(), Some("America/Los_Angeles"));
+        assert_eq!(units["ROOT"].parent, None);
+    }
+
+    #[test]
+    fn index_by_skips_rows_without_the_key() {
+        let rows = vec![json!({"code": "a"}), json!({"label": "no code"})];
+        let idx = index_by(rows, "code");
+        assert_eq!(idx.len(), 1);
+        assert!(idx.contains_key("a"));
     }
 }

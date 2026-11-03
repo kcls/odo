@@ -17,8 +17,13 @@
 #
 # Usage: ./load-data-manifest.sh [--force] <manifest.json|url> [more...]
 #
-# Summarizes what each manifest would install and waits for confirmation
-# before touching anything. --force skips the prompt for unattended runs.
+# Summarizes what each manifest contains, then runs `odo-register --plan`
+# against the target: what would be created, what is already there, and
+# what is registered with values other than the manifest's. The plan gets
+# its own short activation of the account, which is switched off again
+# while you read it; only on confirmation is it switched back on to
+# apply. --force skips the prompt for unattended runs (the plan still
+# runs and is printed, as a record).
 #
 # Environment variables:
 #   ODO_URL=url               Gateway base URL (default: http://localhost:30080)
@@ -72,8 +77,8 @@ usage() {
     echo "account, which is activated for the duration of the run and disabled"
     echo "again afterwards."
     echo
-    echo "Prints what each manifest would install, against which target, and"
-    echo "waits for confirmation."
+    echo "Prints what each manifest contains and the target, plans the run"
+    echo "against it (read only), and waits for confirmation."
     echo
     echo "Options:"
     echo "  -f, --force               Skip the confirmation prompt"
@@ -285,19 +290,9 @@ if [ "$(PGPASSWORD="$PGPASSWORD" psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" \
     exit 1
 fi
 
-# Leave the account disabled with a password nobody holds, and drop any
-# fetched manifests, whatever happens from here -- success, a failed
-# manifest, or Ctrl-C.
-cleanup() {
-    local rc=$?
-    trap - EXIT INT TERM
-
-    [ -z "$FETCH_DIR" ] || rm -rf "$FETCH_DIR"
-
-    if [ "$ACCOUNT_ACTIVATED" -eq 0 ]; then
-        exit $rc
-    fi
-
+# Switch the account off with a password nobody holds. Returns non-zero
+# (after saying how to do it by hand) when that fails.
+deactivate_account() {
     if ! run_sql <<'SQL'
 BEGIN;
 UPDATE auth.usr
@@ -316,9 +311,24 @@ SQL
         echo -e "${RED}WARNING: failed to disable $REGISTRATION_USER.${NC}" >&2
         echo -e "${RED}Disable it by hand before leaving this install:${NC}" >&2
         echo "  UPDATE auth.usr SET status = 'inactive' WHERE username = '$REGISTRATION_USER';" >&2
-        exit 1
+        return 1
     fi
+    ACCOUNT_ACTIVATED=0
     echo -e "${GREEN}$REGISTRATION_USER disabled${NC}"
+}
+
+# Leave the account disabled with a password nobody holds, and drop any
+# fetched manifests, whatever happens from here -- success, a failed
+# manifest, or Ctrl-C.
+cleanup() {
+    local rc=$?
+    trap - EXIT INT TERM
+
+    [ -z "$FETCH_DIR" ] || rm -rf "$FETCH_DIR"
+
+    if [ "$ACCOUNT_ACTIVATED" -eq 1 ]; then
+        deactivate_account || exit 1
+    fi
     exit $rc
 }
 trap cleanup EXIT INT TERM
@@ -417,38 +427,26 @@ for i in "${!MANIFESTS[@]}"; do
     echo
 done
 
-if [ "$FORCE" -eq 1 ]; then
-    echo -e "${YELLOW}--force: applying without confirmation${NC}"
-elif [ ! -t 0 ]; then
-    echo -e "${RED}Not running on a terminal, so there is nobody to confirm.${NC}" >&2
-    echo "Re-run with --force if this is meant to be unattended." >&2
-    exit 1
-else
-    read -r -p "Apply to ${PGDATABASE} on ${PGHOST}? [y/N] " reply
-    case "$reply" in
-        y|Y|yes|YES) ;;
-        *) echo "Aborted; nothing was changed."; exit 1 ;;
-    esac
-fi
-
-echo -e "${YELLOW}Activating $REGISTRATION_USER${NC}"
-ACCOUNT_ACTIVATED=1
-# The password is generated inside the database and comes back in the
-# result set, so it appears in no statement text: a server running with
-# log_statement = 'all' records this SQL and no secret.
-# auth.update_user_password() hashes it in place, so the client never
-# handles a hash either.
-#
-# It used to travel the other way, as a PGOPTIONS custom GUC. That fails
-# through a connection pooler -- pgbouncer rejects any startup parameter
-# in `options` outside its known set ("unsupported startup parameter in
-# options: odo.reg_pw") -- and DATABASE_URL may well point at one.
-#
-# MATERIALIZED keeps the planner from evaluating gen_random_bytes() once
-# per reference, which would hash one string and hand us another. Hex so
-# the value needs no quoting as a shell word. No row comes back if the
-# account has no auth.local_account row, which the length check catches.
-REGISTRATION_PASSWORD="$(run_sql_query <<SQL
+# Switch the account on with a fresh password, exported for odo-register.
+activate_account() {
+    echo -e "${YELLOW}Activating $REGISTRATION_USER${NC}"
+    ACCOUNT_ACTIVATED=1
+    # The password is generated inside the database and comes back in the
+    # result set, so it appears in no statement text: a server running with
+    # log_statement = 'all' records this SQL and no secret.
+    # auth.update_user_password() hashes it in place, so the client never
+    # handles a hash either.
+    #
+    # It used to travel the other way, as a PGOPTIONS custom GUC. That fails
+    # through a connection pooler -- pgbouncer rejects any startup parameter
+    # in `options` outside its known set ("unsupported startup parameter in
+    # options: odo.reg_pw") -- and DATABASE_URL may well point at one.
+    #
+    # MATERIALIZED keeps the planner from evaluating gen_random_bytes() once
+    # per reference, which would hash one string and hand us another. Hex so
+    # the value needs no quoting as a shell word. No row comes back if the
+    # account has no auth.local_account row, which the length check catches.
+    REGISTRATION_PASSWORD="$(run_sql_query <<SQL
 BEGIN;
 UPDATE auth.usr
    SET status = 'active', updated_at = CURRENT_TIMESTAMP
@@ -463,18 +461,55 @@ SELECT pw.secret
            pw.secret);
 COMMIT;
 SQL
-)"
+    )"
 
-if [ "${#REGISTRATION_PASSWORD}" -ne 64 ]; then
-    echo -e "${RED}Could not set a password for $REGISTRATION_USER.${NC}" >&2
-    echo "The account has no auth.local_account row; re-deploy the schema." >&2
+    if [ "${#REGISTRATION_PASSWORD}" -ne 64 ]; then
+        echo -e "${RED}Could not set a password for $REGISTRATION_USER.${NC}" >&2
+        echo "The account has no auth.local_account row; re-deploy the schema." >&2
+        exit 1
+    fi
+    export REGISTRATION_PASSWORD
+}
+
+run_odo_register() {
+    REGISTRATION_USERNAME="$REGISTRATION_USER" \
+    ODO_URL="${ODO_URL:-http://localhost:30080}" \
+        "$ODO_REGISTER_BIN" "$@"
+}
+
+# --- plan -----------------------------------------------------------------------
+# Read only: what the run would create, what is already registered, and
+# what is registered with other values. Needs a login, so the account is
+# switched on for it -- and off again before the prompt, so it is not
+# left enabled while someone reads. The plan's access token outlives that
+# (see the exposure note at the top), but only odo-register held it, and
+# it has exited.
+# Nobody to confirm means nothing to plan for: refuse before the account
+# is switched on at all.
+if [ "$FORCE" -ne 1 ] && [ ! -t 0 ]; then
+    echo -e "${RED}Not running on a terminal, so there is nobody to confirm.${NC}" >&2
+    echo "Re-run with --force if this is meant to be unattended." >&2
     exit 1
 fi
-export REGISTRATION_PASSWORD
 
+activate_account
+echo -e "${YELLOW}Planning ${#MANIFESTS[@]} manifest(s) via ${ODO_REGISTER_BIN}${NC}"
+run_odo_register --plan "${MANIFESTS[@]}"
+deactivate_account || exit 1
+echo
+
+if [ "$FORCE" -eq 1 ]; then
+    echo -e "${YELLOW}--force: applying without confirmation${NC}"
+else
+    read -r -p "Apply to ${PGDATABASE} on ${PGHOST}? [y/N] " reply
+    case "$reply" in
+        y|Y|yes|YES) ;;
+        *) echo "Aborted; nothing was changed."; exit 1 ;;
+    esac
+fi
+
+activate_account
 echo -e "${YELLOW}Applying ${#MANIFESTS[@]} manifest(s) via ${ODO_REGISTER_BIN}${NC}"
-REGISTRATION_USERNAME="$REGISTRATION_USER" \
-ODO_URL="${ODO_URL:-http://localhost:30080}" \
-    "$ODO_REGISTER_BIN" "${MANIFESTS[@]}"
+run_odo_register "${MANIFESTS[@]}"
 
 echo -e "${GREEN}Registration complete${NC}"
