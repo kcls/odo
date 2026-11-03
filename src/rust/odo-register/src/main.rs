@@ -34,7 +34,11 @@
 //! list a parent before its children.
 //!
 //! Usage:
-//!   odo-register [--plan] <manifest.json> [more-manifests...]
+//!   odo-register [--plan [--detailed-exitcode]] <manifest.json> [more...]
+//!
+//! Exit status: 0 success, 1 failure, 2 usage. With --plan
+//! --detailed-exitcode, a plan that would create anything exits 3 instead
+//! of 0, so a caller can skip an apply that would change nothing.
 //!
 //! All calls go through the Envoy gateway (every endpoint this tool uses
 //! is gateway-routed), so one base URL suffices.
@@ -183,6 +187,10 @@ const PAGE_LIMIT: usize = 200;
 const UNIT_TYPE_LIST: &str = "/api/v1/odo/org/admin/unit-type/list";
 const IDP_LIST: &str = "/api/v1/odo/auth/saml/admin/idp/list";
 const ATTRIBUTE_LIST: &str = "/api/v1/odo/auth/saml/admin/attribute/list";
+
+/// `--plan --detailed-exitcode`: the plan would create something. Not 2,
+/// which usage errors already return.
+const EXIT_PLAN_HAS_CREATES: u8 = 3;
 
 /// Every user status (auth.usr's check constraint). User search filters on
 /// exactly one, so finding a username means asking for each.
@@ -1594,13 +1602,23 @@ async fn main() -> ExitCode {
     } else {
         Mode::Apply
     };
-    let paths: Vec<&String> = args.iter().filter(|a| *a != "--plan").collect();
+    let detailed_exitcode = args.iter().any(|a| a == "--detailed-exitcode");
+    if detailed_exitcode && mode != Mode::Plan {
+        eprintln!("--detailed-exitcode only applies to --plan");
+        return ExitCode::from(2);
+    }
+    let paths: Vec<&String> = args
+        .iter()
+        .filter(|a| *a != "--plan" && *a != "--detailed-exitcode")
+        .collect();
     if let Some(unknown) = paths.iter().find(|a| a.starts_with('-')) {
         eprintln!("unknown option: {unknown}");
         return ExitCode::from(2);
     }
     if paths.is_empty() {
-        eprintln!("usage: odo-register [--plan] <manifest.json> [more-manifests...]");
+        eprintln!(
+            "usage: odo-register [--plan [--detailed-exitcode]] <manifest.json> [more-manifests...]"
+        );
         eprintln!("       odo-register --version");
         return ExitCode::from(2);
     }
@@ -1671,6 +1689,9 @@ async fn main() -> ExitCode {
             run.totals.summary(mode)
         ),
         Mode::Apply => println!("registration complete: {}", run.totals.summary(mode)),
+    }
+    if detailed_exitcode && run.totals.create > 0 {
+        return ExitCode::from(EXIT_PLAN_HAS_CREATES);
     }
     ExitCode::SUCCESS
 }

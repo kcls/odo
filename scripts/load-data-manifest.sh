@@ -17,13 +17,14 @@
 #
 # Usage: ./load-data-manifest.sh [--force] <manifest.json|url> [more...]
 #
-# Summarizes what each manifest contains, then runs `odo-register --plan`
+# Prints the target and any manifest warnings, then runs `odo-register --plan`
 # against the target: what would be created, what is already there, and
 # what is registered with values other than the manifest's. The plan gets
 # its own short activation of the account, which is switched off again
 # while you read it; only on confirmation is it switched back on to
 # apply. --force skips the prompt for unattended runs (the plan still
-# runs and is printed, as a record).
+# runs and is printed, as a record). When the plan has nothing to create,
+# the script stops there: an apply would change nothing.
 #
 # Environment variables:
 #   ODO_URL=url               Gateway base URL (default: http://localhost:30080)
@@ -77,8 +78,8 @@ usage() {
     echo "account, which is activated for the duration of the run and disabled"
     echo "again afterwards."
     echo
-    echo "Prints what each manifest contains and the target, plans the run"
-    echo "against it (read only), and waits for confirmation."
+    echo "Prints the target, plans the run against it (read only), and waits"
+    echo "for confirmation. Stops after the plan when it has nothing to create."
     echo
     echo "Options:"
     echo "  -f, --force               Skip the confirmation prompt"
@@ -361,8 +362,10 @@ done
 # --- what is about to happen -------------------------------------------------
 # Everything below is upsert-only, but "upsert-only" is not "harmless": these
 # manifests create org structure, accounts and role grants on whichever
-# install this happens to be pointed at. Show the target and the contents
-# before the account is switched on.
+# install this happens to be pointed at. Show the target, and anything in the
+# manifests worth a warning, before the account is switched on. What each
+# manifest would install is left to the plan below, which says it against
+# the live install.
 
 # Top-level keys odo-register understands. Anything else in a manifest is
 # silently ignored by the deserializer, so a typo'd key is a section that
@@ -372,23 +375,11 @@ KNOWN_KEYS='["org_unit_types","org_units","permissions","roles","role_permission
 # above stays worth reading.
 META_KEYS='["app","description","comment","version","$schema"]'
 
-summarize() {
-    local tmp
-    tmp="$(mktemp)"
+# Print a manifest's warnings, if any. Fails when it is not valid JSON.
+warnings() {
     jq -r --argjson known "$KNOWN_KEYS" --argjson meta "$META_KEYS" '
-        def cnt($m; $k):
-            if $k == "saml_attr_role_maps"
-            then ($m[$k].maps // []) | length
-            else ($m[$k] // []) | length
-            end;
-
         . as $m
-        | [ $known[] | . as $k | select(cnt($m; $k) > 0) | "    \($k)|\(cnt($m; $k))" ] as $rows
-        | ( if ($rows | length) == 0
-            then ["    (nothing this tool installs)"]
-            else $rows end )[],
-
-          ( [ ($m.users // [])[] | select(.password) ] | length ) as $pw
+        | ( [ ($m.users // [])[] | select(.password) ] | length ) as $pw
         | ( if $pw > 0 then "    ! \($pw) user(s) carry a cleartext password" else empty end ),
 
           ( if ((($m.org_units // []) | length) + (($m.org_unit_types // []) | length)) > 0
@@ -397,35 +388,26 @@ summarize() {
           ( $m | keys_unsorted[]
             | select(. as $k | ($known + $meta) | index($k) | not)
             | "    ? unknown key \"\(.)\" - odo-register will ignore it" )
-    ' "$1" > "$tmp" || { rm -f "$tmp"; return 1; }
-
-    # Align the columns when `column` is available (util-linux /
-    # bsdextrautils); fall back to the raw rows when it is not. This is
-    # cosmetic, and a server without it must not look like a parse error.
-    if command -v column >/dev/null 2>&1; then
-        column -t -s'|' < "$tmp"
-    else
-        sed 's/|/  /' "$tmp"
-    fi
-    rm -f "$tmp"
+    ' "$1"
 }
 
 echo
-echo -e "${BLUE}=== About to apply ===${NC}"
+echo -e "${BLUE}=== Target ===${NC}"
 echo -e "  Gateway:  ${YELLOW}${ODO_URL:-http://localhost:30080}${NC}"
 echo -e "  Database: ${YELLOW}${PGDATABASE}${NC} on ${YELLOW}${PGHOST}:${PGPORT}${NC}"
-echo -e "  Account:  ${REGISTRATION_USER} (enabled for this run, disabled afterwards)"
+echo -e "  Account:  ${REGISTRATION_USER} (enabled for each step, disabled in between)"
 echo
-# Show what the operator typed, not the temp file a URL landed in.
+# Show what the operator typed, not the temp file a URL landed in; the plan
+# below names manifests by the path odo-register was given.
 ORIGINALS=("$@")
 for i in "${!MANIFESTS[@]}"; do
     echo -e "  ${BLUE}$(( i + 1 )). ${ORIGINALS[$i]}${NC}"
-    if ! summarize "${MANIFESTS[$i]}"; then
+    if ! warnings "${MANIFESTS[$i]}"; then
         echo -e "${RED}Could not parse ${MANIFESTS[$i]} as JSON.${NC}" >&2
         exit 1
     fi
-    echo
 done
+echo
 
 # Switch the account on with a fresh password, exported for odo-register.
 activate_account() {
@@ -494,9 +476,23 @@ fi
 
 activate_account
 echo -e "${YELLOW}Planning ${#MANIFESTS[@]} manifest(s) via ${ODO_REGISTER_BIN}${NC}"
-run_odo_register --plan "${MANIFESTS[@]}"
+# --detailed-exitcode: 0 means nothing to create, 3 means something to
+# create; anything else is a failure. `|| plan_rc=$?` keeps set -e from
+# treating 3 as one.
+plan_rc=0
+run_odo_register --plan --detailed-exitcode "${MANIFESTS[@]}" || plan_rc=$?
 deactivate_account || exit 1
 echo
+case "$plan_rc" in
+    0)
+        # Items that differ are not changed by an apply either, so with
+        # nothing to create there is nothing for one to do.
+        echo -e "${GREEN}Nothing to create; not applying.${NC}"
+        exit 0
+        ;;
+    3) ;;
+    *) exit "$plan_rc" ;;
+esac
 
 if [ "$FORCE" -eq 1 ]; then
     echo -e "${YELLOW}--force: applying without confirmation${NC}"
