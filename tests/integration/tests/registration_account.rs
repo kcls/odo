@@ -143,9 +143,56 @@ async fn registration_account_lacks_admin_reach() {
         .await
         .unwrap();
     assert_eq!(resp.status(), 403, "user detail denied");
+}
 
-    // No odo.auth.user_role.read: it can grant a role but not enumerate who
-    // holds one.
+/// `odo-register --plan` reads what is registered before reporting what a
+/// run would do, so the account can read everything it writes
+/// (013_registration_read_perms).
+#[tokio::test]
+async fn registration_account_can_read_what_it_registers() {
+    let c = client();
+    let token = registration_token(&c).await;
+
+    for (base, path, body) in [
+        (
+            auth_base(),
+            "/api/v1/odo/auth/authz/permission/list",
+            json!({"limit": 1}),
+        ),
+        (
+            auth_base(),
+            "/api/v1/odo/auth/authz/role/list",
+            json!({"limit": 1}),
+        ),
+        (
+            auth_base(),
+            "/api/v1/odo/auth/authz/role/get",
+            json!({"code": "odo-registration"}),
+        ),
+        (
+            auth_base(),
+            "/api/v1/odo/auth/user/search",
+            json!({"keywords": REGISTRATION_USERNAME, "status": "active"}),
+        ),
+        (
+            notify_base(),
+            "/api/v1/odo/notify/template/list",
+            json!({"limit": 1}),
+        ),
+        (asset_base(), "/api/v1/odo/asset/directory/list", json!({})),
+    ] {
+        let resp = c
+            .post(format!("{base}{path}"))
+            .headers(auth_header(&token))
+            .json(&body)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), 200, "{path}");
+    }
+
+    // The permission check comes before the request is validated, so an
+    // empty request reaching validation (400) shows the read is allowed.
     let resp = c
         .post(format!(
             "{}/api/v1/odo/auth/authz/user-role/list",
@@ -156,7 +203,7 @@ async fn registration_account_lacks_admin_reach() {
         .send()
         .await
         .unwrap();
-    assert_eq!(resp.status(), 403, "user-role list denied");
+    assert_eq!(resp.status(), 400, "user-role list allowed");
 }
 
 /// Org structure used to be off limits to this account ("org structure is
