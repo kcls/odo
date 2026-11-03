@@ -116,14 +116,17 @@ templates, or fixtures.
   routing: each directory row may map an entity_type + optional category
   to its path — SAML maps, fixture users/assignments) via a JSON
   manifest applied by `odo-register` with the `odo-registration` machine
-  account. Upsert-only; 409 = already
-  registered; never deletes. New registration surface belongs behind
-  perms held by that account (see the seed). Manifests live in the app's
-  own repo; run `./scripts/load-data-manifest.sh <manifest.json>` from here —
-  it summarizes what each manifest installs and against which target, waits
-  for confirmation (`--force` skips it; a non-TTY without `--force` refuses
-  rather than hangs), then activates the account, applies the manifests and
-  disables it again, so hosted apps never hold registration credentials.
+  account. Upsert-only: it reads what exists first, creates what is
+  missing, reports rows whose values differ from the manifest, and never
+  updates or deletes. New registration surface belongs behind perms held
+  by that account (see the seed) — a read perm as well as the write, since
+  `odo-register --plan` reads everything it registers. Manifests live in
+  the app's own repo; run `./scripts/load-data-manifest.sh <manifest.json>`
+  from here — it summarizes each manifest and the target, runs `--plan`
+  under its own short activation of the account, waits for confirmation
+  (`--force` skips it; a non-TTY without `--force` refuses before
+  activating anything), then activates the account again, applies and
+  disables it, so hosted apps never hold registration credentials.
 - **Org structure via manifest**: `org_unit_types` (by `label`) and
   `org_units` (by `code`, with `parent` code and `unit_type` label) are
   manifest keys too, applied before everything else so later
