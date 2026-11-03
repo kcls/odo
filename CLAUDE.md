@@ -123,7 +123,8 @@ templates, or fixtures.
   `odo-register --plan` reads everything it registers. Manifests live in
   the app's own repo; run `./scripts/load-data-manifest.sh <manifest.json>`
   from here — it summarizes each manifest and the target, runs `--plan`
-  under its own short activation of the account, waits for confirmation
+  under its own short activation of the account, stops there when the
+  plan has nothing to create, otherwise waits for confirmation
   (`--force` skips it; a non-TTY without `--force` refuses before
   activating anything), then activates the account again, applies and
   disables it, so hosted apps never hold registration credentials.
