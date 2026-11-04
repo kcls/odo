@@ -56,3 +56,15 @@ services:
     build:
       dockerfile: src/ui/odo-admin/Dockerfile
       context: .
+
+# Images published by release-build.yml alongside the services, but which
+# are not services: nothing here is built or deployed by build-service.sh
+# or deploy-service.sh, which read only `services`.
+images:
+
+  # Schema migrations: the core sqitch project at this release, for a
+  # deployment repository to run before rolling out the services.
+  odo-migrate:
+    build:
+      dockerfile: src/sqitch/Dockerfile
+      context: .

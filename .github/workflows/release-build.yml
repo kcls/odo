@@ -111,16 +111,16 @@ jobs:
 
             # Fail loudly on a typo rather than silently building nothing.
             for service in $(echo "$SERVICES" | jq -r '.[]'); do
-              if [[ "$(yq eval ".services | has(\"$service\")" service-map.yaml)" != "true" ]]; then
+              if [[ "$(yq eval "(.services + (.images // {})) | has(\"$service\")" service-map.yaml)" != "true" ]]; then
                 echo "::error::Unknown service '$service' (not in service-map.yaml)"
                 exit 1
               fi
             done
           else
-            SERVICES=$(yq eval '.services | keys' service-map.yaml -o json | jq -c .)
+            SERVICES=$(yq eval '(.services + (.images // {})) | keys' service-map.yaml -o json | jq -c .)
           fi
 
-          MATRIX=$(yq eval -o json '.services' service-map.yaml \
+          MATRIX=$(yq eval -o json '.services + (.images // {})' service-map.yaml \
             | jq -c --argjson want "$SERVICES" '
                 to_entries
                 | map(select(.key as $k | $want | index($k)))
