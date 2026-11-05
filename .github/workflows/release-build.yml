@@ -3,14 +3,21 @@ name: Release Build
 # Publishes container images for every service in service-map.yaml.
 #
 #   push to release/X.Y   -> :<short-sha>
+#   push to build/<name>  -> :<short-sha>
 #   push of tag vX.Y.Z    -> :<short-sha>, :vX.Y.Z, :vX.Y
 #   push of tag vX.Y.Z-rc1 -> :<short-sha>, :vX.Y.Z-rc1  (no line tag)
 #   workflow_dispatch     -> :<short-sha>, optionally a subset of services
 #
+# build/** is for working branches that need deployable images without a
+# release: name the branch build/<anything> and every push publishes the
+# full set at that commit. Only ever the sha tag -- never a moving branch
+# tag, which would change what a pod runs on its next restart without a
+# manifest change saying so.
+#
 # A published vX.Y.Z tag is never re-pointed; a bad release is superseded by
 # the next patch. See docs/tech-docs/release-management.md.
 #
-# Alongside the images, every run builds odo-register as a static binary for
+# Alongside the images, every run but a build/** push builds odo-register as a static binary for
 # x86_64 and aarch64. A tag push attaches those to the GitHub Release, so a
 # host that only runs k3s can fetch the tool (scripts/fetch-odo-register.sh)
 # instead of carrying a Rust toolchain to build it.
@@ -22,6 +29,7 @@ on:
   push:
     branches:
       - 'release/**'
+      - 'build/**'
     tags:
       - 'v*'
   workflow_dispatch:
@@ -217,6 +225,9 @@ jobs:
   odo-register:
     name: Build odo-register (${{ matrix.target }})
     needs: plan
+    # A working-branch build is for its images; nothing fetches these
+    # binaries from it.
+    if: ${{ !startsWith(github.ref, 'refs/heads/build/') }}
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
