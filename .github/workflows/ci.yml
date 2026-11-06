@@ -26,7 +26,10 @@ jobs:
           components: clippy
 
       # odo-auth's saml feature builds samael, which links xmlsec1/libxml2 and
-      # needs clang for bindgen. Same package set as the odo-auth Dockerfile.
+      # needs clang for bindgen. The odo-auth Dockerfile's set, less the
+      # xmlsec OpenSSL runtime: libxmlsec1-dev depends on it, and its name
+      # differs by release (libxmlsec1-openssl1 from Ubuntu 26.04), so
+      # naming it here breaks whenever ubuntu-latest moves.
       - name: Install SAML build dependencies
         run: |
           sudo apt-get update
@@ -35,7 +38,6 @@ jobs:
             libssl-dev \
             libxml2-dev \
             libxmlsec1-dev \
-            libxmlsec1-openssl \
             libclang-dev \
             clang
 
