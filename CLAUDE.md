@@ -96,6 +96,8 @@ templates, or fixtures.
   clippy `-D warnings` + `cargo test` for all eight crates (odo-auth also
   with `--features saml`), then core typecheck/lint/build and the admin UI's
   tests and build. `openapi-drift.yml` is the spec gate and is enabled.
+  The Rust jobs run in the Dockerfiles' build image (`rust:<ver>-bookworm`):
+  a Rust bump changes the four Rust Dockerfiles and both workflows.
 - Releases: `.github/workflows/release-build.yml` publishes images to
   `ghcr.io/<owner>/<repo>/<service>` from `build/**` pushes (`:<short-sha>`)
   and `vX.Y.Z` tags (`:<short-sha>`, `:vX.Y.Z`, `:vX.Y`; a suffixed

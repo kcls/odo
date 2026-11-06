@@ -17,15 +17,14 @@ jobs:
   openapi-drift:
     name: Check committed OpenAPI specs are current
     runs-on: ubuntu-latest
+    # The service Dockerfiles' build image; bump it with them.
+    container: rust:1.99-bookworm
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
           submodules: recursive
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
 
       # generate-openapi.sh also regenerates the admin UI's TypeScript types
       # via `npx openapi-typescript`, so the job needs a pinned Node.
