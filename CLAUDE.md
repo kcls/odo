@@ -97,9 +97,9 @@ templates, or fixtures.
   with `--features saml`), then core typecheck/lint/build and the admin UI's
   tests and build. `openapi-drift.yml` is the spec gate and is enabled.
 - Releases: `.github/workflows/release-build.yml` publishes images to
-  `ghcr.io/<owner>/<repo>/<service>` from `release/**` and `build/**` pushes
-  (`:<short-sha>`) and `vX.Y.Z` tags (`:<short-sha>`, `:vX.Y.Z`, `:vX.Y`; a
-  suffixed prerelease tag like `vX.Y.Z-rc1` publishes no `:vX.Y`). This repo
+  `ghcr.io/<owner>/<repo>/<service>` from `build/**` pushes (`:<short-sha>`)
+  and `vX.Y.Z` tags (`:<short-sha>`, `:vX.Y.Z`, `:vX.Y`; a suffixed
+  prerelease tag like `vX.Y.Z-rc1` publishes no `:vX.Y`). This repo
   publishes only — it holds no credential for, and never writes to, any
   deployment repository, and ships no release artifacts: deployment repos
   consume `k8s/` as a kustomize remote base pinned to the tag. See

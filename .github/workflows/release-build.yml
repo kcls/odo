@@ -2,7 +2,6 @@ name: Release Build
 
 # Publishes container images for every service in service-map.yaml.
 #
-#   push to release/X.Y   -> :<short-sha>
 #   push to build/<name>  -> :<short-sha>
 #   push of tag vX.Y.Z    -> :<short-sha>, :vX.Y.Z, :vX.Y
 #   push of tag vX.Y.Z-rc1 -> :<short-sha>, :vX.Y.Z-rc1  (no line tag)
@@ -13,6 +12,9 @@ name: Release Build
 # full set at that commit. Only ever the sha tag -- never a moving branch
 # tag, which would change what a pod runs on its next restart without a
 # manifest change saying so.
+#
+# release/** branches publish nothing: a release is its vX.Y.Z tag, and
+# CI already builds and tests every push to them.
 #
 # A published vX.Y.Z tag is never re-pointed; a bad release is superseded by
 # the next patch. See docs/tech-docs/release-management.md.
@@ -28,7 +30,6 @@ name: Release Build
 on:
   push:
     branches:
-      - 'release/**'
       - 'build/**'
     tags:
       - 'v*'
