@@ -52,6 +52,14 @@ else
 fi
 
 if [ "$CHECK_MODE" = "1" ]; then
+    # Outside a usable repository (e.g. git refusing a checkout owned by
+    # another user) `git diff -- a b` silently becomes `git diff --no-index`,
+    # which would report drift that isn't there.
+    if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        echo "ERROR: $REPO_ROOT is not a git work tree git will use" \
+             "(check safe.directory); cannot check for drift." >&2
+        exit 1
+    fi
     if ! git diff --quiet -- "$OPENAPI_DIR" "$TS_OUT_DIR" 2>/dev/null; then
         echo >&2
         echo "ERROR: committed OpenAPI specs / generated types are out of date." >&2
