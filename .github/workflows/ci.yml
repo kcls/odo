@@ -16,28 +16,29 @@ jobs:
   rust:
     name: Rust lint and unit tests
     runs-on: ubuntu-latest
+    # The service Dockerfiles' build image, so CI compiles with the same Rust
+    # and system libraries as the images do; bump it with them. The runner's
+    # own libraries (and its several preinstalled LLVMs, which bindgen can
+    # pick up instead of the one installed here) are not what ships.
+    container: rust:1.99-bookworm
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
+      - name: Install clippy
+        run: rustup component add clippy
 
       # odo-auth's saml feature builds samael, which links xmlsec1/libxml2 and
-      # needs clang for bindgen. The odo-auth Dockerfile's set, less the
-      # xmlsec OpenSSL runtime: libxmlsec1-dev depends on it, and its name
-      # differs by release (libxmlsec1-openssl1 from Ubuntu 26.04), so
-      # naming it here breaks whenever ubuntu-latest moves.
+      # needs clang for bindgen: the odo-auth Dockerfile's set.
       - name: Install SAML build dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
+          apt-get update
+          apt-get install -y --no-install-recommends \
             pkg-config \
             libssl-dev \
             libxml2-dev \
             libxmlsec1-dev \
+            libxmlsec1-openssl \
             libclang-dev \
             clang
 
