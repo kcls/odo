@@ -21,6 +21,10 @@ jobs:
     # own libraries (and its several preinstalled LLVMs, which bindgen can
     # pick up instead of the one installed here) are not what ships.
     container: rust:1.99-bookworm
+    # A container job's default shell is sh (dash here), not the runner's bash.
+    defaults:
+      run:
+        shell: bash
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
