@@ -167,8 +167,9 @@ templates, or fixtures.
   "Cannot find module '@odo/core'" until `npm run build` has run in core.
 - `--features saml` builds samael, which links xmlsec1/libxml2 and needs
   clang for bindgen: `pkg-config libssl-dev libxml2-dev libxmlsec1-dev
-  libxmlsec1-openssl libclang-dev clang` (the list the odo-auth Dockerfile
-  installs). Without them the build fails in samael's build script.
+  libclang-dev clang`. libxmlsec1-dev pulls in the xmlsec OpenSSL runtime,
+  whose package name varies by release (libxmlsec1-openssl1 from Ubuntu
+  26.04). Without them the build fails in samael's build script.
 - Docker/BuildKit can serve stale cargo caches (phantom old code in
   deployed binaries): `docker builder prune --force --filter
   type=exec.cachemount`, then rebuild.
