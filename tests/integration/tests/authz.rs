@@ -6,7 +6,10 @@ async fn user_has_perm() {
     let c = client();
     let token = staff_token(&c).await;
     let resp = c
-        .post(format!("{}/api/v1/odo/auth/authz/user-has-perm", auth_base()))
+        .post(format!(
+            "{}/api/v1/odo/auth/authz/user-has-perm",
+            auth_base()
+        ))
         .headers(auth_header(&token))
         .json(&json!({"perm": "odo.auth.session"}))
         .send()
@@ -22,7 +25,10 @@ async fn user_has_perm_negative() {
     let c = client();
     let token = staff_token(&c).await;
     let resp = c
-        .post(format!("{}/api/v1/odo/auth/authz/user-has-perm", auth_base()))
+        .post(format!(
+            "{}/api/v1/odo/auth/authz/user-has-perm",
+            auth_base()
+        ))
         .headers(auth_header(&token))
         .json(&json!({"perm": "fake.nonexistent.perm"}))
         .send()
@@ -38,7 +44,10 @@ async fn user_has_role() {
     let c = client();
     let token = staff_token(&c).await;
     let resp = c
-        .post(format!("{}/api/v1/odo/auth/authz/user-has-role", auth_base()))
+        .post(format!(
+            "{}/api/v1/odo/auth/authz/user-has-role",
+            auth_base()
+        ))
         .headers(auth_header(&token))
         .json(&json!({"role": "e2e-test-role"}))
         .send()
@@ -72,7 +81,10 @@ async fn user_roles() {
 async fn authz_requires_token() {
     let c = client();
     let resp = c
-        .post(format!("{}/api/v1/odo/auth/authz/user-has-perm", auth_base()))
+        .post(format!(
+            "{}/api/v1/odo/auth/authz/user-has-perm",
+            auth_base()
+        ))
         .json(&json!({"perm": "odo.auth.session"}))
         .send()
         .await
@@ -93,7 +105,10 @@ async fn users_with_role_filters_to_holders() {
     let sso_id = user_id_by_uuid(&c, &admin, SSO.uuid).await;
     let admin_id = token_user_id(&admin);
     let resp = c
-        .post(format!("{}/api/v1/odo/auth/authz/users-with-role", auth_base()))
+        .post(format!(
+            "{}/api/v1/odo/auth/authz/users-with-role",
+            auth_base()
+        ))
         .headers(auth_header(&token))
         .json(&json!({
             "role": "odo-admin",
@@ -131,7 +146,10 @@ async fn users_with_role_with_org_unit() {
     let admin_id = token_user_id(&admin);
     let branch = branch_org_id(&c, &token).await;
     let resp = c
-        .post(format!("{}/api/v1/odo/auth/authz/users-with-role", auth_base()))
+        .post(format!(
+            "{}/api/v1/odo/auth/authz/users-with-role",
+            auth_base()
+        ))
         .headers(auth_header(&token))
         .json(&json!({
             "role": "e2e-test-role",
@@ -164,7 +182,10 @@ async fn users_with_role_empty_input() {
     let token = staff_token(&c).await;
 
     let resp = c
-        .post(format!("{}/api/v1/odo/auth/authz/users-with-role", auth_base()))
+        .post(format!(
+            "{}/api/v1/odo/auth/authz/users-with-role",
+            auth_base()
+        ))
         .headers(auth_header(&token))
         .json(&json!({
             "role": "e2e-test-role",
@@ -183,7 +204,10 @@ async fn users_with_role_empty_input() {
 async fn users_with_role_requires_auth() {
     let c = client();
     let resp = c
-        .post(format!("{}/api/v1/odo/auth/authz/users-with-role", auth_base()))
+        .post(format!(
+            "{}/api/v1/odo/auth/authz/users-with-role",
+            auth_base()
+        ))
         .json(&json!({
             "role": "e2e-test-role",
             "user_ids": [1],

@@ -252,7 +252,13 @@ async fn mapping_crud_lifecycle() {
     assert_eq!(err["code"], "ATTRIBUTE_IN_USE");
 
     // Cleanup: mapping, then attribute, role, IdP
-    let resp = post_json(&c, &token, "/attr-role-map/delete", json!({"id": mapping_id})).await;
+    let resp = post_json(
+        &c,
+        &token,
+        "/attr-role-map/delete",
+        json!({"id": mapping_id}),
+    )
+    .await;
     assert_eq!(resp.status(), 200);
     let resp = post_json(&c, &token, "/attribute/delete", json!({"id": attr_id})).await;
     assert_eq!(resp.status(), 200);

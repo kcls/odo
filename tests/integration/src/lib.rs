@@ -284,7 +284,10 @@ pub async fn ensure_upload_fixtures() {
                 ("e2e-assets/portraits", "e2e-portrait", None),
             ] {
                 let resp = c
-                    .post(format!("{}/api/v1/odo/asset/directory/create", asset_base()))
+                    .post(format!(
+                        "{}/api/v1/odo/asset/directory/create",
+                        asset_base()
+                    ))
                     .headers(auth_header(&admin))
                     .json(&serde_json::json!({
                         "path": path,

@@ -4,7 +4,11 @@ use serde_json::json;
 #[tokio::test]
 async fn health() {
     let c = client();
-    let resp = c.get(format!("{}/health", auth_base())).send().await.unwrap();
+    let resp = c
+        .get(format!("{}/health", auth_base()))
+        .send()
+        .await
+        .unwrap();
     assert_eq!(resp.status(), 200);
 }
 

@@ -165,7 +165,10 @@ async fn update_local_user_names_and_deletion() {
         .unwrap();
     assert_eq!(resp.status(), 200);
     let deleted: serde_json::Value = resp.json().await.unwrap();
-    assert!(deleted["deleted_at"].is_string(), "soft delete stamps deleted_at");
+    assert!(
+        deleted["deleted_at"].is_string(),
+        "soft delete stamps deleted_at"
+    );
 
     let resp = c
         .post(update_url())
@@ -182,9 +185,15 @@ async fn update_local_user_names_and_deletion() {
         .unwrap();
     assert_eq!(resp.status(), 200);
     let restored: serde_json::Value = resp.json().await.unwrap();
-    assert!(restored["deleted_at"].is_null(), "restore clears deleted_at");
+    assert!(
+        restored["deleted_at"].is_null(),
+        "restore clears deleted_at"
+    );
     assert_eq!(restored["first_given_name"], "E2E");
-    assert!(restored["second_given_name"].is_null(), "blank clears the middle name");
+    assert!(
+        restored["second_given_name"].is_null(),
+        "blank clears the middle name"
+    );
 }
 
 #[tokio::test]
@@ -310,7 +319,10 @@ async fn create_user_lifecycle() {
         resp.status()
     );
     let resp = c
-        .post(format!("{}/api/v1/odo/auth/authz/role-permission/create", auth_base()))
+        .post(format!(
+            "{}/api/v1/odo/auth/authz/role-permission/create",
+            auth_base()
+        ))
         .headers(auth_header(&admin))
         .json(&json!({"role": "e2e-test-role", "perm": "odo.auth.session", "min_depth": 0}))
         .send()
@@ -324,7 +336,10 @@ async fn create_user_lifecycle() {
 
     let root = root_org_id(&c, &admin).await;
     let resp = c
-        .post(format!("{}/api/v1/odo/auth/authz/user-role/create", auth_base()))
+        .post(format!(
+            "{}/api/v1/odo/auth/authz/user-role/create",
+            auth_base()
+        ))
         .headers(auth_header(&admin))
         .json(&json!({"usr": user_id, "role": "e2e-test-role", "org_unit": root}))
         .send()
@@ -393,7 +408,12 @@ async fn short_password_is_refused_without_creating_the_account() {
     // The refusal left nothing behind: the same identity is still free.
     // (It used to be inserted first, so this got USERNAME_TAKEN.)
     let resp = create("long-enough-1").await.unwrap();
-    assert_eq!(resp.status(), 200, "create after refusal: {:?}", resp.text().await);
+    assert_eq!(
+        resp.status(),
+        200,
+        "create after refusal: {:?}",
+        resp.text().await
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -406,7 +426,12 @@ fn set_password_url() -> String {
 
 /// A fresh local account that may log in (the login-only e2e-test-role at
 /// the root), with `password`. Returns (id, username).
-async fn create_login_user(c: &reqwest::Client, admin: &str, tag: &str, password: &str) -> (i64, String) {
+async fn create_login_user(
+    c: &reqwest::Client,
+    admin: &str,
+    tag: &str,
+    password: &str,
+) -> (i64, String) {
     let nanos = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
@@ -424,11 +449,19 @@ async fn create_login_user(c: &reqwest::Client, admin: &str, tag: &str, password
         .await
         .unwrap();
     assert_eq!(resp.status(), 200);
-    let id = resp.json::<serde_json::Value>().await.unwrap()["id"].as_i64().unwrap();
+    let id = resp.json::<serde_json::Value>().await.unwrap()["id"]
+        .as_i64()
+        .unwrap();
 
     for (path, body) in [
-        ("role/create", json!({"code": "e2e-test-role", "label": "E2E login-only role"})),
-        ("role-permission/create", json!({"role": "e2e-test-role", "perm": "odo.auth.session", "min_depth": 0})),
+        (
+            "role/create",
+            json!({"code": "e2e-test-role", "label": "E2E login-only role"}),
+        ),
+        (
+            "role-permission/create",
+            json!({"role": "e2e-test-role", "perm": "odo.auth.session", "min_depth": 0}),
+        ),
     ] {
         let resp = c
             .post(format!("{}/api/v1/odo/auth/authz/{path}", auth_base()))
@@ -437,11 +470,18 @@ async fn create_login_user(c: &reqwest::Client, admin: &str, tag: &str, password
             .send()
             .await
             .unwrap();
-        assert!(resp.status() == 200 || resp.status() == 409, "{path}: {}", resp.status());
+        assert!(
+            resp.status() == 200 || resp.status() == 409,
+            "{path}: {}",
+            resp.status()
+        );
     }
     let root = root_org_id(c, admin).await;
     let resp = c
-        .post(format!("{}/api/v1/odo/auth/authz/user-role/create", auth_base()))
+        .post(format!(
+            "{}/api/v1/odo/auth/authz/user-role/create",
+            auth_base()
+        ))
         .headers(auth_header(admin))
         .json(&json!({"usr": id, "role": "e2e-test-role", "org_unit": root}))
         .send()
@@ -460,7 +500,11 @@ async fn login_status(c: &reqwest::Client, username: &str, password: &str) -> re
         .status()
 }
 
-async fn set_password(c: &reqwest::Client, token: &str, body: serde_json::Value) -> reqwest::Response {
+async fn set_password(
+    c: &reqwest::Client,
+    token: &str,
+    body: serde_json::Value,
+) -> reqwest::Response {
     c.post(set_password_url())
         .headers(auth_header(token))
         .json(&body)
@@ -483,7 +527,12 @@ async fn set_password_refuses_short_and_unknown() {
     let admin = odo_admin_token(&c).await;
     let resp = set_password(&c, &admin, json!({"id": 1, "password": "short"})).await;
     assert_eq!(resp.status(), 400);
-    let resp = set_password(&c, &admin, json!({"id": i32::MAX, "password": "long-enough-1"})).await;
+    let resp = set_password(
+        &c,
+        &admin,
+        json!({"id": i32::MAX, "password": "long-enough-1"}),
+    )
+    .await;
     assert_eq!(resp.status(), 404);
 }
 
@@ -495,14 +544,30 @@ async fn set_password_replaces_it_and_ends_sessions() {
     // Logging in opens a session the reset must end.
     assert_eq!(login_status(&c, &username, "first-password-1").await, 200);
 
-    let resp = set_password(&c, &admin, json!({"id": id, "password": "second-password-2"})).await;
+    let resp = set_password(
+        &c,
+        &admin,
+        json!({"id": id, "password": "second-password-2"}),
+    )
+    .await;
     assert_eq!(resp.status(), 200);
     let result: serde_json::Value = resp.json().await.unwrap();
     assert_eq!(result["success"], true);
-    assert!(result["sessions_revoked"].as_u64().unwrap() >= 1, "{result}");
+    assert!(
+        result["sessions_revoked"].as_u64().unwrap() >= 1,
+        "{result}"
+    );
 
-    assert_eq!(login_status(&c, &username, "first-password-1").await, 401, "old password");
-    assert_eq!(login_status(&c, &username, "second-password-2").await, 200, "new password");
+    assert_eq!(
+        login_status(&c, &username, "first-password-1").await,
+        401,
+        "old password"
+    );
+    assert_eq!(
+        login_status(&c, &username, "second-password-2").await,
+        200,
+        "new password"
+    );
 
     // A deleted account must be restored first.
     let resp = c
@@ -513,7 +578,12 @@ async fn set_password_replaces_it_and_ends_sessions() {
         .await
         .unwrap();
     assert_eq!(resp.status(), 200);
-    let resp = set_password(&c, &admin, json!({"id": id, "password": "third-password-3"})).await;
+    let resp = set_password(
+        &c,
+        &admin,
+        json!({"id": id, "password": "third-password-3"}),
+    )
+    .await;
     assert_eq!(resp.status(), 409);
     let err: serde_json::Value = resp.json().await.unwrap();
     assert_eq!(err["code"], "ACCOUNT_DELETED");
@@ -552,7 +622,10 @@ async fn set_password_gives_a_passwordless_account_one() {
         .json::<serde_json::Value>()
         .await
         .unwrap();
-    assert!(detail["local_account"].is_object(), "now has a local account: {detail}");
+    assert!(
+        detail["local_account"].is_object(),
+        "now has a local account: {detail}"
+    );
 }
 
 #[tokio::test]
@@ -588,7 +661,11 @@ async fn set_password_refused_for_saml_accounts() {
 // user/update status: deactivating and reactivating accounts
 // ---------------------------------------------------------------------------
 
-async fn update_user(c: &reqwest::Client, token: &str, body: serde_json::Value) -> reqwest::Response {
+async fn update_user(
+    c: &reqwest::Client,
+    token: &str,
+    body: serde_json::Value,
+) -> reqwest::Response {
     c.post(update_url())
         .headers(auth_header(token))
         .json(&body)
@@ -611,14 +688,21 @@ async fn deactivating_blocks_sign_in_until_reactivated() {
         .cookie_provider(jar)
         .build()
         .unwrap();
-    assert_eq!(login_status(&session, &username, "status-password-1").await, 200);
+    assert_eq!(
+        login_status(&session, &username, "status-password-1").await,
+        200
+    );
 
     let resp = update_user(&c, &admin, json!({"id": id, "status": "inactive"})).await;
     assert_eq!(resp.status(), 200);
     let updated: serde_json::Value = resp.json().await.unwrap();
     assert_eq!(updated["status"], "inactive");
 
-    assert_eq!(login_status(&c, &username, "status-password-1").await, 401, "login while inactive");
+    assert_eq!(
+        login_status(&c, &username, "status-password-1").await,
+        401,
+        "login while inactive"
+    );
     let refresh = session
         .post(format!("{}/api/v1/odo/auth/token/refresh", auth_base()))
         .json(&json!({}))
@@ -629,8 +713,15 @@ async fn deactivating_blocks_sign_in_until_reactivated() {
 
     let resp = update_user(&c, &admin, json!({"id": id, "status": "active"})).await;
     assert_eq!(resp.status(), 200);
-    assert_eq!(resp.json::<serde_json::Value>().await.unwrap()["status"], "active");
-    assert_eq!(login_status(&c, &username, "status-password-1").await, 200, "login after reactivating");
+    assert_eq!(
+        resp.json::<serde_json::Value>().await.unwrap()["status"],
+        "active"
+    );
+    assert_eq!(
+        login_status(&c, &username, "status-password-1").await,
+        200,
+        "login after reactivating"
+    );
 }
 
 #[tokio::test]
@@ -645,7 +736,10 @@ async fn deleting_ends_sessions() {
         .cookie_provider(jar)
         .build()
         .unwrap();
-    assert_eq!(login_status(&session, &username, "delete-password-1").await, 200);
+    assert_eq!(
+        login_status(&session, &username, "delete-password-1").await,
+        200
+    );
 
     let resp = update_user(&c, &admin, json!({"id": id, "deleted": true})).await;
     assert_eq!(resp.status(), 200);
@@ -684,10 +778,18 @@ async fn saml_account_status_can_change_but_not_its_profile() {
 
     let resp = update_user(&c, &admin, json!({"id": id, "status": "inactive"})).await;
     assert_eq!(resp.status(), 200);
-    assert_eq!(resp.json::<serde_json::Value>().await.unwrap()["status"], "inactive");
+    assert_eq!(
+        resp.json::<serde_json::Value>().await.unwrap()["status"],
+        "inactive"
+    );
 
     // Status alongside a profile field is still refused whole.
-    let resp = update_user(&c, &admin, json!({"id": id, "status": "active", "family_name": "Nope"})).await;
+    let resp = update_user(
+        &c,
+        &admin,
+        json!({"id": id, "status": "active", "family_name": "Nope"}),
+    )
+    .await;
     assert_eq!(resp.status(), 409);
     let err: serde_json::Value = resp.json().await.unwrap();
     assert_eq!(err["code"], "NOT_LOCAL_ACCOUNT");
@@ -697,7 +799,12 @@ async fn saml_account_status_can_change_but_not_its_profile() {
 async fn self_deactivation_refused() {
     let c = client();
     let token = odo_admin_token(&c).await;
-    let resp = update_user(&c, &token, json!({"id": token_user_id(&token), "status": "inactive"})).await;
+    let resp = update_user(
+        &c,
+        &token,
+        json!({"id": token_user_id(&token), "status": "inactive"}),
+    )
+    .await;
     assert_eq!(resp.status(), 400);
 }
 

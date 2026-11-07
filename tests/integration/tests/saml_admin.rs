@@ -37,7 +37,12 @@ async fn post_json(
 #[tokio::test]
 async fn idp_list_requires_token() {
     let c = client();
-    let resp = c.post(base("/idp/list")).json(&json!({})).send().await.unwrap();
+    let resp = c
+        .post(base("/idp/list"))
+        .json(&json!({}))
+        .send()
+        .await
+        .unwrap();
     assert_eq!(resp.status(), 401);
 }
 
@@ -336,10 +341,22 @@ async fn sp_can_be_unlinked_from_its_idp() {
     assert_eq!(resp.status(), 200);
     let sp: serde_json::Value = resp.json().await.unwrap();
 
-    let resp = post_json(&c, &token, "/sp/update", json!({"id": sp["id"], "idp": idp["id"], "clear_idp": true})).await;
+    let resp = post_json(
+        &c,
+        &token,
+        "/sp/update",
+        json!({"id": sp["id"], "idp": idp["id"], "clear_idp": true}),
+    )
+    .await;
     assert_eq!(resp.status(), 400, "idp and clear_idp together");
 
-    let resp = post_json(&c, &token, "/sp/update", json!({"id": sp["id"], "clear_idp": true})).await;
+    let resp = post_json(
+        &c,
+        &token,
+        "/sp/update",
+        json!({"id": sp["id"], "clear_idp": true}),
+    )
+    .await;
     assert_eq!(resp.status(), 200);
     let unlinked: serde_json::Value = resp.json().await.unwrap();
     assert!(unlinked["idp"].is_null());

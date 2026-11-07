@@ -71,7 +71,12 @@ async fn upload_document() {
     assert!(data["id"].as_i64().unwrap() > 0);
     assert!(data["filename"].is_string());
     assert!(data["original_name"].as_str() == Some("odo_test_doc.txt"));
-    assert!(data["relative_path"].as_str().unwrap().contains("e2e-assets/files"));
+    assert!(
+        data["relative_path"]
+            .as_str()
+            .unwrap()
+            .contains("e2e-assets/files")
+    );
     assert_eq!(data["size"].as_i64(), Some(content.len() as i64));
     assert_eq!(data["mime_type"].as_str(), Some("text/plain"));
     assert_eq!(data["uploaded_by"].as_i64(), Some(staff_id(&c).await));
@@ -157,7 +162,12 @@ async fn upload_photo() {
     assert_eq!(resp.status(), 200);
 
     let data: serde_json::Value = resp.json().await.unwrap();
-    assert!(data["relative_path"].as_str().unwrap().contains("e2e-assets/photos"));
+    assert!(
+        data["relative_path"]
+            .as_str()
+            .unwrap()
+            .contains("e2e-assets/photos")
+    );
     assert_eq!(data["mime_type"].as_str(), Some("image/jpeg"));
 }
 
@@ -175,7 +185,12 @@ async fn upload_portrait_photo() {
     assert_eq!(resp.status(), 200);
 
     let data: serde_json::Value = resp.json().await.unwrap();
-    assert!(data["relative_path"].as_str().unwrap().contains("e2e-assets/portraits"));
+    assert!(
+        data["relative_path"]
+            .as_str()
+            .unwrap()
+            .contains("e2e-assets/portraits")
+    );
 }
 
 #[tokio::test]
@@ -234,7 +249,11 @@ async fn upload_and_retrieve() {
 
     // Retrieve via Authorization header
     let retrieve_resp = c
-        .get(format!("{}/api/v1/odo/asset/files/{}", asset_base(), relative_path))
+        .get(format!(
+            "{}/api/v1/odo/asset/files/{}",
+            asset_base(),
+            relative_path
+        ))
         .headers(auth_header(&token))
         .send()
         .await
@@ -270,7 +289,11 @@ async fn retrieve_large_file_streams_intact() {
     assert_eq!(upload_data["size"].as_i64(), Some(content.len() as i64));
 
     let retrieve_resp = c
-        .get(format!("{}/api/v1/odo/asset/files/{}", asset_base(), relative_path))
+        .get(format!(
+            "{}/api/v1/odo/asset/files/{}",
+            asset_base(),
+            relative_path
+        ))
         .headers(auth_header(&token))
         .send()
         .await
@@ -308,7 +331,12 @@ async fn retrieve_range_requests() {
     let len = content.len();
 
     // Full GET advertises range support.
-    let full = c.get(&url).headers(auth_header(&token)).send().await.unwrap();
+    let full = c
+        .get(&url)
+        .headers(auth_header(&token))
+        .send()
+        .await
+        .unwrap();
     assert_eq!(full.status(), 200);
     assert_eq!(full.headers().get("accept-ranges").unwrap(), "bytes");
 
@@ -327,7 +355,10 @@ async fn retrieve_range_requests() {
     );
     assert_eq!(resp.headers().get("content-type").unwrap(), "text/plain");
     assert_eq!(resp.headers().get("cache-control").unwrap(), "no-cache");
-    assert_eq!(resp.bytes().await.unwrap().as_ref(), &content[100_000..101_000]);
+    assert_eq!(
+        resp.bytes().await.unwrap().as_ref(),
+        &content[100_000..101_000]
+    );
 
     // Suffix range.
     let resp = c
@@ -366,7 +397,10 @@ async fn retrieve_range_requests() {
 async fn retrieve_range_requires_token() {
     // Range handling must not bypass auth.
     let resp = client()
-        .get(format!("{}/api/v1/odo/asset/files/some/file.txt", asset_base()))
+        .get(format!(
+            "{}/api/v1/odo/asset/files/some/file.txt",
+            asset_base()
+        ))
         .header("Range", "bytes=0-10")
         .send()
         .await
@@ -462,7 +496,10 @@ async fn retrieve_requires_token() {
     let c = client();
 
     let resp = c
-        .get(format!("{}/api/v1/odo/asset/files/some/file.txt", asset_base()))
+        .get(format!(
+            "{}/api/v1/odo/asset/files/some/file.txt",
+            asset_base()
+        ))
         .send()
         .await
         .unwrap();
@@ -549,9 +586,17 @@ async fn files_get_returns_metadata_for_uploaded_file() {
     let files = data["files"].as_array().unwrap();
     assert_eq!(files.len(), 1);
     assert_eq!(files[0]["id"].as_i64(), Some(id));
-    assert_eq!(files[0]["file_name"].as_str(), Some("odo_test_files_get.txt"));
+    assert_eq!(
+        files[0]["file_name"].as_str(),
+        Some("odo_test_files_get.txt")
+    );
     assert_eq!(files[0]["file_size"].as_i64(), Some(content.len() as i64));
-    assert!(files[0]["relative_path"].as_str().unwrap().contains("e2e-assets/files"));
+    assert!(
+        files[0]["relative_path"]
+            .as_str()
+            .unwrap()
+            .contains("e2e-assets/files")
+    );
     assert_eq!(files[0]["uploaded_by"].as_i64(), Some(staff_id(&c).await));
 }
 
@@ -778,9 +823,16 @@ async fn files_get_include_deleted_returns_deleted_flagged() {
         .await
         .unwrap();
     let files = incl["files"].as_array().unwrap();
-    assert_eq!(files.len(), 1, "include_deleted returns the soft-deleted file");
+    assert_eq!(
+        files.len(),
+        1,
+        "include_deleted returns the soft-deleted file"
+    );
     assert_eq!(files[0]["id"].as_i64(), Some(id));
-    assert!(files[0]["deleted_at"].as_str().is_some(), "must carry deleted_at");
+    assert!(
+        files[0]["deleted_at"].as_str().is_some(),
+        "must carry deleted_at"
+    );
     assert!(files[0]["uuid"].as_str().is_some_and(|s| !s.is_empty()));
 }
 
@@ -823,7 +875,10 @@ async fn directory_registry_lifecycle() {
     // permissions first (same order app registration uses).
     for perm in [&read_perm, &write_perm] {
         let resp = c
-            .post(format!("{}/api/v1/odo/auth/authz/permission/create", auth_base()))
+            .post(format!(
+                "{}/api/v1/odo/auth/authz/permission/create",
+                auth_base()
+            ))
             .headers(auth_header(&admin))
             .json(&serde_json::json!({"code": perm, "description": "itest directory perm"}))
             .send()
@@ -837,7 +892,9 @@ async fn directory_registry_lifecycle() {
         let resp = c
             .post(dir_url("/create"))
             .headers(auth_header(&admin))
-            .json(&serde_json::json!({"path": bad, "read_perm": read_perm, "write_perm": write_perm}))
+            .json(
+                &serde_json::json!({"path": bad, "read_perm": read_perm, "write_perm": write_perm}),
+            )
             .send()
             .await
             .unwrap();
@@ -891,7 +948,10 @@ async fn directory_registry_lifecycle() {
         .unwrap();
     assert_eq!(resp.status(), 200);
     let rows: Vec<serde_json::Value> = resp.json().await.unwrap();
-    assert!(rows.iter().any(|r| r["path"].as_str() == Some(path.as_str())));
+    assert!(
+        rows.iter()
+            .any(|r| r["path"].as_str() == Some(path.as_str()))
+    );
 
     // Delete; second delete 404s.
     let resp = c
@@ -914,7 +974,10 @@ async fn directory_registry_lifecycle() {
     // Cleanup the itest permissions.
     for perm in [&read_perm, &write_perm] {
         let resp = c
-            .post(format!("{}/api/v1/odo/auth/authz/permission/delete", auth_base()))
+            .post(format!(
+                "{}/api/v1/odo/auth/authz/permission/delete",
+                auth_base()
+            ))
             .headers(auth_header(&admin))
             .json(&serde_json::json!({"code": perm}))
             .send()
@@ -972,14 +1035,7 @@ async fn directory_upload_mapping_conflicts() {
 
     // Uploads for the new entity route into the registered path.
     let file = create_test_file(&format!("itest-map-{nanos}.txt"), b"mapped");
-    let resp = upload_file(
-        &staff_token(&c).await,
-        &file,
-        "document",
-        &entity,
-        None,
-    )
-    .await;
+    let resp = upload_file(&staff_token(&c).await, &file, "document", &entity, None).await;
     std::fs::remove_file(&file).ok();
     assert_eq!(resp.status(), 200);
     let data: serde_json::Value = resp.json().await.unwrap();

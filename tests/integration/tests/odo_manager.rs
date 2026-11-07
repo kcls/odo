@@ -13,7 +13,12 @@ fn unique(tag: &str) -> String {
     format!("itest-{tag}-{nanos}")
 }
 
-async fn post(c: &reqwest::Client, token: &str, url: String, body: serde_json::Value) -> reqwest::StatusCode {
+async fn post(
+    c: &reqwest::Client,
+    token: &str,
+    url: String,
+    body: serde_json::Value,
+) -> reqwest::StatusCode {
     c.post(url)
         .headers(auth_header(token))
         .json(&body)
@@ -75,15 +80,39 @@ async fn manager_reads_everything_and_writes_only_notification_content() {
 
     // Reads behind every admin tool.
     let reads = [
-        (format!("{auth}/api/v1/odo/auth/user/detail"), json!({"id": token_user_id(&token)})),
+        (
+            format!("{auth}/api/v1/odo/auth/user/detail"),
+            json!({"id": token_user_id(&token)}),
+        ),
         (format!("{auth}/api/v1/odo/auth/authz/role/list"), json!({})),
-        (format!("{auth}/api/v1/odo/auth/authz/permission/list"), json!({})),
-        (format!("{auth}/api/v1/odo/auth/authz/user-role/list"), json!({"usr": token_user_id(&token)})),
-        (format!("{auth}/api/v1/odo/auth/saml/admin/idp/list"), json!({})),
-        (format!("{org}/api/v1/odo/org/admin/unit-type/list"), json!({})),
-        (format!("{notify}/api/v1/odo/notify/template/list"), json!({})),
-        (format!("{notify}/api/v1/odo/notify/email-group/list"), json!({})),
-        (format!("{notify}/api/v1/odo/notify/delivery/list"), json!({})),
+        (
+            format!("{auth}/api/v1/odo/auth/authz/permission/list"),
+            json!({}),
+        ),
+        (
+            format!("{auth}/api/v1/odo/auth/authz/user-role/list"),
+            json!({"usr": token_user_id(&token)}),
+        ),
+        (
+            format!("{auth}/api/v1/odo/auth/saml/admin/idp/list"),
+            json!({}),
+        ),
+        (
+            format!("{org}/api/v1/odo/org/admin/unit-type/list"),
+            json!({}),
+        ),
+        (
+            format!("{notify}/api/v1/odo/notify/template/list"),
+            json!({}),
+        ),
+        (
+            format!("{notify}/api/v1/odo/notify/email-group/list"),
+            json!({}),
+        ),
+        (
+            format!("{notify}/api/v1/odo/notify/delivery/list"),
+            json!({}),
+        ),
     ];
     for (url, body) in reads {
         assert_eq!(post(&c, &token, url.clone(), body).await, 200, "read {url}");
@@ -143,9 +172,16 @@ async fn manager_reads_everything_and_writes_only_notification_content() {
             format!("{org}/api/v1/odo/org/admin/unit-type/create"),
             json!({"label": unique("mgr-type")}),
         ),
-        (format!("{notify}/api/v1/odo/notify/delivery/retry"), json!({"id": i32::MAX})),
+        (
+            format!("{notify}/api/v1/odo/notify/delivery/retry"),
+            json!({"id": i32::MAX}),
+        ),
     ];
     for (url, body) in writes {
-        assert_eq!(post(&c, &token, url.clone(), body).await, 403, "write {url}");
+        assert_eq!(
+            post(&c, &token, url.clone(), body).await,
+            403,
+            "write {url}"
+        );
     }
 }
