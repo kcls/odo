@@ -108,6 +108,16 @@ async fn manager_reads_everything_and_writes_only_notification_content() {
     )
     .await;
     assert_eq!(status, 200, "email group create");
+    // A test send needs only the template write (the role lacks
+    // odo.notify.send): it can reach no one but the sender.
+    let status = post(
+        &c,
+        &token,
+        format!("{notify}/api/v1/odo/notify/template/send-test"),
+        json!({"subject_template": "Hi", "body_template": "Body"}),
+    )
+    .await;
+    assert_eq!(status, 200, "template send-test");
 
     // Everything else stays read-only. Each request would succeed for an
     // admin, so a 403 here is the permission, not a bad body.

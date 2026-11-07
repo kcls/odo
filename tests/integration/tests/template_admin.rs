@@ -222,6 +222,80 @@ async fn preview_escapes_only_the_html_body() {
 }
 
 #[tokio::test]
+async fn send_test_queues_the_draft_to_the_signed_in_user_only() {
+    let c = client();
+    let token = odo_admin_token(&c).await;
+    let code = unique_code("send-test");
+    let resp = post_json(
+        &c,
+        &token,
+        "/send-test",
+        json!({
+            "subject_template": "Hello {{name}}",
+            "body_template": "Plain {{name}}",
+            "body_template_html": "<p>Dear {{name}}</p>",
+            "variables": {"name": "O'Brien & <Sons>"},
+            "template_code": code,
+            // Not a request field: a caller can't pick the recipient.
+            "recipients": [{"type": "email_group", "email_group_id": 1, "channels": ["email"]}]
+        }),
+    )
+    .await;
+    assert_eq!(resp.status(), 200);
+    let sent: serde_json::Value = resp.json().await.unwrap();
+    assert!(sent["email"].as_str().unwrap().contains('@'));
+
+    let resp = c
+        .post(format!("{}/api/v1/odo/notify/delivery/get", notify_base()))
+        .headers(auth_header(&token))
+        .json(&json!({"id": sent["delivery_id"]}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+    let detail: serde_json::Value = resp.json().await.unwrap();
+    let delivery = &detail["delivery"];
+    assert_eq!(delivery["channel"], "email");
+    assert_eq!(delivery["template_code"], code.as_str());
+    assert_eq!(delivery["subject"], "[Test] Hello O'Brien & <Sons>");
+    assert_eq!(delivery["recipient"]["kind"], "user");
+    assert_eq!(delivery["recipient"]["id"], token_user_id(&token));
+    assert_eq!(delivery["recipient"]["detail"], sent["email"]);
+    // Rendered as a real send would be: the HTML variant, values escaped.
+    assert_eq!(
+        detail["body"],
+        "<p>Dear O&#x27;Brien &amp; &lt;Sons&gt;</p>"
+    );
+    assert_eq!(detail["event"]["source_entity_type"], "template_test");
+}
+
+#[tokio::test]
+async fn send_test_rejects_a_broken_template_and_needs_write() {
+    let c = client();
+    let token = odo_admin_token(&c).await;
+    let resp = post_json(
+        &c,
+        &token,
+        "/send-test",
+        json!({"subject_template": "S", "body_template": "{{#if oops}}"}),
+    )
+    .await;
+    assert_eq!(resp.status(), 400);
+    let err: serde_json::Value = resp.json().await.unwrap();
+    assert!(err["message"].as_str().unwrap().contains("body_template"));
+
+    let staff = staff_token(&c).await;
+    let resp = post_json(
+        &c,
+        &staff,
+        "/send-test",
+        json!({"subject_template": "S", "body_template": "B"}),
+    )
+    .await;
+    assert_eq!(resp.status(), 403);
+}
+
+#[tokio::test]
 async fn list_search_ignores_case() {
     let c = client();
     let token = odo_admin_token(&c).await;

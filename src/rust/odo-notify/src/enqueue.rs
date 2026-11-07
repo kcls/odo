@@ -48,7 +48,7 @@ impl Recipient {
 /// template's HTML variant, with variables escaped; or, for a text-only
 /// template, the text rendered verbatim and then escaped as a whole, with
 /// its line breaks kept. In-app bodies are plain text, displayed as such.
-fn render_body(
+pub(crate) fn render_body(
     channel: &str,
     body_template: &str,
     body_template_html: Option<&str>,

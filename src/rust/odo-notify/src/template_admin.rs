@@ -6,14 +6,17 @@
 //! stays intact. Handlebars syntax is validated server-side on every write
 //! using the same renderer the enqueue path uses, and a preview endpoint
 //! renders drafts against sample data without saving anything. Every
-//! write is kept as a version (see `template_history`).
+//! write is kept as a version (see `template_history`). A draft can also be
+//! sent as a test email, only ever to the signed-in user (see
+//! `send_test_template`).
 
 use axum::Json;
 use axum::extract::State;
 use chrono::Utc;
 use odo_client::context::RequestContext;
 use odo_client::error::{ApiResult, LocalError};
-use odo_entity::notification::template;
+use odo_entity::auth::usr;
+use odo_entity::notification::{delivery, event, template};
 use odo_entity::org::unit;
 use odo_service::admin::{
     Page, Paginated, Sort, clean_code, clean_optional, clean_required, clean_search, contains_ci,
@@ -27,6 +30,7 @@ use std::sync::Arc;
 use utoipa::ToSchema;
 
 use crate::AppState;
+use crate::enqueue::render_body;
 use crate::inbox::SuccessResponse;
 use crate::template_history::set_actor;
 
@@ -150,6 +154,31 @@ pub struct PreviewRequest {
     #[serde(default)]
     variables: Option<serde_json::Value>,
 }
+
+#[derive(Deserialize, ToSchema)]
+pub struct SendTestRequest {
+    subject_template: String,
+    body_template: String,
+    #[serde(default)]
+    body_template_html: Option<String>,
+    #[serde(default)]
+    variables: Option<serde_json::Value>,
+    /// Recorded on the delivery so the delivery log can be filtered by
+    /// template; need not name a saved template.
+    #[serde(default)]
+    template_code: Option<String>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct SendTestResponse {
+    pub delivery_id: i64,
+    /// The signed-in user's address, where the test was sent.
+    pub email: String,
+}
+
+/// Marks a test delivery's subject, so it can't be mistaken for a real
+/// notification in an inbox.
+const TEST_SUBJECT_PREFIX: &str = "[Test] ";
 
 // ===========================================================================
 // Handlers
@@ -452,6 +481,99 @@ pub async fn preview_template(
         subject: preview("subject_template", params.subject_template, false)?,
         body: preview("body_template", params.body_template, false)?,
         body_html: preview("body_template_html", params.body_template_html, true)?,
+    }))
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/odo/notify/template/send-test",
+    request_body = SendTestRequest,
+    responses((status = 200, body = SendTestResponse, description = "Test email queued")),
+    security(("bearer" = [])),
+    tag = "template-admin"
+)]
+/// Render (possibly unsaved) template text as an email and queue it to the
+/// signed-in user's own address.
+///
+/// Gated on the template write permission rather than `odo.notify.send`,
+/// which odo-manager deliberately lacks. That is safe only because the
+/// recipient is never caller-chosen: a test can reach no inbox but the
+/// sender's own. It goes through the normal queue, so it exercises the real
+/// SMTP path and shows in the delivery log.
+pub async fn send_test_template(
+    State(state): State<Arc<AppState>>,
+    Json(params): Json<SendTestRequest>,
+) -> ApiResult<Json<SendTestResponse>> {
+    let user_id = RequestContext::user_id().ok_or(LocalError::unauthenticated())? as i32;
+    state
+        .auth_client
+        .permission_required(WRITE_PERM, None)
+        .await?;
+
+    let user = usr::Entity::find_by_id(user_id)
+        .one(&state.db)
+        .await?
+        .ok_or_else(|| LocalError::not_found(format!("user {user_id}")))?;
+    let email = user.email.trim().to_string();
+    if email.is_empty() {
+        return Err(LocalError::invalid_input(
+            "Your account has no email address to send a test to",
+        )
+        .into());
+    }
+
+    let vars = params.variables.unwrap_or(serde_json::json!({}));
+    let subject = render_text(&params.subject_template, &vars)
+        .map_err(|e| LocalError::invalid_input(format!("subject_template: {e}")))?;
+    let body = render_body(
+        "email",
+        &params.body_template,
+        params.body_template_html.as_deref(),
+        &vars,
+    )
+    .map_err(|e| {
+        let field = match params.body_template_html.as_deref() {
+            Some(html) if !html.trim().is_empty() => "body_template_html",
+            _ => "body_template",
+        };
+        LocalError::invalid_input(format!("{field}: {e}"))
+    })?;
+    let template_code = clean_optional(params.template_code.as_deref());
+
+    let now = Utc::now();
+    let txn = state.db.begin().await?;
+    let evt = event::Entity::insert(event::ActiveModel {
+        template_code: Set(template_code.clone()),
+        template_variables: Set(vars),
+        source_service: Set(Some("odo-notify".to_string())),
+        source_entity_type: Set(Some("template_test".to_string())),
+        created_by: Set(Some(user_id)),
+        created_at: Set(now.into()),
+        ..Default::default()
+    })
+    .exec_with_returning(&txn)
+    .await?;
+    let dlv = delivery::Entity::insert(delivery::ActiveModel {
+        event_id: Set(evt.id),
+        channel: Set("email".to_string()),
+        template_code: Set(template_code),
+        title_rendered: Set(format!("{TEST_SUBJECT_PREFIX}{subject}")),
+        body_rendered: Set(Some(body)),
+        status: Set("pending".to_string()),
+        recipient_user: Set(Some(user_id)),
+        created_at: Set(now.into()),
+        updated_at: Set(now.into()),
+        ..Default::default()
+    })
+    .exec_with_returning(&txn)
+    .await?;
+    txn.commit().await?;
+
+    tracing::info!(delivery_id = dlv.id, "SendTestTemplate");
+
+    Ok(Json(SendTestResponse {
+        delivery_id: dlv.id,
+        email,
     }))
 }
 
