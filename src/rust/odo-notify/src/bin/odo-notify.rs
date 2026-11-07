@@ -34,6 +34,7 @@ use utoipa::OpenApi;
         template_admin::update_template,
         template_admin::delete_template,
         template_admin::preview_template,
+        template_admin::send_test_template,
         template_history::list_versions,
         template_history::get_version,
         template_history::restore_version,
@@ -68,11 +69,13 @@ use utoipa::OpenApi;
         template_admin::TemplateRow,
         template_admin::TemplatePage,
         template_admin::PreviewResponse,
+        template_admin::SendTestResponse,
         template_admin::ListTemplatesRequest,
         template_admin::CreateTemplateRequest,
         template_admin::UpdateTemplateRequest,
         template_admin::TemplateIdRequest,
         template_admin::PreviewRequest,
+        template_admin::SendTestRequest,
         template_history::TemplateVersionSummary,
         template_history::TemplateVersionPage,
         template_history::TemplateVersionRow,
@@ -234,6 +237,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route(
             "/api/v1/odo/notify/template/preview",
             post(template_admin::preview_template),
+        )
+        .route(
+            "/api/v1/odo/notify/template/send-test",
+            post(template_admin::send_test_template),
         )
         .route(
             "/api/v1/odo/notify/template/versions",

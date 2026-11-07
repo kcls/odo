@@ -865,6 +865,43 @@
         ]
       }
     },
+    "/api/v1/odo/notify/template/send-test": {
+      "post": {
+        "tags": [
+          "template-admin"
+        ],
+        "summary": "Render (possibly unsaved) template text as an email and queue it to the\nsigned-in user's own address.",
+        "description": "Gated on the template write permission rather than `odo.notify.send`,\nwhich odo-manager deliberately lacks. That is safe only because the\nrecipient is never caller-chosen: a test can reach no inbox but the\nsender's own. It goes through the normal queue, so it exercises the real\nSMTP path and shows in the delivery log.",
+        "operationId": "send_test_template",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendTestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Test email queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SendTestResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/odo/notify/template/update": {
       "post": {
         "tags": [
@@ -2266,6 +2303,52 @@
           "user",
           "email_group"
         ]
+      },
+      "SendTestRequest": {
+        "type": "object",
+        "required": [
+          "subject_template",
+          "body_template"
+        ],
+        "properties": {
+          "body_template": {
+            "type": "string"
+          },
+          "body_template_html": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "subject_template": {
+            "type": "string"
+          },
+          "template_code": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Recorded on the delivery so the delivery log can be filtered by\ntemplate; need not name a saved template."
+          },
+          "variables": {}
+        }
+      },
+      "SendTestResponse": {
+        "type": "object",
+        "required": [
+          "delivery_id",
+          "email"
+        ],
+        "properties": {
+          "delivery_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "email": {
+            "type": "string",
+            "description": "The signed-in user's address, where the test was sent."
+          }
+        }
       },
       "Sort": {
         "type": "object",

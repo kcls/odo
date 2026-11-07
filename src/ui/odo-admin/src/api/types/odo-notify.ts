@@ -410,6 +410,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/odo/notify/template/send-test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Render (possibly unsaved) template text as an email and queue it to the
+         *     signed-in user's own address.
+         * @description Gated on the template write permission rather than `odo.notify.send`,
+         *     which odo-manager deliberately lacks. That is safe only because the
+         *     recipient is never caller-chosen: a test can reach no inbox but the
+         *     sender's own. It goes through the normal queue, so it exercises the real
+         *     SMTP path and shows in the delivery log.
+         */
+        post: operations["send_test_template"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/odo/notify/template/update": {
         parameters: {
             query?: never;
@@ -876,6 +901,23 @@ export interface components {
         };
         /** @enum {string} */
         RecipientKind: "user" | "email_group";
+        SendTestRequest: {
+            body_template: string;
+            body_template_html?: string | null;
+            subject_template: string;
+            /**
+             * @description Recorded on the delivery so the delivery log can be filtered by
+             *     template; need not name a saved template.
+             */
+            template_code?: string | null;
+            variables?: unknown;
+        };
+        SendTestResponse: {
+            /** Format: int64 */
+            delivery_id: number;
+            /** @description The signed-in user's address, where the test was sent. */
+            email: string;
+        };
         /**
          * @description Standard sort inputs for admin list endpoints. Flatten this into a
          *     per-resource request struct alongside `Page`:
@@ -1637,6 +1679,30 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TemplateRow"];
+                };
+            };
+        };
+    };
+    send_test_template: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendTestRequest"];
+            };
+        };
+        responses: {
+            /** @description Test email queued */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SendTestResponse"];
                 };
             };
         };

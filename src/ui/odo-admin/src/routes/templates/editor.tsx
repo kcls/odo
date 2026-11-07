@@ -1,4 +1,4 @@
-import { HistoryIcon, Loader2Icon, RefreshCwIcon, Trash2Icon, TriangleAlertIcon } from "lucide-react"
+import { HistoryIcon, Loader2Icon, RefreshCwIcon, SendIcon, Trash2Icon, TriangleAlertIcon } from "lucide-react"
 import { useEffect, useRef, useState, type FormEvent } from "react"
 import { useTranslation } from "react-i18next"
 import { Link, useBlocker, useLoaderData, useNavigate, useRevalidator, useRouteLoaderData } from "react-router"
@@ -8,7 +8,7 @@ import { ApiRequestError } from "@/api/client"
 import { describeError } from "@/api/errors"
 import { templatesApi, type TemplateRow } from "@/api/notify"
 import { PERMS } from "@/auth/perms"
-import { checkPerms } from "@/auth/session"
+import { checkPerms, useCurrentUser } from "@/auth/session"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import { DetailHeader } from "@/components/detail-header"
 import { StatusBadge } from "@/components/status-badge"
@@ -78,6 +78,9 @@ function Editor({ template, canWrite }: { template: TemplateRow | null; canWrite
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [sendingTest, setSendingTest] = useState(false)
+  const [confirmingTest, setConfirmingTest] = useState(false)
+  const currentUser = useCurrentUser()
   // Set just before navigating away on purpose (after a save or delete),
   // when the dirty state from this render is stale.
   const leaving = useRef(false)
@@ -89,6 +92,7 @@ function Editor({ template, canWrite }: { template: TemplateRow | null; canWrite
     canWrite && !pending && draft.code.trim() && draft.name.trim() && draft.subject.trim() && draft.body.trim()
 
   const preview = useTemplatePreview(draft)
+  const canSendTest = canWrite && !sendingTest && sampleOk && draft.subject.trim() && draft.body.trim()
 
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
@@ -140,6 +144,27 @@ function Editor({ template, canWrite }: { template: TemplateRow | null; canWrite
       }
     } finally {
       setPending(false)
+    }
+  }
+
+  // Sends the form as it stands, saved or not, like the preview.
+  const sendTest = async () => {
+    const sample = parseJsonText(draft.sampleData)
+    if (!sample.ok || !canSendTest) return
+    setSendingTest(true)
+    try {
+      const sent = await templatesApi.sendTest({
+        subject_template: draft.subject,
+        body_template: draft.body,
+        body_template_html: draft.bodyHtml || undefined,
+        variables: sample.value,
+        template_code: draft.code.trim() || undefined,
+      })
+      toast.success(t("preview.testQueued", { email: sent.email }))
+    } catch (err) {
+      toast.error(describeError(err))
+    } finally {
+      setSendingTest(false)
     }
   }
 
@@ -311,7 +336,12 @@ function Editor({ template, canWrite }: { template: TemplateRow | null; canWrite
           </CardContent>
         </Card>
 
-        <PreviewCard preview={preview} />
+        <PreviewCard
+          preview={preview}
+          sendTest={
+            canWrite ? { onSend: () => setConfirmingTest(true), disabled: !canSendTest, pending: sendingTest } : undefined
+          }
+        />
       </div>
 
       <ConfirmDialog
@@ -322,6 +352,18 @@ function Editor({ template, canWrite }: { template: TemplateRow | null; canWrite
         confirmLabel={t("common:actions.delete")}
         destructive
         onConfirm={deleteTemplate}
+      />
+      <ConfirmDialog
+        open={confirmingTest}
+        onOpenChange={setConfirmingTest}
+        title={t("sendTest.title")}
+        description={
+          currentUser?.email
+            ? t("sendTest.body", { email: currentUser.email })
+            : t("sendTest.bodyNoEmail")
+        }
+        confirmLabel={t("sendTest.confirm")}
+        onConfirm={sendTest}
       />
       <ConfirmDialog
         open={blocker.state === "blocked"}
@@ -339,7 +381,16 @@ function Editor({ template, canWrite }: { template: TemplateRow | null; canWrite
   )
 }
 
-function PreviewCard({ preview }: { preview: ReturnType<typeof useTemplatePreview> }) {
+type SendTest = { onSend: () => void; disabled: boolean; pending: boolean }
+
+/** `sendTest` is absent for users who can't write templates. */
+function PreviewCard({
+  preview,
+  sendTest,
+}: {
+  preview: ReturnType<typeof useTemplatePreview>
+  sendTest?: SendTest
+}) {
   const { t } = useTranslation("templates")
   const p = preview.preview
   return (
@@ -349,7 +400,24 @@ function PreviewCard({ preview }: { preview: ReturnType<typeof useTemplatePrevie
           <h2>{t("preview.title")}</h2>
         </CardTitle>
         <CardDescription>{t("preview.description")}</CardDescription>
-        <CardAction>
+        <CardAction className="flex gap-1">
+          {sendTest && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              title={t("preview.sendTestHint")}
+              onClick={sendTest.onSend}
+              disabled={sendTest.disabled}
+            >
+              {sendTest.pending ? (
+                <Loader2Icon data-icon="inline-start" className="animate-spin" />
+              ) : (
+                <SendIcon data-icon="inline-start" />
+              )}
+              {sendTest.pending ? t("preview.sending") : t("preview.sendTest")}
+            </Button>
+          )}
           <Button type="button" variant="ghost" size="sm" onClick={preview.refresh} disabled={preview.rendering}>
             {preview.rendering ? (
               <Loader2Icon data-icon="inline-start" className="animate-spin" />

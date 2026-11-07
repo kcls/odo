@@ -49,7 +49,17 @@
     "bodyHtml": "HTML body",
     "htmlFrame": "HTML body preview",
     "nothing": "Nothing to preview yet.",
-    "failed": "Preview failed: {{message}}"
+    "failed": "Preview failed: {{message}}",
+    "sendTest": "Send test",
+    "sendTestHint": "Email this preview to yourself",
+    "sending": "Sending…",
+    "testQueued": "Test email queued to {{email}}"
+  },
+  "sendTest": {
+    "title": "Send a test email?",
+    "body": "The preview, as rendered from the form and sample data, will be emailed to your own address, {{email}}. Unsaved changes are included.",
+    "bodyNoEmail": "The preview, as rendered from the form and sample data, will be emailed to your own address. Unsaved changes are included.",
+    "confirm": "Send test"
   },
   "delete": {
     "title": "Delete template?",

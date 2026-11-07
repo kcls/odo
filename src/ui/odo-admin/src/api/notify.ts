@@ -39,6 +39,10 @@ export const templatesApi = {
   preview(params: S["PreviewRequest"]): Promise<PreviewResponse> {
     return apiPost(`${TEMPLATE}/preview`, params)
   },
+  /** Email (possibly unsaved) template text to the signed-in user only. */
+  sendTest(params: S["SendTestRequest"]): Promise<S["SendTestResponse"]> {
+    return apiPost(`${TEMPLATE}/send-test`, params)
+  },
   /** One page of a live template's versions, newest first. */
   versions(template: number, page: { limit: number; offset: number }): Promise<TemplateVersionPage> {
     return apiPost(`${TEMPLATE}/versions`, { template, ...page } satisfies S["ListTemplateVersionsRequest"])
