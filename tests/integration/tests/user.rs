@@ -168,7 +168,11 @@ async fn get_deleted_user_omitted_by_default() {
         .send()
         .await
         .unwrap();
-    assert_eq!(resp.status(), 404, "soft-deleted user is not resolvable by default");
+    assert_eq!(
+        resp.status(),
+        404,
+        "soft-deleted user is not resolvable by default"
+    );
 }
 
 #[tokio::test]
@@ -183,10 +187,17 @@ async fn get_deleted_user_with_deleted_flagged() {
         .send()
         .await
         .unwrap();
-    assert_eq!(resp.status(), 200, "with_deleted resolves the soft-deleted user");
+    assert_eq!(
+        resp.status(),
+        200,
+        "with_deleted resolves the soft-deleted user"
+    );
     let data: serde_json::Value = resp.json().await.unwrap();
     assert_eq!(data["id"].as_i64(), Some(deleted));
-    assert!(data["deleted_at"].as_str().is_some(), "deleted user must carry deleted_at");
+    assert!(
+        data["deleted_at"].as_str().is_some(),
+        "deleted user must carry deleted_at"
+    );
     assert!(data["uuid"].as_str().is_some_and(|s| !s.is_empty()));
 }
 
@@ -217,5 +228,8 @@ async fn status_is_the_plain_stored_value() {
     assert_eq!(resp.status(), 200);
     let found: Vec<serde_json::Value> = resp.json().await.unwrap();
     assert!(!found.is_empty());
-    assert!(found.iter().all(|u| u["status"] == "active"), "user/search: {found:?}");
+    assert!(
+        found.iter().all(|u| u["status"] == "active"),
+        "user/search: {found:?}"
+    );
 }

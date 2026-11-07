@@ -12,7 +12,14 @@ use serde_json::{Value, json};
 
 const TEMPLATE: &str = "itest-delivery-template";
 const STATUSES: &[&str] = &["pending", "processing", "delivered", "failed", "skipped"];
-const ENDPOINTS: &[&str] = &["/list", "/get", "/summary", "/recipients", "/daily", "/retry"];
+const ENDPOINTS: &[&str] = &[
+    "/list",
+    "/get",
+    "/summary",
+    "/recipients",
+    "/daily",
+    "/retry",
+];
 
 fn base(path: &str) -> String {
     format!("{}/api/v1/odo/notify/delivery{}", notify_base(), path)
@@ -414,17 +421,29 @@ async fn daily_has_every_day_and_counts_today() {
     let (token, _, _) = enqueue_to_new_group(&c).await;
     let since = (chrono::Utc::now() - chrono::Duration::days(6)).to_rfc3339();
 
-    let daily = post_ok(&c, &token, "/daily", json!({"since": since, "channel": "email", "timezone": "UTC"})).await;
+    let daily = post_ok(
+        &c,
+        &token,
+        "/daily",
+        json!({"since": since, "channel": "email", "timezone": "UTC"}),
+    )
+    .await;
     assert_eq!(daily["timezone"], "UTC");
     let days = daily["days"].as_array().unwrap();
     // Six days back through today, quiet days included.
     assert!((7..=8).contains(&days.len()), "got {} days", days.len());
     let dates: Vec<&str> = days.iter().map(|d| d["day"].as_str().unwrap()).collect();
-    assert!(dates.windows(2).all(|w| w[0] < w[1]), "oldest first: {dates:?}");
+    assert!(
+        dates.windows(2).all(|w| w[0] < w[1]),
+        "oldest first: {dates:?}"
+    );
     let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
     let last = days.last().unwrap();
     assert_eq!(last["day"], today);
-    let total: i64 = ["delivered", "failed", "skipped", "queued"].iter().map(|k| last[*k].as_i64().unwrap()).sum();
+    let total: i64 = ["delivered", "failed", "skipped", "queued"]
+        .iter()
+        .map(|k| last[*k].as_i64().unwrap())
+        .sum();
     assert!(total >= 1, "today counts the delivery just queued");
 }
 
@@ -455,7 +474,8 @@ async fn retry_refuses_unknown_and_unfinished_deliveries() {
     assert_eq!(resp.status(), 404);
 
     // Just queued: pending (or being sent), so there's nothing to retry yet.
-    let status = post_ok(&c, &token, "/get", json!({"id": delivery_id})).await["delivery"]["status"].clone();
+    let status =
+        post_ok(&c, &token, "/get", json!({"id": delivery_id})).await["delivery"]["status"].clone();
     if status == "pending" || status == "processing" {
         let resp = post(&c, &token, "/retry", json!({"id": delivery_id})).await;
         assert_eq!(resp.status(), 409);
@@ -482,7 +502,11 @@ async fn retry_refuses_in_app_deliveries() {
     assert_eq!(resp.status(), 200);
     let id = resp.json::<Value>().await.unwrap()["deliveries"][0]["id"].clone();
     let resp = post(&c, &token, "/retry", json!({"id": id})).await;
-    assert_eq!(resp.status(), 409, "in-app deliveries are delivered on enqueue");
+    assert_eq!(
+        resp.status(),
+        409,
+        "in-app deliveries are delivered on enqueue"
+    );
 }
 
 #[tokio::test]
@@ -492,7 +516,10 @@ async fn retry_requeues_a_skipped_delivery() {
     let (_, group, delivery_id) = enqueue_to_new_group(&c).await;
     // Switch the group off: the processor skips its deliveries (terminal).
     let resp = c
-        .post(format!("{}/api/v1/odo/notify/email-group/update", notify_base()))
+        .post(format!(
+            "{}/api/v1/odo/notify/email-group/update",
+            notify_base()
+        ))
         .headers(auth_header(&token))
         .json(&json!({"id": group["id"], "is_active": false}))
         .send()
@@ -503,13 +530,18 @@ async fn retry_requeues_a_skipped_delivery() {
     // The processor polls every ~10s; give it a few cycles.
     let mut status = Value::Null;
     for _ in 0..30 {
-        status = post_ok(&c, &token, "/get", json!({"id": delivery_id})).await["delivery"]["status"].clone();
+        status =
+            post_ok(&c, &token, "/get", json!({"id": delivery_id})).await["delivery"]["status"]
+                .clone();
         if status == "skipped" {
             break;
         }
         tokio::time::sleep(std::time::Duration::from_secs(2)).await;
     }
-    assert_eq!(status, "skipped", "the processor skipped the inactive group's delivery");
+    assert_eq!(
+        status, "skipped",
+        "the processor skipped the inactive group's delivery"
+    );
 
     let row = post_ok(&c, &token, "/retry", json!({"id": delivery_id})).await;
     assert_eq!(row["id"], delivery_id);

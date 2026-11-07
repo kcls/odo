@@ -186,7 +186,8 @@ async fn permission_list_sorts_by_allowed_columns() {
 
     // An unknown / malicious sort key must fall back to the default, not error
     // and not inject — the allow-list rejects it.
-    let bad = codes(json!({"sort_by": "code; DROP TABLE authz.permission", "sort_dir": "desc"})).await;
+    let bad =
+        codes(json!({"sort_by": "code; DROP TABLE authz.permission", "sort_dir": "desc"})).await;
     assert_eq!(bad, asc_codes, "unknown sort key falls back to default");
 }
 
@@ -398,13 +399,25 @@ async fn permission_and_role_search_ignore_case() {
             .collect()
     };
 
-    let resp = post_json(&c, &token, "/permission/list", json!({"search": "ODO.AUTH.ROLE", "limit": 200})).await;
+    let resp = post_json(
+        &c,
+        &token,
+        "/permission/list",
+        json!({"search": "ODO.AUTH.ROLE", "limit": 200}),
+    )
+    .await;
     assert_eq!(resp.status(), 200);
     assert!(codes(resp.json().await.unwrap()).contains(&"odo.auth.role.read".to_string()));
 
     // By label ("ODO Administrator") and by code, in the other case.
     for search in ["odo administrator", "ODO-ADMIN"] {
-        let resp = post_json(&c, &token, "/role/list", json!({"search": search, "limit": 200})).await;
+        let resp = post_json(
+            &c,
+            &token,
+            "/role/list",
+            json!({"search": search, "limit": 200}),
+        )
+        .await;
         assert_eq!(resp.status(), 200);
         assert!(
             codes(resp.json().await.unwrap()).contains(&"odo-admin".to_string()),
@@ -420,7 +433,13 @@ async fn search_matches_wildcard_characters_literally() {
     // As LIKE patterns, "%" matched everything and "_" any one character
     // ("auth_role" matched "auth.role"); now they are literal text.
     for search in ["%", "auth_role"] {
-        let resp = post_json(&c, &token, "/permission/list", json!({"search": search, "limit": 200})).await;
+        let resp = post_json(
+            &c,
+            &token,
+            "/permission/list",
+            json!({"search": search, "limit": 200}),
+        )
+        .await;
         assert_eq!(resp.status(), 200);
         let page: serde_json::Value = resp.json().await.unwrap();
         for row in page["rows"].as_array().unwrap() {

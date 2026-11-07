@@ -250,7 +250,10 @@ async fn user_perm_scopes_endpoint() {
         .iter()
         .find(|p| p["perm"] == scoped_perm)
         .expect("target user has the scoped perm");
-    assert_eq!(scoped["global"], false, "min_depth 1 branch grant is not global");
+    assert_eq!(
+        scoped["global"], false,
+        "min_depth 1 branch grant is not global"
+    );
     let units = scoped["scope_units"].as_array().unwrap();
     assert_eq!(units.len(), 1, "one minimal scope root (the region)");
     assert!(
@@ -330,11 +333,15 @@ async fn org_scoped_enforcement() {
     assert_eq!(resp.status(), 200);
     let existing: serde_json::Value = resp.json().await.unwrap();
     for a in existing["assignments"].as_array().unwrap() {
-        let is_fixture_grant =
-            a["role"] == "e2e-test-role" && a["org_unit"].as_i64() == Some(root);
+        let is_fixture_grant = a["role"] == "e2e-test-role" && a["org_unit"].as_i64() == Some(root);
         if !is_fixture_grant {
-            let resp =
-                post_json(&c, &admin, "/delete", json!({"id": a["id"].as_i64().unwrap()})).await;
+            let resp = post_json(
+                &c,
+                &admin,
+                "/delete",
+                json!({"id": a["id"].as_i64().unwrap()}),
+            )
+            .await;
             assert_eq!(resp.status(), 200);
         }
     }

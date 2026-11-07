@@ -33,7 +33,6 @@ async fn post_json(
         .unwrap()
 }
 
-
 #[tokio::test]
 async fn staff_denied() {
     let c = client();
@@ -207,7 +206,13 @@ async fn unit_crud_lifecycle() {
     let unit_b: serde_json::Value = resp.json().await.unwrap();
     let b_id = unit_b["id"].as_i64().unwrap();
 
-    let resp = post_json(&c, &token, "/unit/update", json!({"id": a_id, "parent": b_id})).await;
+    let resp = post_json(
+        &c,
+        &token,
+        "/unit/update",
+        json!({"id": a_id, "parent": b_id}),
+    )
+    .await;
     assert_eq!(resp.status(), 200);
     let moved: serde_json::Value = resp.json().await.unwrap();
     assert_eq!(moved["parent"], b_id);
@@ -226,11 +231,23 @@ async fn unit_crud_lifecycle() {
     assert_eq!(node_a["parent"], b_id);
 
     // Cycle (B under A while A is under B) -> 400
-    let resp = post_json(&c, &token, "/unit/update", json!({"id": b_id, "parent": a_id})).await;
+    let resp = post_json(
+        &c,
+        &token,
+        "/unit/update",
+        json!({"id": b_id, "parent": a_id}),
+    )
+    .await;
     assert_eq!(resp.status(), 400);
 
     // Self-parent -> 400
-    let resp = post_json(&c, &token, "/unit/update", json!({"id": a_id, "parent": a_id})).await;
+    let resp = post_json(
+        &c,
+        &token,
+        "/unit/update",
+        json!({"id": a_id, "parent": a_id}),
+    )
+    .await;
     assert_eq!(resp.status(), 400);
 
     // Deleting B while A is below it -> 409
@@ -308,7 +325,9 @@ async fn org_unit_children_crud() {
     )
     .await;
     assert_eq!(resp.status(), 200);
-    let addr_id = resp.json::<serde_json::Value>().await.unwrap()["id"].as_i64().unwrap();
+    let addr_id = resp.json::<serde_json::Value>().await.unwrap()["id"]
+        .as_i64()
+        .unwrap();
 
     let resp = post_json(
         &c,
@@ -327,7 +346,10 @@ async fn org_unit_children_crud() {
     )
     .await;
     assert_eq!(resp.status(), 200);
-    assert_eq!(resp.json::<serde_json::Value>().await.unwrap()["city"], "Bellevue");
+    assert_eq!(
+        resp.json::<serde_json::Value>().await.unwrap()["city"],
+        "Bellevue"
+    );
 
     // --- Closure ---
     let resp = post_json(
@@ -338,7 +360,9 @@ async fn org_unit_children_crud() {
     )
     .await;
     assert_eq!(resp.status(), 200);
-    let closure_id = resp.json::<serde_json::Value>().await.unwrap()["id"].as_i64().unwrap();
+    let closure_id = resp.json::<serde_json::Value>().await.unwrap()["id"]
+        .as_i64()
+        .unwrap();
 
     // --- Operating hours ---
     let resp = post_json(
@@ -349,7 +373,9 @@ async fn org_unit_children_crud() {
     )
     .await;
     assert_eq!(resp.status(), 200);
-    let hours_id = resp.json::<serde_json::Value>().await.unwrap()["id"].as_i64().unwrap();
+    let hours_id = resp.json::<serde_json::Value>().await.unwrap()["id"]
+        .as_i64()
+        .unwrap();
 
     let resp = post_json(
         &c,
@@ -421,13 +447,30 @@ async fn unit_type_search_ignores_case() {
     let token = odo_admin_token(&c).await;
     let resp = post_json(&c, &token, "/unit-type/list", json!({})).await;
     let all: serde_json::Value = resp.json().await.unwrap();
-    let label = all["rows"][0]["label"].as_str().expect("seeded unit types").to_string();
+    let label = all["rows"][0]["label"]
+        .as_str()
+        .expect("seeded unit types")
+        .to_string();
 
-    let resp = post_json(&c, &token, "/unit-type/list", json!({"search": label.to_uppercase()})).await;
+    let resp = post_json(
+        &c,
+        &token,
+        "/unit-type/list",
+        json!({"search": label.to_uppercase()}),
+    )
+    .await;
     assert_eq!(resp.status(), 200);
     let page: serde_json::Value = resp.json().await.unwrap();
-    let labels: Vec<&str> = page["rows"].as_array().unwrap().iter().map(|r| r["label"].as_str().unwrap()).collect();
-    assert!(labels.contains(&label.as_str()), "{label} not in {labels:?}");
+    let labels: Vec<&str> = page["rows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| r["label"].as_str().unwrap())
+        .collect();
+    assert!(
+        labels.contains(&label.as_str()),
+        "{label} not in {labels:?}"
+    );
 }
 
 #[tokio::test]
@@ -455,13 +498,25 @@ async fn unit_type_parent_can_be_cleared() {
     assert_eq!(resp.status(), 400);
 
     // A null parent still means "unchanged"...
-    let resp = post_json(&c, &token, "/unit-type/update", json!({"id": child["id"], "parent": null})).await;
+    let resp = post_json(
+        &c,
+        &token,
+        "/unit-type/update",
+        json!({"id": child["id"], "parent": null}),
+    )
+    .await;
     assert_eq!(resp.status(), 200);
     let same: serde_json::Value = resp.json().await.unwrap();
     assert_eq!(same["parent"], parent["id"]);
 
     // ...and clear_parent removes it.
-    let resp = post_json(&c, &token, "/unit-type/update", json!({"id": child["id"], "clear_parent": true})).await;
+    let resp = post_json(
+        &c,
+        &token,
+        "/unit-type/update",
+        json!({"id": child["id"], "clear_parent": true}),
+    )
+    .await;
     assert_eq!(resp.status(), 200);
     let cleared: serde_json::Value = resp.json().await.unwrap();
     assert!(cleared["parent"].is_null());

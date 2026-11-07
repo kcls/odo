@@ -8,7 +8,10 @@ use serde_json::json;
 async fn ensure_test_template(c: &reqwest::Client) -> String {
     let admin = odo_admin_token(c).await;
     let resp = c
-        .post(format!("{}/api/v1/odo/notify/template/create", notify_base()))
+        .post(format!(
+            "{}/api/v1/odo/notify/template/create",
+            notify_base()
+        ))
         .headers(auth_header(&admin))
         .json(&json!({
             "code": TEST_TEMPLATE,
@@ -29,7 +32,6 @@ async fn ensure_test_template(c: &reqwest::Client) -> String {
 }
 
 const TEST_TEMPLATE: &str = "e2e-notify-template";
-
 
 #[tokio::test]
 async fn health() {
@@ -93,7 +95,10 @@ async fn inbox_mark_read_not_found() {
     let c = client();
     let token = staff_token(&c).await;
     let resp = c
-        .post(format!("{}/api/v1/odo/notify/inbox/mark-read", notify_base()))
+        .post(format!(
+            "{}/api/v1/odo/notify/inbox/mark-read",
+            notify_base()
+        ))
         .headers(auth_header(&token))
         .json(&json!({"delivery_id": -1}))
         .send()
@@ -121,7 +126,10 @@ async fn inbox_mark_all_read() {
     let c = client();
     let token = staff_token(&c).await;
     let resp = c
-        .post(format!("{}/api/v1/odo/notify/inbox/mark-all-read", notify_base()))
+        .post(format!(
+            "{}/api/v1/odo/notify/inbox/mark-all-read",
+            notify_base()
+        ))
         .headers(auth_header(&token))
         .send()
         .await
@@ -136,7 +144,10 @@ async fn inbox_dismiss_all() {
     let c = client();
     let token = staff_token(&c).await;
     let resp = c
-        .post(format!("{}/api/v1/odo/notify/inbox/dismiss-all", notify_base()))
+        .post(format!(
+            "{}/api/v1/odo/notify/inbox/dismiss-all",
+            notify_base()
+        ))
         .headers(auth_header(&token))
         .send()
         .await
@@ -242,10 +253,10 @@ async fn enqueue_email_channel() {
             "recipients": [{"type": "user", "user_id": staff_id(&c).await, "channels": ["email"]}],
             "template_code": TEST_TEMPLATE,
             "template_variables": {
-			  "incident_occurred_at": "2026-03-26T00:00:00-0800",
-			  "incident_id": 999,
-			  "incident_timezone": "America/Los_Angeles",
-			  "recipient_name": "Test User"
+              "incident_occurred_at": "2026-03-26T00:00:00-0800",
+              "incident_id": 999,
+              "incident_timezone": "America/Los_Angeles",
+              "recipient_name": "Test User"
             },
             "source_service": "integration-tests",
         }))
@@ -491,7 +502,10 @@ async fn enqueue_and_read_inbox() {
 
     // Mark it read
     let mark_resp = c
-        .post(format!("{}/api/v1/odo/notify/inbox/mark-read", notify_base()))
+        .post(format!(
+            "{}/api/v1/odo/notify/inbox/mark-read",
+            notify_base()
+        ))
         .headers(auth_header(&token))
         .json(&json!({"delivery_id": delivery_id}))
         .send()

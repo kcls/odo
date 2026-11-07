@@ -99,7 +99,12 @@ async fn template_crud_lifecycle() {
     .await;
     assert_eq!(resp.status(), 400);
     let err: serde_json::Value = resp.json().await.unwrap();
-    assert!(err["message"].as_str().unwrap().contains("subject_template"));
+    assert!(
+        err["message"]
+            .as_str()
+            .unwrap()
+            .contains("subject_template")
+    );
 
     // Update: add HTML body and rename
     let resp = post_json(
@@ -375,7 +380,9 @@ async fn create_template(c: &reqwest::Client, token: &str, tag: &str) -> (i64, S
     )
     .await;
     assert_eq!(resp.status(), 200);
-    let id = resp.json::<serde_json::Value>().await.unwrap()["id"].as_i64().unwrap();
+    let id = resp.json::<serde_json::Value>().await.unwrap()["id"]
+        .as_i64()
+        .unwrap();
     (id, code)
 }
 
@@ -399,10 +406,22 @@ async fn every_write_is_kept_as_a_version() {
     assert_eq!(page["rows"][0]["changed_by"], admin_id);
     assert!(page["rows"][0]["changed_by_name"].is_string());
 
-    let resp = post_json(&c, &token, "/update", json!({"id": id, "body_template": "Second body"})).await;
+    let resp = post_json(
+        &c,
+        &token,
+        "/update",
+        json!({"id": id, "body_template": "Second body"}),
+    )
+    .await;
     assert_eq!(resp.status(), 200);
     // Saving the same content again isn't a new version.
-    let resp = post_json(&c, &token, "/update", json!({"id": id, "body_template": "Second body"})).await;
+    let resp = post_json(
+        &c,
+        &token,
+        "/update",
+        json!({"id": id, "body_template": "Second body"}),
+    )
+    .await;
     assert_eq!(resp.status(), 200);
 
     let page = versions(&c, &token, id).await;
@@ -412,9 +431,19 @@ async fn every_write_is_kept_as_a_version() {
     assert_eq!(newest["action"], "update");
     assert_eq!(newest["changed_by"], admin_id);
     assert_eq!(newest["changed_fields"], json!(["body_template"]));
-    assert_eq!(page["rows"][1]["changed_fields"], json!([]), "the first version has nothing before it");
+    assert_eq!(
+        page["rows"][1]["changed_fields"],
+        json!([]),
+        "the first version has nothing before it"
+    );
 
-    let resp = post_json(&c, &token, "/version", json!({"template": id, "version": 1})).await;
+    let resp = post_json(
+        &c,
+        &token,
+        "/version",
+        json!({"template": id, "version": 1}),
+    )
+    .await;
     assert_eq!(resp.status(), 200);
     let v1: serde_json::Value = resp.json().await.unwrap();
     assert_eq!(v1["body_template"], "First body");
@@ -435,7 +464,13 @@ async fn restore_brings_back_a_version_as_a_new_one() {
     .await;
     assert_eq!(resp.status(), 200);
 
-    let resp = post_json(&c, &token, "/restore", json!({"template": id, "version": 1})).await;
+    let resp = post_json(
+        &c,
+        &token,
+        "/restore",
+        json!({"template": id, "version": 1}),
+    )
+    .await;
     assert_eq!(resp.status(), 200);
     let restored: serde_json::Value = resp.json().await.unwrap();
     assert_eq!(restored["code"], code.as_str());
@@ -448,14 +483,29 @@ async fn restore_brings_back_a_version_as_a_new_one() {
     let newest = &page["rows"][0];
     assert_eq!(newest["action"], "restore");
     assert_eq!(newest["restored_from"], 1);
-    assert_eq!(newest["changed_fields"], json!(["name", "body_template", "is_active"]));
+    assert_eq!(
+        newest["changed_fields"],
+        json!(["name", "body_template", "is_active"])
+    );
 
     // Restoring what's already there changes nothing.
-    let resp = post_json(&c, &token, "/restore", json!({"template": id, "version": 3})).await;
+    let resp = post_json(
+        &c,
+        &token,
+        "/restore",
+        json!({"template": id, "version": 3}),
+    )
+    .await;
     assert_eq!(resp.status(), 200);
     assert_eq!(versions(&c, &token, id).await["total"], 3);
 
-    let resp = post_json(&c, &token, "/restore", json!({"template": id, "version": 99})).await;
+    let resp = post_json(
+        &c,
+        &token,
+        "/restore",
+        json!({"template": id, "version": 99}),
+    )
+    .await;
     assert_eq!(resp.status(), 404);
 }
 

@@ -321,7 +321,10 @@ async fn list_search_ignores_case() {
     let code = unique_code("case");
     create_group(&c, &token, &code).await;
 
-    for search in [code.to_uppercase(), format!("TEST GROUP {}", code.to_uppercase())] {
+    for search in [
+        code.to_uppercase(),
+        format!("TEST GROUP {}", code.to_uppercase()),
+    ] {
         let resp = c
             .post(base("/list"))
             .headers(auth_header(&token))

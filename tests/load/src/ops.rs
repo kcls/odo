@@ -187,7 +187,8 @@ impl Ctx {
             .timeout(std::time::Duration::from_secs(30))
             .build()
             .context("building HTTP client")?;
-        let odo_admin = Arc::new(Identity::login(&client, &base, "e2e.odo.admin", "test123!").await?);
+        let odo_admin =
+            Arc::new(Identity::login(&client, &base, "e2e.odo.admin", "test123!").await?);
         // Upload routing is registry data: ensure the harness's own
         // mapping exists (odo.auth.session as the perm — universal).
         let resp = client
@@ -851,7 +852,6 @@ pub async fn execute(
     }
 }
 
-
 /// ~1KB deterministic payload for asset churn.
 static LOAD_TEST_FILE: &[u8] = &[b'x'; 1024];
 
@@ -981,7 +981,11 @@ pub async fn sweep_leftovers(ctx: &Ctx) -> Result<usize> {
     }
 
     if let Ok(dirs) = ctx
-        .post_json("/api/v1/odo/asset/directory/list", &json!({}), &ctx.odo_admin)
+        .post_json(
+            "/api/v1/odo/asset/directory/list",
+            &json!({}),
+            &ctx.odo_admin,
+        )
         .await
     {
         // directory/list returns a bare array of rows.

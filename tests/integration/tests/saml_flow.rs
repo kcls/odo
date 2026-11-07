@@ -26,7 +26,10 @@ async fn sso_configs_for_origin() {
         .unwrap();
     assert_eq!(resp.status(), 200);
     let data: serde_json::Value = resp.json().await.unwrap();
-    assert!(data["count"].as_i64().unwrap() > 0, "No SSO configs for {ORIGIN}");
+    assert!(
+        data["count"].as_i64().unwrap() > 0,
+        "No SSO configs for {ORIGIN}"
+    );
     let config = &data["sso_configs"][0];
     assert!(config["sp_id"].is_number());
     assert!(config["label"].is_string());

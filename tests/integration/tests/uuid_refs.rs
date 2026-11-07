@@ -42,7 +42,10 @@ async fn fetch_unit_uuid(c: &reqwest::Client, token: &str, id: i64) -> String {
         .unwrap();
     assert_eq!(resp.status(), 200);
     let data: serde_json::Value = resp.json().await.unwrap();
-    data["org_unit"]["uuid"].as_str().expect("unit uuid").to_string()
+    data["org_unit"]["uuid"]
+        .as_str()
+        .expect("unit uuid")
+        .to_string()
 }
 
 // ---- JWT dual claim ----
@@ -172,7 +175,10 @@ async fn unit_routes_by_uuid() {
     let root_uuid = fetch_unit_uuid(&c, &token, root_id).await;
 
     let resp = c
-        .get(format!("{}/api/v1/odo/org/unit/uuid/{root_uuid}", org_base()))
+        .get(format!(
+            "{}/api/v1/odo/org/unit/uuid/{root_uuid}",
+            org_base()
+        ))
         .headers(auth_header(&token))
         .send()
         .await
@@ -182,7 +188,10 @@ async fn unit_routes_by_uuid() {
     assert_eq!(data["org_unit"]["id"].as_i64(), Some(root_id));
 
     let resp = c
-        .get(format!("{}/api/v1/odo/org/unit/uuid/{root_uuid}/descendants", org_base()))
+        .get(format!(
+            "{}/api/v1/odo/org/unit/uuid/{root_uuid}/descendants",
+            org_base()
+        ))
         .headers(auth_header(&token))
         .send()
         .await
@@ -193,7 +202,10 @@ async fn unit_routes_by_uuid() {
     assert_eq!(rows[0]["id"].as_i64(), Some(root_id));
 
     let resp = c
-        .get(format!("{}/api/v1/odo/org/unit/uuid/{root_uuid}/ancestors", org_base()))
+        .get(format!(
+            "{}/api/v1/odo/org/unit/uuid/{root_uuid}/ancestors",
+            org_base()
+        ))
         .headers(auth_header(&token))
         .send()
         .await
@@ -223,7 +235,10 @@ async fn user_has_perm_accepts_org_uuid() {
     let root_uuid = fetch_unit_uuid(&c, &token, root_id).await;
 
     let resp = c
-        .post(format!("{}/api/v1/odo/auth/authz/user-has-perm", auth_base()))
+        .post(format!(
+            "{}/api/v1/odo/auth/authz/user-has-perm",
+            auth_base()
+        ))
         .headers(auth_header(&token))
         .json(&json!({"perm": "odo.auth.session", "org_unit_uuid": root_uuid}))
         .send()
@@ -232,7 +247,11 @@ async fn user_has_perm_accepts_org_uuid() {
     assert_eq!(resp.status(), 200);
     let data: serde_json::Value = resp.json().await.unwrap();
     assert_eq!(data["has_perm"], true);
-    assert_eq!(data["org_unit"].as_i64(), Some(root_id), "resolved to the id");
+    assert_eq!(
+        data["org_unit"].as_i64(),
+        Some(root_id),
+        "resolved to the id"
+    );
 }
 
 #[tokio::test]
@@ -245,7 +264,10 @@ async fn users_with_role_accepts_uuids() {
     let root_uuid = fetch_unit_uuid(&c, &token, root_id).await;
 
     let resp = c
-        .post(format!("{}/api/v1/odo/auth/authz/users-with-role", auth_base()))
+        .post(format!(
+            "{}/api/v1/odo/auth/authz/users-with-role",
+            auth_base()
+        ))
         .headers(auth_header(&token))
         .json(&json!({
             "role": "e2e-test-role",
@@ -273,7 +295,10 @@ async fn user_role_assignment_by_uuid() {
 
     // Create by uuid refs.
     let resp = c
-        .post(format!("{}/api/v1/odo/auth/authz/user-role/create", auth_base()))
+        .post(format!(
+            "{}/api/v1/odo/auth/authz/user-role/create",
+            auth_base()
+        ))
         .headers(auth_header(&admin))
         .json(&json!({
             "usr_uuid": staff_uuid,
@@ -291,7 +316,10 @@ async fn user_role_assignment_by_uuid() {
 
     // List by uuid.
     let resp = c
-        .post(format!("{}/api/v1/odo/auth/authz/user-role/list", auth_base()))
+        .post(format!(
+            "{}/api/v1/odo/auth/authz/user-role/list",
+            auth_base()
+        ))
         .headers(auth_header(&admin))
         .json(&json!({"usr_uuid": staff_uuid}))
         .send()
@@ -309,7 +337,10 @@ async fn user_role_assignment_by_uuid() {
 
     // Cleanup.
     let resp = c
-        .post(format!("{}/api/v1/odo/auth/authz/user-role/delete", auth_base()))
+        .post(format!(
+            "{}/api/v1/odo/auth/authz/user-role/delete",
+            auth_base()
+        ))
         .headers(auth_header(&admin))
         .json(&json!({"id": id}))
         .send()
@@ -459,7 +490,9 @@ async fn user_get_returns_working_org_unit_uuids() {
     assert_eq!(resp.status(), 200);
     let data: serde_json::Value = resp.json().await.unwrap();
     let ids = data["working_org_units"].as_array().expect("ids array");
-    let uuids = data["working_org_unit_uuids"].as_array().expect("uuids array");
+    let uuids = data["working_org_unit_uuids"]
+        .as_array()
+        .expect("uuids array");
     assert_eq!(ids.len(), uuids.len(), "parallel lists");
     for (id, uuid) in ids.iter().zip(uuids) {
         let expected = fetch_unit_uuid(&c, &token, id.as_i64().unwrap()).await;

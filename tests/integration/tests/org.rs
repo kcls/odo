@@ -3,7 +3,11 @@ use integration_tests::*;
 #[tokio::test]
 async fn health() {
     let c = client();
-    let resp = c.get(format!("{}/health", org_base())).send().await.unwrap();
+    let resp = c
+        .get(format!("{}/health", org_base()))
+        .send()
+        .await
+        .unwrap();
     assert_eq!(resp.status(), 200);
 }
 
@@ -55,7 +59,10 @@ async fn ancestors() {
     // A branch two levels below the root gives the ancestors path depth.
     let branch = branch_org_id(&c, &token).await;
     let resp = c
-        .get(format!("{}/api/v1/odo/org/unit/{branch}/ancestors", org_base()))
+        .get(format!(
+            "{}/api/v1/odo/org/unit/{branch}/ancestors",
+            org_base()
+        ))
         .headers(auth_header(&token))
         .send()
         .await
@@ -63,7 +70,10 @@ async fn ancestors() {
     assert_eq!(resp.status(), 200);
     let data: Vec<serde_json::Value> = resp.json().await.unwrap();
     assert!(!data.is_empty());
-    assert!(data[0]["parent"].is_null(), "Ancestor list should start with root");
+    assert!(
+        data[0]["parent"].is_null(),
+        "Ancestor list should start with root"
+    );
     assert_eq!(data.last().unwrap()["id"].as_i64(), Some(branch));
 }
 
@@ -73,7 +83,10 @@ async fn descendants() {
     let token = staff_token(&c).await;
     let root = root_org_id(&c, &token).await;
     let resp = c
-        .get(format!("{}/api/v1/odo/org/unit/{root}/descendants", org_base()))
+        .get(format!(
+            "{}/api/v1/odo/org/unit/{root}/descendants",
+            org_base()
+        ))
         .headers(auth_header(&token))
         .send()
         .await
@@ -86,10 +99,13 @@ async fn descendants() {
     let mut seen = std::collections::HashSet::new();
     for (i, node) in data.iter().enumerate() {
         let id = node["id"].as_i64().unwrap();
-        if i > 0 {
-            if let Some(parent) = node["parent"].as_i64() {
-                assert!(seen.contains(&parent), "Parent {parent} should appear before child {id}");
-            }
+        if i > 0
+            && let Some(parent) = node["parent"].as_i64()
+        {
+            assert!(
+                seen.contains(&parent),
+                "Parent {parent} should appear before child {id}"
+            );
         }
         seen.insert(id);
     }
@@ -121,7 +137,10 @@ async fn provision_deleted_unit(c: &reqwest::Client, admin: &str) -> i64 {
 
     // Branch unit type id via the admin list.
     let resp = c
-        .post(format!("{}/api/v1/odo/org/admin/unit-type/list", org_base()))
+        .post(format!(
+            "{}/api/v1/odo/org/admin/unit-type/list",
+            org_base()
+        ))
         .headers(auth_header(admin))
         .json(&serde_json::json!({}))
         .send()
@@ -193,9 +212,15 @@ async fn unit_detail_includes_uuid() {
         .unwrap();
     assert_eq!(resp.status(), 200);
     let data: serde_json::Value = resp.json().await.unwrap();
-    assert!(data["org_unit"]["uuid"].as_str().is_some_and(|s| !s.is_empty()));
+    assert!(
+        data["org_unit"]["uuid"]
+            .as_str()
+            .is_some_and(|s| !s.is_empty())
+    );
     // Active unit: no deleted_at.
-    assert!(data["org_unit"].get("deleted_at").is_none() || data["org_unit"]["deleted_at"].is_null());
+    assert!(
+        data["org_unit"].get("deleted_at").is_none() || data["org_unit"]["deleted_at"].is_null()
+    );
 }
 
 #[tokio::test]
@@ -215,7 +240,10 @@ async fn label_batch_returns_uuid_and_omits_deleted_by_default() {
     assert_eq!(resp.status(), 200);
     let data: serde_json::Value = resp.json().await.unwrap();
     let labels = data["labels"].as_array().unwrap();
-    let active = labels.iter().find(|l| l["id"].as_i64() == Some(root)).expect("active root present");
+    let active = labels
+        .iter()
+        .find(|l| l["id"].as_i64() == Some(root))
+        .expect("active root present");
     assert!(active["uuid"].as_str().is_some_and(|s| !s.is_empty()));
     // Soft-deleted unit is not returned without include_deleted.
     assert!(
@@ -245,7 +273,10 @@ async fn label_batch_include_deleted_returns_soft_deleted_flagged() {
         .find(|l| l["id"].as_i64() == Some(deleted))
         .expect("soft-deleted unit returned with include_deleted");
     assert!(del["uuid"].as_str().is_some_and(|s| !s.is_empty()));
-    assert!(del["deleted_at"].as_str().is_some(), "deleted unit must carry deleted_at");
+    assert!(
+        del["deleted_at"].as_str().is_some(),
+        "deleted unit must carry deleted_at"
+    );
 }
 
 #[tokio::test]
@@ -264,7 +295,11 @@ async fn unit_detail_resolves_soft_deleted_flagged() {
     let data: serde_json::Value = resp.json().await.unwrap();
     assert_eq!(data["org_unit"]["id"].as_i64(), Some(deleted));
     assert!(data["org_unit"]["deleted_at"].as_str().is_some());
-    assert!(data["org_unit"]["uuid"].as_str().is_some_and(|s| !s.is_empty()));
+    assert!(
+        data["org_unit"]["uuid"]
+            .as_str()
+            .is_some_and(|s| !s.is_empty())
+    );
 }
 
 #[tokio::test]
