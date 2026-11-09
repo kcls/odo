@@ -79,7 +79,7 @@ K3S_GROUP="k3s"
 KUBECONFIG_PATH="/etc/rancher/k3s/k3s.yaml"
 REGISTRIES_CONF="/etc/rancher/k3s/registries.yaml"
 
-K9S_VERSION="v0.50.18"
+K9S_VERSION="v0.51.0"
 K9S_ARCH="linux_${ARCH}"
 
 YQ_VERSION="v4.53.2"
