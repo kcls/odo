@@ -20,8 +20,7 @@ spec:
       serviceAccountName: fluent-bit
       containers:
         - name: fluent-bit
-          #image: fluent/fluent-bit:3.2
-          image: fluent/fluent-bit:4.0
+          image: fluent/fluent-bit:5.1.5
           imagePullPolicy: IfNotPresent
           args: ["-c", "/fluent-bit/etc/fluent-bit.yaml"]
           ports:
