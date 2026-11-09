@@ -64,7 +64,7 @@ jobs:
       - name: Install yq
         run: |
           sudo wget -qO /usr/bin/yq \
-            https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+            https://github.com/mikefarah/yq/releases/download/v4.54.1/yq_linux_amd64
           sudo chmod +x /usr/bin/yq
 
       - name: Resolve version
