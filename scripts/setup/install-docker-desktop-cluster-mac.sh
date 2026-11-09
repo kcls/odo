@@ -26,7 +26,7 @@ NVM_VERSION="v0.40.4"
 
 SEA_ORM_CLI_VERSION="2.0.0-rc.38"
 
-ENVOY_GATEWAY_VERSION="v1.7.2"
+ENVOY_GATEWAY_VERSION="v1.9.3"
 
 LOCAL_REGISTRY_PORT="32000"       # host port; container listens on 5000
 LOCAL_REGISTRY_NAME="local-registry"
@@ -352,7 +352,9 @@ run_local_registry() {
 install_envoy_gateway() {
     print_section "Installing Envoy Gateway $ENVOY_GATEWAY_VERSION"
 
-    kubectl apply --server-side \
+    # --force-conflicts is Envoy Gateway's documented install command: it
+    # takes over CRD fields a previous manager left behind.
+    kubectl apply --server-side --force-conflicts \
         -f "https://github.com/envoyproxy/gateway/releases/download/${ENVOY_GATEWAY_VERSION}/install.yaml"
 
     echo "Envoy Gateway applied"
