@@ -8,5 +8,5 @@
 #
 # Once exited, the pod is deleted.
 
-kubectl run netshoot --rm -it --image nicolaka/netshoot \
+kubectl run netshoot --rm -it --image nicolaka/netshoot:v0.16 \
     --restart=Never -- sh -c "apk add --no-cache postgresql17-client && /bin/sh"
