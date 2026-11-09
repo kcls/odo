@@ -17,7 +17,7 @@ available, e.g. microk8s regristry.
 Deploy to the `odo-core` namespace:
 
 ```bash
-kubectl apply -k k8s/base/infrastructure/registry/
+kubectl apply -k k8s/infrastructure/registry/
 ```
 
 ## Configuration
