@@ -215,15 +215,19 @@ setup_k3s_group() {
 }
 
 install_k3s() {
-    print_section "Installing k3s (without Traefik ingress)"
+    print_section "Installing k3s (without Traefik or Gateway API CRDs)"
 
     if command -v k3s >/dev/null 2>&1; then
         echo "k3s is already installed"
         return
     fi
 
+    # Newer k3s releases ship the Gateway API CRDs as a packaged Helm chart
+    # (gateway-api-crd). Envoy Gateway installs its own, version-matched
+    # copy, and two owners of those CRDs conflict on every apply.
     curl -sfL https://get.k3s.io | sudo sh -s - server \
         --disable=traefik \
+        --disable=gateway-api-crd \
         --write-kubeconfig-mode "640" \
         --write-kubeconfig-group "$K3S_GROUP"
 
@@ -446,7 +450,10 @@ EOF
 install_envoy_gateway() {
     print_section "Installing Envoy Gateway $ENVOY_GATEWAY_VERSION"
 
-    kctl apply --server-side \
+    # --force-conflicts is Envoy Gateway's documented install command: it
+    # takes over CRD fields a previous manager (an older Envoy Gateway, or
+    # k3s's gateway-api-crd chart) left behind.
+    kctl apply --server-side --force-conflicts \
         -f "https://github.com/envoyproxy/gateway/releases/download/${ENVOY_GATEWAY_VERSION}/install.yaml"
 
     echo "Envoy Gateway applied"
