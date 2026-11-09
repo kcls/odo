@@ -231,7 +231,7 @@ run_local_registry() {
         -p "${LOCAL_REGISTRY_PORT}:5000" \
         --restart=always \
         --name "$LOCAL_REGISTRY_NAME" \
-        registry:2
+        registry:3.1.2
 
     echo "Local registry running at localhost:$LOCAL_REGISTRY_PORT"
 }
