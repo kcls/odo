@@ -71,6 +71,10 @@ DOCKER_SUITE="${DOCKER_SUITE:-$(os_release VERSION_CODENAME)}"
 # ---------------------------------------------------------------------------
 # Version / configuration variables
 # ---------------------------------------------------------------------------
+# Pinned so every host gets a Kubernetes minor that ENVOY_GATEWAY_VERSION
+# supports; bump the two together against Envoy Gateway's compatibility
+# matrix (https://gateway.envoyproxy.io/news/releases/matrix/).
+K3S_VERSION="v1.36.6+k3s1"
 K3S_GROUP="k3s"
 KUBECONFIG_PATH="/etc/rancher/k3s/k3s.yaml"
 REGISTRIES_CONF="/etc/rancher/k3s/registries.yaml"
@@ -81,7 +85,7 @@ K9S_ARCH="linux_${ARCH}"
 YQ_VERSION="v4.53.2"
 YQ_PLATFORM="linux_${ARCH}"
 
-ENVOY_GATEWAY_VERSION="v1.7.2"
+ENVOY_GATEWAY_VERSION="v1.9.3"
 
 LOCAL_REGISTRY_PORT="32000"       # host port; container listens on 5000
 
@@ -215,17 +219,23 @@ setup_k3s_group() {
 }
 
 install_k3s() {
-    print_section "Installing k3s (without Traefik or Gateway API CRDs)"
+    print_section "Installing k3s $K3S_VERSION (without Traefik or Gateway API CRDs)"
 
     if command -v k3s >/dev/null 2>&1; then
-        echo "k3s is already installed"
+        local installed
+        installed="$(k3s --version | awk 'NR==1 {print $3}')"
+        echo "k3s $installed is already installed"
+        if [[ "$installed" != "$K3S_VERSION" ]]; then
+            echo -e "${YELLOW}This script pins $K3S_VERSION; $installed is left as is.${NC}"
+        fi
         return
     fi
 
-    # Newer k3s releases ship the Gateway API CRDs as a packaged Helm chart
+    # k3s 1.37 and later ship the Gateway API CRDs as a packaged Helm chart
     # (gateway-api-crd). Envoy Gateway installs its own, version-matched
-    # copy, and two owners of those CRDs conflict on every apply.
-    curl -sfL https://get.k3s.io | sudo sh -s - server \
+    # copy, and two owners of those CRDs conflict on every apply. Older k3s
+    # ignores the unknown --disable value, so the flag is safe to keep.
+    curl -sfL https://get.k3s.io | sudo INSTALL_K3S_VERSION="$K3S_VERSION" sh -s - server \
         --disable=traefik \
         --disable=gateway-api-crd \
         --write-kubeconfig-mode "640" \
