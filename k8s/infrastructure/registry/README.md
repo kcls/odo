@@ -7,7 +7,7 @@ available, e.g. microk8s regristry.
 
 ## Components
 
-- **Deployment**: Docker Registry v2 container
+- **Deployment**: Docker Registry (distribution v3) container
 - **Service**: NodePort service exposing port 5000 on node port 32000
 - **PersistentVolumeClaim**: 20Gi storage for Docker images
 - **ConfigMap**: Registry configuration with cleanup policies
