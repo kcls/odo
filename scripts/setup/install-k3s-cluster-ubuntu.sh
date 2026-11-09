@@ -82,7 +82,7 @@ REGISTRIES_CONF="/etc/rancher/k3s/registries.yaml"
 K9S_VERSION="v0.51.0"
 K9S_ARCH="linux_${ARCH}"
 
-YQ_VERSION="v4.53.2"
+YQ_VERSION="v4.54.1"
 YQ_PLATFORM="linux_${ARCH}"
 
 ENVOY_GATEWAY_VERSION="v1.9.3"
