@@ -423,7 +423,7 @@ export interface paths {
          * Render (possibly unsaved) template text as an email and queue it to the
          *     signed-in user's own address.
          * @description Gated on the template write permission rather than `odo.notify.send`,
-         *     which odo-manager deliberately lacks. That is safe only because the
+         *     which odo-notify-admin deliberately lacks. That is safe only because the
          *     recipient is never caller-chosen: a test can reach no inbox but the
          *     sender's own. It goes through the normal queue, so it exercises the real
          *     SMTP path and shows in the delivery log.

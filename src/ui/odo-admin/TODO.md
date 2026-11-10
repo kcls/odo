@@ -78,12 +78,14 @@
       `inactive`), refuses your own account, and ends the user's sessions
       on deactivation. The Users list searches active or inactive accounts
       (`?status=inactive`), since `user/search` matches one status.
-- [x] **odo-manager role** (sqitch `011_odo_manager_role`): every
-      platform read permission, user detail included, plus
-      `odo.notify.email_group.write` and `odo.notify.template.write`.
-      Not delivery retry, and no other writes. The UI hides each write
-      action without its permission, so the role sees every tool read-only
-      apart from Email Groups and Email Templates.
+- [x] **odo-viewer and odo-notify-admin roles** (sqitch
+      `014_odo_viewer_notify_admin`, replacing 011's odo-manager):
+      odo-viewer holds every platform read permission, user detail
+      included, and no writes. odo-notify-admin holds read and write on
+      email templates and email groups plus delivery read (the
+      Notifications page), not delivery retry. The UI hides each write
+      action without its permission, so a viewer sees every tool
+      read-only.
 - [x] **Email template history**: every write to a template is kept as a
       version (sqitch `012_notify_template_history`; a trigger, so app
       registration and direct SQL are captured too, with the author when
