@@ -15,3 +15,4 @@
 011_odo_manager_role [009_notify_delivery_write] 2026-10-31T12:00:00Z Bill Erickson <bserickson@kcls.org> # odo-manager: read the whole admin UI, manage email groups and templates
 012_notify_template_history [001_odo_baseline] 2026-10-31T12:10:00Z Bill Erickson <bserickson@kcls.org> # Keep every version of every notification template
 013_registration_read_perms [005_registration_org_units] 2026-11-03T12:00:00Z Bill Erickson <bserickson@kcls.org> # odo-registration may read what it registers, so odo-register can plan a run
+014_odo_viewer_notify_admin [011_odo_manager_role] 2026-11-10T12:00:00Z Bill Erickson <bserickson@kcls.org> # Split odo-manager into odo-viewer (read-only) and odo-notify-admin

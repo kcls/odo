@@ -871,7 +871,7 @@
           "template-admin"
         ],
         "summary": "Render (possibly unsaved) template text as an email and queue it to the\nsigned-in user's own address.",
-        "description": "Gated on the template write permission rather than `odo.notify.send`,\nwhich odo-manager deliberately lacks. That is safe only because the\nrecipient is never caller-chosen: a test can reach no inbox but the\nsender's own. It goes through the normal queue, so it exercises the real\nSMTP path and shows in the delivery log.",
+        "description": "Gated on the template write permission rather than `odo.notify.send`,\nwhich odo-notify-admin deliberately lacks. That is safe only because the\nrecipient is never caller-chosen: a test can reach no inbox but the\nsender's own. It goes through the normal queue, so it exercises the real\nSMTP path and shows in the delivery log.",
         "operationId": "send_test_template",
         "requestBody": {
           "content": {
