@@ -11,6 +11,7 @@ import { PERMS } from "@/auth/perms"
 import { checkPerms, useCurrentUser } from "@/auth/session"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import { DetailHeader } from "@/components/detail-header"
+import { EmailFrame } from "@/components/email-frame"
 import { StatusBadge } from "@/components/status-badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
@@ -460,15 +461,7 @@ function PreviewCard({
             )}
             {p.body_html != null && (
               <PreviewPart label={t("preview.bodyHtml")}>
-                {/* An empty sandbox: no scripts, forms, or same-origin access,
-                    and the email's own styles stay inside the frame. Email
-                    is designed for a light background, as clients show it. */}
-                <iframe
-                  title={t("preview.htmlFrame")}
-                  sandbox=""
-                  srcDoc={p.body_html}
-                  className="h-96 w-full rounded-md border bg-white"
-                />
+                <EmailFrame title={t("preview.htmlFrame")} html={p.body_html} />
               </PreviewPart>
             )}
           </>

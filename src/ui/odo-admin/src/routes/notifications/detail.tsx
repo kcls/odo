@@ -10,6 +10,7 @@ import { PERMS } from "@/auth/perms"
 import { checkPerms } from "@/auth/session"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import { DetailHeader } from "@/components/detail-header"
+import { EmailFrame } from "@/components/email-frame"
 import { Section } from "@/components/section"
 import { StatusBadge } from "@/components/status-badge"
 import { Button } from "@/components/ui/button"
@@ -161,15 +162,8 @@ export function Component() {
               {!detail.body ? (
                 <p className="text-muted-foreground">{t("detail.noBody")}</p>
               ) : d.channel === "email" ? (
-                // Email bodies are HTML as sent: render them in an empty
-                // sandbox (no scripts, forms, or same-origin access), on the
-                // light background mail clients use.
-                <iframe
-                  title={t("detail.htmlFrame")}
-                  sandbox=""
-                  srcDoc={detail.body}
-                  className="h-96 w-full rounded-md border bg-white"
-                />
+                // Email bodies are HTML as sent.
+                <EmailFrame title={t("detail.htmlFrame")} html={detail.body} />
               ) : (
                 <pre className="font-sans text-sm whitespace-pre-wrap">{detail.body}</pre>
               )}
