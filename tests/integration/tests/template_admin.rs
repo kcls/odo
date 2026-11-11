@@ -226,6 +226,45 @@ async fn preview_escapes_only_the_html_body() {
     );
 }
 
+/// `{{{...}}}` would insert application data into HTML unescaped, so every
+/// path that renders an HTML body refuses it, naming the field.
+#[tokio::test]
+async fn unescaped_output_is_refused_in_html_bodies() {
+    let c = client();
+    let token = odo_admin_token(&c).await;
+    let html = "<p>Dear {{#if name}}{{{name}}}{{/if}}</p>";
+    let attempts = [
+        (
+            "/create",
+            json!({
+                "code": unique_code("raw"),
+                "name": "Raw",
+                "subject_template": "S",
+                "body_template": "B",
+                "body_template_html": html
+            }),
+        ),
+        (
+            "/preview",
+            json!({"subject_template": "S", "body_template": "B", "body_template_html": html}),
+        ),
+        (
+            "/send-test",
+            json!({"subject_template": "S", "body_template": "B", "body_template_html": html}),
+        ),
+    ];
+    for (path, body) in attempts {
+        let resp = post_json(&c, &token, path, body).await;
+        assert_eq!(resp.status(), 400, "{path}");
+        let err: serde_json::Value = resp.json().await.unwrap();
+        let message = err["message"].as_str().unwrap_or_default();
+        assert!(
+            message.contains("body_template_html") && message.contains("not allowed"),
+            "{path}: {err}"
+        );
+    }
+}
+
 #[tokio::test]
 async fn send_test_queues_the_draft_to_the_signed_in_user_only() {
     let c = client();

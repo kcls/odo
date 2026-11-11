@@ -1,7 +1,8 @@
 // For helpers see https://docs.rs/handlebars/latest/handlebars/#custom-helper
 
 pub use handlebars::RenderError;
-use handlebars::{Handlebars, handlebars_helper};
+use handlebars::template::{Template, TemplateElement};
+use handlebars::{Handlebars, RenderErrorReason, handlebars_helper};
 use odo_client::date;
 use serde_json::Value;
 
@@ -20,14 +21,44 @@ fn registry(escape: bool) -> Handlebars<'static> {
 }
 
 /// Render a Handlebars template for **HTML** output: `{{var}}` values are
-/// HTML-escaped (`{{{var}}}` opts out), so variable data can't inject
-/// markup. Use for HTML email bodies.
+/// HTML-escaped, so variable data can't inject markup. Use for HTML email
+/// bodies.
+///
+/// Handlebars' unescaped form, `{{{var}}}`, is refused with an error rather
+/// than rendered: variable data comes from applications and can include
+/// text typed by the public. Refusing it here, rather than only when a
+/// template is saved, also covers templates that reach the database some
+/// other way (registration, restored versions, direct SQL).
 ///
 /// `template_text` is the user supplied template string and `context` is a
 /// `serde_json::Value` containing the key/value pairs to substitute.
 /// Returns the rendered string or an error describing what went wrong.
 pub fn render(template_text: &str, context: &Value) -> Result<String, RenderError> {
+    let template = Template::compile(template_text).map_err(RenderErrorReason::from)?;
+    if has_unescaped_output(&template.elements) {
+        return Err(RenderErrorReason::Other(
+            "{{{...}}} (unescaped output) is not allowed; use {{...}}".to_string(),
+        )
+        .into());
+    }
     registry(true).render_template(template_text, context)
+}
+
+/// Whether any `{{{...}}}` appears, including inside blocks (`{{#if}}`,
+/// `{{#each}}`, their `{{else}}`s) and partial or decorator blocks.
+fn has_unescaped_output(elements: &[TemplateElement]) -> bool {
+    let nested = |t: &Option<Template>| {
+        t.as_ref()
+            .is_some_and(|t| has_unescaped_output(&t.elements))
+    };
+    elements.iter().any(|element| match element {
+        TemplateElement::HtmlExpression(_) => true,
+        TemplateElement::HelperBlock(h) => nested(&h.template) || nested(&h.inverse),
+        TemplateElement::DecoratorBlock(d) | TemplateElement::PartialBlock(d) => {
+            nested(&d.template)
+        }
+        _ => false,
+    })
 }
 
 /// Render a Handlebars template for **plain-text** output (email subjects,
@@ -71,6 +102,43 @@ mod tests {
         let context = json!({"name": "O'Brien & <Sons>"});
         let rendered = render("<p>{{name}}</p>", &context).expect("template renders");
         assert_eq!(rendered, "<p>O&#x27;Brien &amp; &lt;Sons&gt;</p>");
+    }
+
+    #[test]
+    fn render_refuses_unescaped_output_anywhere() {
+        let context = json!({"name": "<script>x</script>", "items": [1], "ok": true});
+        for template in [
+            "<p>{{{name}}}</p>",
+            "<p>{{~{name}~}}</p>",
+            "{{#if ok}}<p>{{{name}}}</p>{{/if}}",
+            "{{#if ok}}fine{{else}}{{{name}}}{{/if}}",
+            "{{#each items}}{{{../name}}}{{/each}}",
+            "{{{date name \"%Y\" \"UTC\"}}}",
+        ] {
+            let err = render(template, &context).expect_err(template);
+            assert!(err.to_string().contains("not allowed"), "{template}: {err}");
+        }
+    }
+
+    #[test]
+    fn render_allows_escaped_and_literal_braces() {
+        let context = json!({"name": "Ann"});
+        // A backslash-escaped tag and a raw block are template text, not data.
+        assert_eq!(
+            render(r"\{{{name}}} {{name}}", &context).unwrap(),
+            "{{{name}}} Ann"
+        );
+        assert_eq!(
+            render("{{{{raw}}}}{{{name}}}{{{{/raw}}}}", &context).unwrap(),
+            "{{{name}}}"
+        );
+    }
+
+    #[test]
+    fn render_text_still_allows_triple_braces() {
+        // Plain-text output never escapes, so {{{x}}} is the same as {{x}}.
+        let context = json!({"name": "O'Brien"});
+        assert_eq!(render_text("{{{name}}}", &context).unwrap(), "O'Brien");
     }
 
     #[test]
