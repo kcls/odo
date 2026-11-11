@@ -38,6 +38,9 @@ server {
     # This ensures nginx uses the original protocol and host from the proxy
     absolute_redirect off;
 
+    # Repeated in each location below that sets its own add_header.
+    include /etc/nginx/snippets/odo-admin-security-headers.conf;
+
     root /usr/share/nginx/html;
     index index.html;
 
@@ -49,12 +52,14 @@ server {
     location = @PREFIX@/index.html {
         alias /usr/share/nginx/html/index.html;
         add_header Cache-Control "no-cache, no-store, must-revalidate";
+        include /etc/nginx/snippets/odo-admin-security-headers.conf;
     }
 
     location @PREFIX@/assets/ {
         alias /usr/share/nginx/html/assets/;
         expires 1y;
         add_header Cache-Control "public, immutable";
+        include /etc/nginx/snippets/odo-admin-security-headers.conf;
     }
 
     location @PREFIX@/ {

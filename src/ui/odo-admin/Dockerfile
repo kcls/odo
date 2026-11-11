@@ -32,6 +32,7 @@ FROM nginx:alpine
 # nginx config template and the startup script that renders it and places
 # the app at ODO_ADMIN_BASE_PATH (default /odo/admin).
 COPY src/ui/odo-admin/nginx.conf.template /etc/nginx/templates-odo-admin/default.conf.template
+COPY src/ui/odo-admin/nginx-security-headers.conf /etc/nginx/snippets/odo-admin-security-headers.conf
 COPY --chmod=755 src/ui/odo-admin/docker-entrypoint.d/40-base-path.sh /docker-entrypoint.d/40-base-path.sh
 
 # The pristine build stays root-owned; the startup script copies it into
