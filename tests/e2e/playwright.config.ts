@@ -81,7 +81,6 @@ export default defineConfig({
       testDir: './apps/odo-admin/tests',
       use: {
         ...devices['Desktop Chrome'],
-        bypassCSP: true,
         launchOptions: {
           args: [
             `--unsafely-treat-insecure-origin-as-secure=${BASE_URL}`,
